@@ -82,7 +82,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `tool-names.ts`
   - `tool-registry.ts`
   - `tools.ts`
-  - `web-fetch.ts`
+  - `web-fetch.ts`: **Functional**.
   - `web-search.ts`
   - `write-file.ts`
   - `write-todos.ts`

@@ -40,4 +40,5 @@ func init() {
 	rootCmd.AddCommand(globCmd)
 	rootCmd.AddCommand(grepCmd)
 	rootCmd.AddCommand(webFetchCmd)
+	rootCmd.AddCommand(memoryCmd)
 }
