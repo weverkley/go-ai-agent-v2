@@ -154,3 +154,52 @@ func (c *McpCommand) ListMcpItems() error {
 
 	return nil
 }
+
+// AddMcpItem adds a new MCP item.
+func (c *McpCommand) AddMcpItem(name, url string) error {
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	settings := config.LoadSettings(workspaceDir)
+	if settings.McpServers == nil {
+		settings.McpServers = make(map[string]mcp.MCPServerConfig)
+	}
+
+	if _, exists := settings.McpServers[name]; exists {
+		return fmt.Errorf("MCP server \"%s\" already exists", name)
+	}
+
+	settings.McpServers[name] = mcp.MCPServerConfig{HttpUrl: url}
+
+	if err := config.SaveSettings(workspaceDir, settings); err != nil {
+		return fmt.Errorf("failed to save settings: %w", err)
+	}
+
+	fmt.Printf("MCP server \"%s\" added successfully.\n", name)
+	return nil
+}
+
+// RemoveMcpItem removes an MCP item.
+func (c *McpCommand) RemoveMcpItem(name string) error {
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	settings := config.LoadSettings(workspaceDir)
+
+	if _, exists := settings.McpServers[name]; !exists {
+		return fmt.Errorf("MCP server \"%s\" not found", name)
+	}
+
+	delete(settings.McpServers, name)
+
+	if err := config.SaveSettings(workspaceDir, settings); err != nil {
+		return fmt.Errorf("failed to save settings: %w", err)
+	}
+
+	fmt.Printf("MCP server \"%s\" removed successfully.\n", name)
+	return nil
+}

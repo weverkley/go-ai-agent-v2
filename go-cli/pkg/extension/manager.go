@@ -190,18 +190,27 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 		}
 	}
 
-	// Simulate creating/updating gemini-extension.json
-	dummyConfig := ExtensionConfig{Name: filepath.Base(metadata.Source), Description: "Installed via CLI"}
-	configBytes, err := json.MarshalIndent(dummyConfig, "", "  ")
+	// Read the extension config from the source to get the real name
+	configPath := em.fsService.JoinPaths(installPath, "gemini-extension.json")
+	configBytes, err := em.fsService.ReadFile(configPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal dummy extension config: %w", err)
+		return "", fmt.Errorf("failed to read extension config file from source: %w", err)
 	}
-	err = em.fsService.WriteFile(em.fsService.JoinPaths(installPath, "gemini-extension.json"), string(configBytes))
+
+	var extConfig ExtensionConfig
+	err = json.Unmarshal([]byte(configBytes), &extConfig)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse extension config file from source: %w", err)
+	}
+
+	// Potentially update the config file if needed (e.g., with installation metadata)
+	// For now, we'll just use the name from the config
+	err = em.fsService.WriteFile(configPath, configBytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to write extension config file: %w", err)
 	}
 
-	return filepath.Base(metadata.Source), nil
+	return extConfig.Name, nil
 }
 
 // UninstallExtension removes an installed extension.

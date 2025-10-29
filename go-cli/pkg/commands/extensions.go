@@ -229,3 +229,17 @@ func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
 	return nil
 }
 
+// Update updates an extension.
+func (c *ExtensionsCommand) Update(name string) error {
+	fmt.Printf("Updating extension \"%s\" (placeholder)\n", name)
+	// In a real implementation, this would involve pulling the latest version of a git-based extension.
+	return nil
+}
+
+// Link links a local extension.
+func (c *ExtensionsCommand) Link(path string) error {
+	fmt.Printf("Linking extension at path \"%s\" (placeholder)\n", path)
+	// In a real implementation, this would involve creating a symlink or otherwise registering the local extension.
+	return nil
+}
+

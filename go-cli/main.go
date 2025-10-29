@@ -9,6 +9,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/commands"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/extension"
+	"go-ai-agent-v2/go-cli/pkg/prompts"
 	"go-ai-agent-v2/go-cli/pkg/services"
 )
 
@@ -16,7 +17,7 @@ func main() {
 	version := flag.Bool("version", false, "Print version information")
 
 	generateCmd := flag.NewFlagSet("generate", flag.ExitOnError)
-	prompt := generateCmd.String("prompt", "", "The prompt for content generation")
+	promptName := generateCmd.String("prompt", "default", "The name of the prompt to use for content generation")
 
 	readCmd := flag.NewFlagSet("read", flag.ExitOnError)
 	readFilePath := readCmd.String("file", "", "The path to the file to read")
@@ -59,8 +60,21 @@ func main() {
 	extensionsDisableName := extensionsDisableCmd.String("name", "", "The name of the extension to disable.")
 	extensionsDisableScope := extensionsDisableCmd.String("scope", "", "The scope to disable the extension in.")
 
+	extensionsUpdateCmd := flag.NewFlagSet("update", flag.ExitOnError)
+	extensionsUpdateName := extensionsUpdateCmd.String("name", "", "The name of the extension to update.")
+
+	extensionsLinkCmd := flag.NewFlagSet("link", flag.ExitOnError)
+	extensionsLinkPath := extensionsLinkCmd.String("path", "", "The path to the local extension to link.")
+
 	mcpCmd := flag.NewFlagSet("mcp", flag.ExitOnError)
 	mcpListCmd := flag.NewFlagSet("list", flag.ExitOnError)
+
+	mcpAddCmd := flag.NewFlagSet("add", flag.ExitOnError)
+	mcpAddName := mcpAddCmd.String("name", "", "The name of the MCP server to add.")
+	mcpAddUrl := mcpAddCmd.String("url", "", "The URL of the MCP server to add.")
+
+	mcpRemoveCmd := flag.NewFlagSet("remove", flag.ExitOnError)
+	mcpRemoveName := mcpRemoveCmd.String("name", "", "The name of the MCP server to remove.")
 
 	listModelsCmd := flag.NewFlagSet("list-models", flag.ExitOnError)
 
@@ -70,6 +84,9 @@ func main() {
 		fmt.Println("Go Gemini CLI Version: 0.1.0")
 		os.Exit(0)
 	}
+
+	promptManager := prompts.NewPromptManager()
+	promptManager.AddPrompt("default", "Translate the following Go code to Javascript:")
 
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
@@ -87,12 +104,17 @@ func main() {
 				fmt.Printf("Error initializing GeminiChat: %v\n", err)
 				os.Exit(1)
 			}
-			content, err := geminiClient.GenerateContent(*prompt)
-			if err != nil {
-				fmt.Printf("Error generating content: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Println(content)
+				prompt, err := promptManager.GetPrompt(*promptName)
+				if err != nil {
+					fmt.Printf("Error: %v\n", err)
+					os.Exit(1)
+				}
+				content, err := geminiClient.GenerateContent(prompt)
+				if err != nil {
+					fmt.Printf("Error generating content: %v\n", err)
+					os.Exit(1)
+				}
+				fmt.Println(content)
 
 		case "read":
 			readCmd.Parse(os.Args[2:])
@@ -263,11 +285,36 @@ func main() {
 					Name:  *extensionsDisableName,
 					Scope: *extensionsDisableScope,
 				})
-				if err != nil {
-					fmt.Printf("Error disabling extension: %v\n", err)
-					os.Exit(1)
-				}
-			default:
+									if err != nil {
+										fmt.Printf("Error disabling extension: %v\n", err)
+										os.Exit(1)
+									}
+								case "update":
+									extensionsUpdateCmd.Parse(extensionsCmd.Args()[1:])
+									if *extensionsUpdateName == "" {
+										fmt.Println("Error: --name is required for update command.")
+										extensionsUpdateCmd.PrintDefaults()
+										os.Exit(1)
+									}
+									extensions := commands.NewExtensionsCommand()
+									err := extensions.Update(*extensionsUpdateName)
+									if err != nil {
+										fmt.Printf("Error updating extension: %v\n", err)
+										os.Exit(1)
+									}
+								case "link":
+									extensionsLinkCmd.Parse(extensionsCmd.Args()[1:])
+									if *extensionsLinkPath == "" {
+										fmt.Println("Error: --path is required for link command.")
+										extensionsLinkCmd.PrintDefaults()
+										os.Exit(1)
+									}
+									extensions := commands.NewExtensionsCommand()
+									err := extensions.Link(*extensionsLinkPath)
+									if err != nil {
+										fmt.Printf("Error linking extension: %v\n", err)
+										os.Exit(1)
+									}			default:
 				fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
 				extensionsCmd.PrintDefaults()
 				os.Exit(1)
@@ -286,11 +333,36 @@ func main() {
 				mcpListCmd.Parse(mcpCmd.Args()[1:])
 				mcp := commands.NewMcpCommand()
 				err := mcp.ListMcpItems()
-				if err != nil {
-					fmt.Printf("Error listing MCP items: %v\n", err)
-					os.Exit(1)
-				}
-			default:
+									if err != nil {
+										fmt.Printf("Error listing MCP items: %v\n", err)
+										os.Exit(1)
+									}
+								case "add":
+									mcpAddCmd.Parse(mcpCmd.Args()[1:])
+									if *mcpAddName == "" || *mcpAddUrl == "" {
+										fmt.Println("Error: --name and --url are required for add command.")
+										mcpAddCmd.PrintDefaults()
+										os.Exit(1)
+									}
+									mcp := commands.NewMcpCommand()
+									err := mcp.AddMcpItem(*mcpAddName, *mcpAddUrl)
+									if err != nil {
+										fmt.Printf("Error adding MCP item: %v\n", err)
+										os.Exit(1)
+									}
+								case "remove":
+									mcpRemoveCmd.Parse(mcpCmd.Args()[1:])
+									if *mcpRemoveName == "" {
+										fmt.Println("Error: --name is required for remove command.")
+										mcpRemoveCmd.PrintDefaults()
+										os.Exit(1)
+									}
+									mcp := commands.NewMcpCommand()
+									err := mcp.RemoveMcpItem(*mcpRemoveName)
+									if err != nil {
+										fmt.Printf("Error removing MCP item: %v\n", err)
+										os.Exit(1)
+									}			default:
 				fmt.Printf("Unknown mcp subcommand: %s\n", subcommand)
 				mcpCmd.PrintDefaults()
 				os.Exit(1)

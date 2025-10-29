@@ -12,43 +12,130 @@ The foundational structure for the Go CLI has been established, and several core
     *   `--version` flag implemented.
     *   Top-level commands implemented:
         *   `generate`: **Functional**, generates content using `pkg/core/gemini.go` (real Gemini API integration).
-        *   `read`: Reads file content (currently using `pkg/tools/file_tools.go`, will be moved to `pkg/services/file_system_service.go`).
-        *   `write`: Writes content to a file (currently using `pkg/tools/file_tools.go`, will be moved to `pkg/services/file_system_service.go`).
-        *   `exec`: Executes shell commands (uses `pkg/services/shell_service.go`).
-        *   `ls`: Lists directory contents (uses `pkg/services/file_system_service.go`).
-        *   `git-branch`: Gets the current Git branch name (uses `pkg/services/git_service.go` with `go-git`).
+        *   `read`: **Functional**, reads file content using `pkg/services/file_system_service.go`.
+        *   `write`: **Functional**, writes content to a file using `pkg/services/file_system_service.go`.
+        *   `exec`: **Functional**, executes shell commands (uses `pkg/services/shell_service.go`).
+        *   `ls`: **Functional**, lists directory contents (uses `pkg/services/file_system_service.go`).
+        *   `git-branch`: **Functional**, gets the current Git branch name (uses `pkg/services/git_service.go` with `go-git`).
         *   `extensions`: Command group with subcommands:
             *   `list`: **Functional**, lists discovered extensions by reading `gemini-extension.json` files.
-            *   `install`: **Partially implemented**, command structure and argument parsing in `main.go` are ready, but core logic in `pkg/commands/extensions.go` and `pkg/extension/manager.go` needs further refinement (specifically file operations).
+            *   `install`: **In Progress**, command structure and argument parsing in `main.go` are ready. Core logic in `pkg/commands/extensions.go` and `pkg/extension/manager.go` is partially implemented with git clone and local copy functionality.
+            *   `uninstall`: **Functional**.
+            *   `new`: **Functional**.
+            *   `enable`: **Placeholder**.
+            *   `disable`: **Placeholder**.
         *   `mcp`: Command group with subcommands:
             *   `list`: **Functional**, lists configured MCP servers, merging from settings and extensions, and simulates connection status.
         *   `list-models`: **Functional**, lists available Gemini models using `pkg/core/gemini.go`.
 *   **Core Services & Tools (pkg/core, pkg/extension, pkg/config, pkg/mcp, pkg/services)**:
     *   `pkg/core/gemini.go`: **Functional**, uses `google.golang.org/genai` for Gemini API interaction.
-    *   `pkg/tools/file_tools.go`: **Deprecated**, `ReadFile` and `WriteFile` functionality will be moved to `pkg/services/file_system_service.go`.
-    *   `pkg/services/shell_service.go`: Provides `ExecuteCommand` for shell operations.
-    *   `pkg/services/file_system_service.go`: Provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, and now `WriteFile` (will also include `ReadFile`).
-    *   `pkg/services/git_service.go`: Uses `github.com/go-git/go-git/v5` to interact with Git repositories.
-    *   `pkg/extension/manager.go`: Discovers and loads extensions, parses `gemini-extension.json`. Includes placeholder for `InstallOrUpdateExtension`.
+    *   `pkg/services/shell_service.go`: **Functional**, provides `ExecuteCommand` for shell operations.
+    *   `pkg/services/file_system_service.go`: **Functional**, provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, `WriteFile`, and `ReadFile`.
+    *   `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories.
+    *   `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, but `EnableExtension` and `DisableExtension` are placeholders.
     *   `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
-    *   `pkg/config/settings.go`: Loads application settings, including extension paths and MCP server configurations.
+    *   `pkg/config/settings.go`: **Placeholder**. Loads default settings.
     *   `pkg/mcp/types.go`: Defines `MCPServerStatus` and `MCPServerConfig`.
-    *   `pkg/mcp/client.go`: Placeholder for MCP client interaction.
+    *   `pkg/mcp/client.go`: **Placeholder**. Simulates MCP connection.
 
 ## 2. Remaining Core Components for Translation
 
 Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the following significant modules/functionalities still need to be translated into Go. Prioritization will depend on the specific CLI commands being implemented.
 
 *   **AI Agent Logic (`pkg/core/agents`)**: Translation of the AI agent components that drive the intelligent behavior of the CLI.
+    *   `codebase-investigator.ts`
+    *   `executor.ts`
+    *   `invocation.ts`
+    *   `registry.ts`
+    *   `schema-utils.ts`
+    *   `subagent-tool-wrapper.ts`
+    *   `types.ts`
+    *   `utils.ts`
 *   **Code Assist (`pkg/core/code_assist`)**: Functionality related to code generation, completion, or analysis.
+    *   `codeAssist.ts`
+    *   `converter.ts`
+    *   `oauth-credential-storage.ts`
+    *   `oauth2.ts`
+    *   `server.ts`
+    *   `setup.ts`
+    *   `types.ts`
 *   **Prompts (`pkg/core/prompts`)**: Management and rendering of prompts for AI models or user interactions.
+    *   `mcp-prompts.ts`
+    *   `prompt-registry.ts`
 *   **Tools (other than file I/O)**: Specialized tools such as `grep`, `glob`, `web-fetch`, `memoryTool`, `web-search`, `read-many-files`, etc., need to be implemented.
+    *   `diffOptions.ts`
+    *   `edit.ts`
+    *   `glob.ts`
+    *   `grep.ts`
+    *   `ls.ts`
+    *   `mcp-client-manager.ts`
+    *   `mcp-client.ts`
+    *   `mcp-tool.ts`
+    *   `memoryTool.ts`
+    *   `modifiable-tool.ts`
+    *   `read-file.ts`
+    *   `read-many-files.ts`
+    *   `ripGrep.ts`
+    *   `shell.ts`
+    *   `smart-edit.ts`
+    *   `tool-error.ts`
+    *   `tool-names.ts`
+    *   `tool-registry.ts`
+    *   `tools.ts`
+    *   `web-fetch.ts`
+    *   `web-search.ts`
+    *   `write-file.ts`
+    *   `write-todos.ts`
 *   **Config (`pkg/core/config`)**: Robust configuration management beyond just reading an environment variable (e.g., loading from files).
+    *   `config.ts`
+    *   `constants.ts`
+    *   `flashFallback.ts`
+    *   `models.ts`
+    *   `storage.ts`
 *   **Output (`pkg/core/output`)**: Handling rich output formatting and display, potentially adapting existing JavaScript formatting logic.
+    *   `json-formatter.ts`
+    *   `stream-json-formatter.ts`
+    *   `types.ts`
 *   **Policy (`pkg/core/policy`)**: Implementation of any policy enforcement or decision-making logic.
+    *   `index.ts`
+    *   `policy-engine.ts`
+    *   `stable-stringify.ts`
+    *   `types.ts`
 *   **Confirmation Bus (`pkg/core/confirmation-bus`)**: System for handling user confirmations or asynchronous operations.
+    *   `index.ts`
+    *   `message-bus.ts`
+    *   `types.ts`
 *   **IDE Integration (`pkg/core/ide`)**: (Lower priority, as user explicitly excluded VS Code companion, but might include generic IDE-agnostic features).
+    *   `constants.ts`
+    *   `detect-ide.ts`
+    *   `ide-client.ts`
+    *   `ide-installer.ts`
+    *   `ideContext.ts`
+    *   `process-utils.ts`
+    *   `types.ts`
 *   **Telemetry (`pkg/core/telemetry`)**: Implementation of usage data collection.
+    *   `activity-detector.ts`
+    *   `activity-monitor.ts`
+    *   `activity-types.ts`
+    *   `config.ts`
+    *   `constants.ts`
+    *   `file-exporters.ts`
+    *   `gcp-exporters.ts`
+    *   `high-water-mark-tracker.ts`
+    *   `index.ts`
+    *   `loggers.ts`
+    *   `memory-monitor.ts`
+    *   `metrics.ts`
+    *   `rate-limiter.ts`
+    *   `sdk.ts`
+    *   `semantic.ts`
+    *   `telemetry-utils.ts`
+    *   `telemetry.ts`
+    *   `telemetryAttributes.ts`
+    *   `tool-call-decision.ts`
+    *   `trace.ts`
+    *   `types.ts`
+    *   `uiTelemetry.ts`
 
 ## 3. Command Implementation Strategy
 
@@ -60,9 +147,10 @@ Translate the logic from the following JavaScript files into Go:
 
 *   `install.ts`: **In Progress**. Core logic in `pkg/extension/manager.go` needs to be completed (git clone/local copy). Argument parsing in `main.go` is ready.
 *   `list.ts`: **Functional**.
-*   `new.ts`: Logic for creating new extensions.
-*   `enable.ts`, `disable.ts`: Logic for enabling/disabling extensions.
-*   `uninstall.ts`: Logic for uninstalling extensions.
+*   `new.ts`: **Functional**.
+*   `enable.ts`: **Placeholder**.
+*   `disable.ts`: **Placeholder**.
+*   `uninstall.ts`: **Functional**.
 *   `update.ts`: Logic for updating extensions.
 *   `link.ts`: Logic for linking local extensions.
 
@@ -81,18 +169,33 @@ Translate the logic from the following JavaScript files into Go:
 
 Similar to extensions, each MCP command will involve argument parsing, service interaction, and thorough analysis of the original JavaScript source.
 
-## 4. API Integration Strategy
+## 4. JavaScript Source Code Location
+
+The JavaScript source code to be translated is located in the `docs/gemini-cli-main/packages/` directory. Specifically:
+
+*   **Core Logic**: `core/src/`
+*   **CLI Commands**: `cli/src/commands/`
+
+## 4. Next Steps
+
+1.  **Complete `extensions install`**: Remove placeholder logic in `pkg/extension/manager.go` and `pkg/commands/extensions.go`.
+2.  **Implement `extensions update` and `link`**: Translate the logic from the corresponding JavaScript files.
+3.  **Implement `mcp add` and `remove`**: Translate the logic from the corresponding JavaScript files.
+4.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
+5.  **Testing**: Write unit and integration tests for the new features.
+
+## 5. API Integration Strategy
 
 *   **Gemini API Client**: **Functional**, uses `google.golang.org/genai` for Gemini API interaction. `GEMINI_API_KEY` is read from the environment.
 *   **Error Handling**: Implement robust error handling for API calls, including retries and clear error messages.
 
-## 5. Testing Strategy
+## 6. Testing Strategy
 
 *   **Unit Tests**: Write unit tests for individual functions and methods within each Go package (`pkg/core`, `pkg/tools`, `pkg/services`, `pkg/commands`) to ensure correctness.
 *   **Integration Tests**: Develop integration tests for CLI commands to verify they interact correctly with the services and produce expected outputs. Since the user explicitly excluded rewriting test *files*, new Go-native tests will be created.
 *   **Manual Testing**: Regular manual testing of the CLI commands at various stages of implementation to ensure functionality.
 
-## 6. Execution Flow
+## 7. Execution Flow
 
 The migration will proceed iteratively, focusing on one command or core functionality at a time, following these steps:
 1.  **Identify Target**: Choose a specific JavaScript command or core module to translate.
