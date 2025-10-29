@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"bufio"
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"os"
@@ -14,13 +15,15 @@ import (
 
 // GlobTool represents the glob tool.
 type GlobTool struct {
-	fsService *services.FileSystemService
+	fsService  *services.FileSystemService
+	gitService *services.GitService // Add GitService
 }
 
 // NewGlobTool creates a new instance of GlobTool.
 func NewGlobTool() *GlobTool {
 	return &GlobTool{
-		fsService: services.NewFileSystemService(),
+		fsService:  services.NewFileSystemService(),
+		gitService: services.NewGitService(), // Initialize GitService
 	}
 }
 
@@ -28,6 +31,65 @@ func NewGlobTool() *GlobTool {
 type FileInfo struct {
 	Path    string
 	ModTime time.Time
+}
+
+// getIgnorePatterns reads .gitignore and .geminiignore files and returns a list of glob patterns.
+func (t *GlobTool) getIgnorePatterns(searchDir string, respectGitIgnore, respectGeminiIgnore bool) ([]glob.Glob, error) {
+	var ignorePatterns []glob.Glob
+
+	// Read .gitignore
+	if respectGitIgnore {
+		gitIgnorePath := filepath.Join(searchDir, ".gitignore")
+		if _, err := os.Stat(gitIgnorePath); err == nil {
+			patterns, err := t.readIgnoreFile(gitIgnorePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read .gitignore: %w", err)
+			}
+			ignorePatterns = append(ignorePatterns, patterns...)
+		}
+	}
+
+	// Read .geminiignore
+	if respectGeminiIgnore {
+		geminiIgnorePath := filepath.Join(searchDir, ".geminiignore")
+		if _, err := os.Stat(geminiIgnorePath); err == nil {
+			patterns, err := t.readIgnoreFile(geminiIgnorePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read .geminiignore: %w", err)
+			}
+			ignorePatterns = append(ignorePatterns, patterns...)
+		}
+	}
+
+	return ignorePatterns, nil
+}
+
+// readIgnoreFile reads an ignore file and compiles its patterns.
+func (t *GlobTool) readIgnoreFile(filePath string) ([]glob.Glob, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var patterns []glob.Glob
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // Skip empty lines and comments
+		}
+		g, err := glob.Compile(line)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile ignore pattern %s from %s: %w", line, filePath, err)
+		}
+		patterns = append(patterns, g)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return patterns, nil
 }
 
 // Execute performs a glob search.
@@ -54,6 +116,12 @@ func (t *GlobTool) Execute(
 		return "", fmt.Errorf("failed to compile glob pattern %s: %w", pattern, err)
 	}
 
+	// Get ignore patterns
+	ignorePatterns, err := t.getIgnorePatterns(absSearchPath, respectGitIgnore, respectGeminiIgnore)
+	if err != nil {
+		return "", fmt.Errorf("failed to get ignore patterns: %w", err)
+	}
+
 	var matchedFiles []FileInfo
 
 	err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
@@ -61,7 +129,7 @@ func (t *GlobTool) Execute(
 			return err
 		}
 
-		// Skip directories for now, we are looking for files
+		// Skip directories
 		if info.IsDir() {
 			return nil
 		}
@@ -72,9 +140,17 @@ func (t *GlobTool) Execute(
 			return err
 		}
 
+		// Apply case sensitivity for matching
 		matchPath := relPath
 		if !caseSensitive {
 			matchPath = strings.ToLower(relPath)
+		}
+
+		// Check against ignore patterns
+		for _, ignoreG := range ignorePatterns {
+			if ignoreG.Match(relPath) { // Ignore patterns are usually case-sensitive by default, but glob library handles it.
+				return nil // Skip this file
+			}
 		}
 
 		if g.Match(matchPath) {
