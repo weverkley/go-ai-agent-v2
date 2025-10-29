@@ -30,6 +30,14 @@ func init() {
 	readManyFilesCmd.MarkFlagRequired("paths")
 }
 
+func stringSliceToAnySlice(s []string) []any {
+	anySlice := make([]any, len(s))
+	for i, v := range s {
+		anySlice[i] = v
+	}
+	return anySlice
+}
+
 var readManyFilesCmd = &cobra.Command{
 	Use:   "read-many-files",
 	Short: "Reads content from multiple files",
@@ -37,9 +45,9 @@ var readManyFilesCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		readManyFilesTool := tools.NewReadManyFilesTool()
 		result, err := readManyFilesTool.Execute(map[string]any{
-			"paths":                readManyFilesPaths,
-			"include":              readManyFilesInclude,
-			"exclude":              readManyFilesExclude,
+			"paths":                stringSliceToAnySlice(readManyFilesPaths),
+			"include":              stringSliceToAnySlice(readManyFilesInclude),
+			"exclude":              stringSliceToAnySlice(readManyFilesExclude),
 			"recursive":            readManyFilesRecursive,
 			"useDefaultExcludes":   readManyFilesUseDefaultExcludes,
 			"respectGitIgnore":     readManyFilesRespectGitIgnore,
