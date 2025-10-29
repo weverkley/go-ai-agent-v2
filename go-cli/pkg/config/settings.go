@@ -28,6 +28,7 @@ type Settings struct {
 	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
 	Model          string                         `json:"model,omitempty"`
 	Proxy          string                         `json:"proxy,omitempty"`
+	EnabledExtensions map[SettingScope][]string `json:"enabledExtensions,omitempty"`
 }
 
 func getSettingsPath(workspaceDir string) string {
@@ -50,6 +51,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			TelemetryEnabled: false,
 			Model:          "gemini-pro", // Default model
 			Proxy:          "",
+			EnabledExtensions: make(map[SettingScope][]string),
 		}
 	}
 
@@ -67,6 +69,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			TelemetryEnabled: false,
 			Model:          "gemini-pro", // Default model
 			Proxy:          "",
+			EnabledExtensions: make(map[SettingScope][]string),
 		}
 	}
 
@@ -82,6 +85,9 @@ func LoadSettings(workspaceDir string) *Settings {
 	}
 	if settings.Model == "" {
 		settings.Model = "gemini-pro"
+	}
+	if settings.EnabledExtensions == nil {
+		settings.EnabledExtensions = make(map[SettingScope][]string)
 	}
 
 	return &settings

@@ -237,7 +237,7 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 				fmt.Printf("Removing existing local extension at %s for update (force).", installPath)
 				err = os.RemoveAll(installPath)
 				if err != nil {
-					return "", fmt.Errorf("failed to remove existing local extension at %s: %w", installPath, err)
+					return "", fmt.Errorf("failed to copy local extension: %w", err)
 				}
 			}
 			// Implement actual file copying
@@ -374,9 +374,44 @@ func (em *ExtensionManager) UninstallExtension(name string, _ bool) error {
 }
 // EnableExtension enables an extension.
 func (em *ExtensionManager) EnableExtension(name string, scope config.SettingScope) error {
-	// For now, this is a placeholder. In a real implementation, this would modify
-	// a settings file to mark the extension as enabled for the given scope.
-	fmt.Printf("Enabling extension \"%s\" for scope \"%s\" (placeholder)\n", name, scope)
+	// 1. Check if the extension exists
+	installedExtensions, err := em.LoadExtensions()
+	if err != nil {
+		return fmt.Errorf("failed to load installed extensions: %w", err)
+	}
+
+	found := false
+	for _, ext := range installedExtensions {
+		if ext.Name == name {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("extension \"%s\" not found", name)
+	}
+
+	// 2. Load current settings (em.settings is already loaded)
+
+	// 3. Add extension to EnabledExtensions for the given scope
+	currentEnabled := em.settings.EnabledExtensions[scope]
+
+	// Check if already enabled
+	for _, enabledName := range currentEnabled {
+		if enabledName == name {
+			return nil // Already enabled, do nothing
+		}
+	}
+
+	// Append if not already enabled
+	em.settings.EnabledExtensions[scope] = append(currentEnabled, name)
+
+	// 4. Save updated settings
+	if err := config.SaveSettings(em.workspaceDir, em.settings); err != nil {
+		return fmt.Errorf("failed to save settings: %w", err)
+	}
+
 	return nil
 }
 
