@@ -5,12 +5,23 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/commands"
+	"go-ai-agent-v2/go-cli/pkg/config"
 	"github.com/spf13/cobra"
 )
 
 var (
 	mcpAddName string
-	mcpAddUrl  string
+	mcpAddCommandOrUrl string
+	mcpAddArgs []string
+	mcpAddScope string
+	mcpAddTransport string
+	mcpAddEnv []string
+	mcpAddHeader []string
+	mcpAddTimeout int
+	mcpAddTrust bool
+	mcpAddDescription string
+	mcpAddIncludeTools []string
+	mcpAddExcludeTools []string
 	mcpRemoveName string
 )
 
@@ -20,10 +31,16 @@ func init() {
 	mcpCmd.AddCommand(mcpListCmd)
 
 	mcpCmd.AddCommand(mcpAddCmd)
-	mcpAddCmd.Flags().StringVar(&mcpAddName, "name", "", "The name of the MCP server to add.")
-	mcpAddCmd.Flags().StringVar(&mcpAddUrl, "url", "", "The URL of the MCP server to add.")
-	mcpAddCmd.MarkFlagRequired("name")
-	mcpAddCmd.MarkFlagRequired("url")
+	mcpAddCmd.Flags().StringArrayVar(&mcpAddArgs, "args", []string{}, "Arguments for the command (stdio transport).")
+	mcpAddCmd.Flags().StringVar(&mcpAddScope, "scope", "project", "Configuration scope (user or project)")
+	mcpAddCmd.Flags().StringVar(&mcpAddTransport, "transport", "stdio", "Transport type (stdio, sse, http)")
+	mcpAddCmd.Flags().StringArrayVar(&mcpAddEnv, "env", []string{}, "Set environment variables (e.g. -e KEY=value)")
+	mcpAddCmd.Flags().StringArrayVar(&mcpAddHeader, "header", []string{}, "Set HTTP headers for SSE and HTTP transports (e.g. -H \"X-Api-Key: abc123\")")
+	mcpAddCmd.Flags().IntVar(&mcpAddTimeout, "timeout", 0, "Set connection timeout in milliseconds")
+	mcpAddCmd.Flags().BoolVar(&mcpAddTrust, "trust", false, "Trust the server (bypass all tool call confirmation prompts)")
+	mcpAddCmd.Flags().StringVar(&mcpAddDescription, "description", "", "Set the description for the server")
+	mcpAddCmd.Flags().StringArrayVar(&mcpAddIncludeTools, "include-tools", []string{}, "A comma-separated list of tools to include")
+	mcpAddCmd.Flags().StringArrayVar(&mcpAddExcludeTools, "exclude-tools", []string{}, "A comma-separated list of tools to exclude")
 
 	mcpCmd.AddCommand(mcpRemoveCmd)
 	mcpRemoveCmd.Flags().StringVar(&mcpRemoveName, "name", "", "The name of the MCP server to remove.")
@@ -50,11 +67,30 @@ var mcpListCmd = &cobra.Command{
 }
 
 var mcpAddCmd = &cobra.Command{
-	Use:   "add",
+	Use:   "add [name] [commandOrUrl] [args...]",
 	Short: "Add an MCP server",
+	Args:  cobra.MinimumNArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
+		mcpAddName = args[0]
+		mcpAddCommandOrUrl = args[1]
+		if len(args) > 2 {
+			mcpAddArgs = args[2:]
+		}
 		mcp := commands.NewMcpCommand()
-		err := mcp.AddMcpItem(mcpAddName, mcpAddUrl)
+		err := mcp.AddMcpItem(
+			mcpAddName,
+			mcpAddCommandOrUrl,
+			mcpAddArgs,
+			config.SettingScope(mcpAddScope),
+			mcpAddTransport,
+			mcpAddEnv,
+			mcpAddHeader,
+			mcpAddTimeout,
+			mcpAddTrust,
+			mcpAddDescription,
+			mcpAddIncludeTools,
+			mcpAddExcludeTools,
+		)
 		if err != nil {
 			fmt.Printf("Error adding MCP item: %v\n", err)
 			os.Exit(1)

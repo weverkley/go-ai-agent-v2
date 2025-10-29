@@ -156,7 +156,20 @@ func (c *McpCommand) ListMcpItems() error {
 }
 
 // AddMcpItem adds a new MCP item.
-func (c *McpCommand) AddMcpItem(name, url string) error {
+func (c *McpCommand) AddMcpItem(
+	name string,
+	commandOrUrl string,
+	args []string,
+	scope config.SettingScope,
+	transport string,
+	env []string,
+	header []string,
+	timeout int,
+	trust bool,
+	description string,
+	includeTools []string,
+	excludeTools []string,
+) error {
 	workspaceDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current working directory: %w", err)
@@ -168,16 +181,58 @@ func (c *McpCommand) AddMcpItem(name, url string) error {
 	}
 
 	if _, exists := settings.McpServers[name]; exists {
-		return fmt.Errorf("MCP server \"%s\" already exists", name)
+		// If it exists, we are updating it.
+		fmt.Printf("MCP server \"%s\" already exists, updating.\n", name)
 	}
 
-	settings.McpServers[name] = mcp.MCPServerConfig{HttpUrl: url}
+	// Parse env variables
+	envMap := make(map[string]string)
+	for _, e := range env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			envMap[parts[0]] = parts[1]
+		}
+	}
+
+	// Parse headers
+	headersMap := make(map[string]string)
+	for _, h := range header {
+		parts := strings.SplitN(h, ":", 2)
+		if len(parts) == 2 {
+			headersMap[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+
+	newServer := mcp.MCPServerConfig{
+		Timeout:      timeout,
+		Trust:        trust,
+		Description:  description,
+		IncludeTools: includeTools,
+		ExcludeTools: excludeTools,
+	}
+
+	switch transport {
+	case "sse":
+		newServer.Url = commandOrUrl
+		newServer.Headers = headersMap
+	case "http":
+		newServer.HttpUrl = commandOrUrl
+		newServer.Headers = headersMap
+	case "stdio":
+		newServer.Command = commandOrUrl
+		newServer.Args = args
+		newServer.Env = envMap
+	default:
+		return fmt.Errorf("unsupported transport type: %s", transport)
+	}
+
+	settings.McpServers[name] = newServer
 
 	if err := config.SaveSettings(workspaceDir, settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
-	fmt.Printf("MCP server \"%s\" added successfully.\n", name)
+	fmt.Printf("MCP server \"%s\" added/updated successfully (transport: %s).\n", name, transport)
 	return nil
 }
 
