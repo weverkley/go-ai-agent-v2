@@ -73,7 +73,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `mcp-tool.ts`
   - `memoryTool.ts`: **Functional**.
   - `modifiable-tool.ts`
-  - `read-file.ts`
+  - `read-file.ts`: **Functional**.
   - `read-many-files.ts`: **Functional**.
   - `ripGrep.ts`: **Functional** (implemented by `grep` tool).
   - `shell.ts`: **Functional** (implemented by `exec` command).
@@ -84,7 +84,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `tools.ts`
   - `web-fetch.ts`: **Functional**.
   - `web-search.ts`: **Functional**.
-  - `write-file.ts`
+  - `write-file.ts`: **Functional** (implemented by `write` command).
   - `write-todos.ts`
 - **Config (`pkg/core/config`)**: Robust configuration management beyond just reading an environment variable (e.g., loading from files).
   - `config.ts`

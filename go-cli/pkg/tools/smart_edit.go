@@ -2,6 +2,8 @@ package tools
 
 import (
 	"fmt"
+	"io/ioutil"
+	"strings"
 )
 
 // SmartEditTool represents the smart-edit tool.
@@ -20,13 +22,25 @@ func (t *SmartEditTool) Execute(
 	oldString string,
 	newString string,
 ) (string, error) {
-	// Call the default_api.replace function (assuming it's available in the Go context)
-	// For example: result, err := default_api.replace(filePath, instruction, oldString, newString)
+	// Read the file content
+	contentBytes, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
+	}
+	content := string(contentBytes)
 
-	// Simulate the call to default_api.replace
-	// In a real scenario, this would be an actual call to the tool.
+	// Perform the replacement
+	newContent := strings.Replace(content, oldString, newString, 1) // Replace only the first occurrence
 
-	simulatedResult := fmt.Sprintf("Simulated smart edit on file %s with instruction: %s", filePath, instruction)
+	if newContent == content {
+		return "", fmt.Errorf("old_string not found or no changes made in file %s", filePath)
+	}
 
-	return simulatedResult, nil
+	// Write the new content back to the file
+	err = ioutil.WriteFile(filePath, []byte(newContent), 0644)
+	if err != nil {
+		return "", fmt.Errorf("failed to write file %s: %w", filePath, err)
+	}
+
+	return fmt.Sprintf("Successfully modified file: %s", filePath), nil
 }
