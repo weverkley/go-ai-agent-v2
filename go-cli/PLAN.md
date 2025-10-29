@@ -35,7 +35,7 @@ The foundational structure for the Go CLI has been established, and several core
   - `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, but `EnableExtension` and `DisableExtension` are placeholders.
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
     *   `pkg/config/settings.go`: **Functional** (extended functionality). Loads default settings, can read/write settings.json, and includes fields for DebugMode, UserMemory, ApprovalMode, ShowMemoryUsage, TelemetryEnabled, Model, and Proxy.
-  - `pkg/mcp/types.go`: Defines `MCPServerStatus` and `MCPServerConfig`.
+  - `pkg/mcp/types.go`: Defines `MCPServerStatus`, `MCPServerConfig`, `MCPOAuthConfig`, and `AuthProviderType`.
   - `pkg/mcp/client.go`: **Placeholder**. Simulates MCP connection.
 
 ## 2. Remaining Core Components for Translation
@@ -60,8 +60,8 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `setup.ts`
   - `types.ts`
 - **Prompts (`pkg/core/prompts`)**: Management and rendering of prompts for AI models or user interactions.
-  - `mcp-prompts.ts`: **Functional** (basic prompt management with DiscoveredMCPPrompt support).
-  - `prompt-registry.ts`: **Functional** (basic prompt management with DiscoveredMCPPrompt support).
+  - `mcp-prompts.ts`: **Functional** (basic prompt management with `DiscoveredMCPPrompt` support and `GetPromptsByServer` method).
+  - `prompt-registry.ts`: **Functional** (basic prompt management with `DiscoveredMCPPrompt` support).
 - **Tools (other than file I/O)**: Specialized tools such as `grep`, `glob`, `web-fetch`, `memoryTool`, `web-search`, `read-many-files`, etc., need to be implemented.
   - `diffOptions.ts`
   - `edit.ts`
@@ -83,7 +83,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `tool-registry.ts`
   - `tools.ts`
   - `web-fetch.ts`: **Functional**.
-  - `web-search.ts`
+  - `web-search.ts`: **Functional** (simulated).
   - `write-file.ts`
   - `write-todos.ts`
 - **Config (`pkg/core/config`)**: Robust configuration management beyond just reading an environment variable (e.g., loading from files).

@@ -42,4 +42,5 @@ func init() {
 	rootCmd.AddCommand(webFetchCmd)
 	rootCmd.AddCommand(memoryCmd)
 	rootCmd.AddCommand(webSearchCmd)
+	rootCmd.AddCommand(readManyFilesCmd)
 }
