@@ -417,9 +417,49 @@ func (em *ExtensionManager) EnableExtension(name string, scope config.SettingSco
 
 // DisableExtension disables an extension.
 func (em *ExtensionManager) DisableExtension(name string, scope config.SettingScope) error {
-	// For now, this is a placeholder. In a real implementation, this would modify
-	// a settings file to mark the extension as disabled for the given scope.
-	fmt.Printf("Disabling extension \"%s\" for scope \"%s\" (placeholder)\n", name, scope)
+	// 1. Check if the extension exists
+	installedExtensions, err := em.LoadExtensions()
+	if err != nil {
+		return fmt.Errorf("failed to load installed extensions: %w", err)
+	}
+
+	found := false
+	for _, ext := range installedExtensions {
+		if ext.Name == name {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("extension \"%s\" not found", name)
+	}
+
+	// 2. Load current settings (em.settings is already loaded)
+
+	// 3. Remove extension from EnabledExtensions for the given scope
+	currentEnabled := em.settings.EnabledExtensions[scope]
+	var newEnabled []string
+	removed := false
+	for _, enabledName := range currentEnabled {
+		if enabledName == name {
+			removed = true
+		} else {
+			newEnabled = append(newEnabled, enabledName)
+		}
+	}
+
+	if !removed {
+		return nil // Extension not found in enabled list, nothing to do
+	}
+
+	em.settings.EnabledExtensions[scope] = newEnabled
+
+	// 4. Save updated settings
+	if err := config.SaveSettings(em.workspaceDir, em.settings); err != nil {
+		return fmt.Errorf("failed to save settings: %w", err)
+	}
+
 	return nil
 }
 
