@@ -77,7 +77,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `read-many-files.ts`: **Functional**.
   - `ripGrep.ts`: **Functional** (implemented by `grep` tool).
   - `shell.ts`: **Functional** (implemented by `exec` command).
-  - `smart-edit.ts`
+  - `smart-edit.ts`: **Functional**.
   - `tool-error.ts`
   - `tool-names.ts`
   - `tool-registry.ts`

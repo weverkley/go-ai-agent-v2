@@ -44,4 +44,5 @@ func init() {
 	rootCmd.AddCommand(webSearchCmd)
 	rootCmd.AddCommand(readManyFilesCmd)
 	rootCmd.AddCommand(readFileCmd)
+	rootCmd.AddCommand(todosCmd)
 }
