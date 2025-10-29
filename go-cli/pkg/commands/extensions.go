@@ -1,16 +1,20 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/extension"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
+const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/gemini-cli-main/packages/cli/src/commands/extensions/examples"
+
 // ExtensionsCommand represents the extensions command group.
 type ExtensionsCommand struct {
-	// Dependencies can be added here, e.g., FileSystemService, GitService
+	// Dependencies can be added here, eg., FileSystemService, GitService
 }
 
 // NewExtensionsCommand creates a new instance of ExtensionsCommand.
@@ -45,6 +49,7 @@ func (c *ExtensionsCommand) ListExtensions() error {
 	return nil
 }
 
+// Install installs an extension.
 func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 	fmt.Printf("Installing extension from source: %s\n", args.Source)
 
@@ -121,3 +126,47 @@ func (c *ExtensionsCommand) Uninstall(name string) error {
 	fmt.Printf("Extension \"%s\" successfully uninstalled.\n", name)
 	return nil
 }
+
+// New creates a new extension.
+func (c *ExtensionsCommand) New(args extension.NewArgs) error {
+	fsService := services.NewFileSystemService()
+
+	if args.Template != "" {
+		// Implement copyDirectory logic here
+		fmt.Printf("Creating new extension from template \"%s\" at %s (placeholder)\n", args.Template, args.Path)
+		// Placeholder for copyDirectory
+		templatePath := fsService.JoinPaths(EXAMPLES_PATH, args.Template)
+		err := fsService.CopyDirectory(templatePath, args.Path)
+		if err != nil {
+			return fmt.Errorf("failed to create extension from template: %w", err)
+		}
+		fmt.Printf("Successfully created new extension from template \"%s\" at %s.\n", args.Template, args.Path)
+	} else {
+		// Implement createDirectory and gemini-extension.json creation logic here
+		fmt.Printf("Creating new extension at %s (placeholder)\n", args.Path)
+		// Placeholder for createDirectory
+		err := fsService.CreateDirectory(args.Path)
+		if err != nil {
+			return fmt.Errorf("failed to create new extension directory: %w", err)
+		}
+
+		extensionName := filepath.Base(args.Path)
+		manifest := map[string]interface{}{
+			"name":    extensionName,
+			"version": "1.0.0",
+		}
+		manifestBytes, err := json.MarshalIndent(manifest, "", "  ")
+		if err != nil {
+			return fmt.Errorf("failed to marshal extension manifest: %w", err)
+		}
+		err = fsService.WriteFile(fsService.JoinPaths(args.Path, "gemini-extension.json"), string(manifestBytes))
+		if err != nil {
+			return fmt.Errorf("failed to write gemini-extension.json: %w", err)
+		}
+		fmt.Printf("Successfully created new extension at %s.\n", args.Path)
+	}
+
+	fmt.Printf("You can install this using \"gemini extensions link %s\" to test it out.\n", args.Path)
+	return nil
+}
+

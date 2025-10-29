@@ -2,6 +2,7 @@ package services
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 )
@@ -76,3 +77,78 @@ func (s *FileSystemService) JoinPaths(elements ...string) string {
 	return filepath.Join(elements...)
 }
 
+// CreateDirectory creates a directory, ensuring it doesn't already exist.
+func (s *FileSystemService) CreateDirectory(path string) error {
+	exists, err := s.PathExists(path)
+	if err != nil {
+		return fmt.Errorf("failed to check path existence for %s: %w", path, err)
+	}
+	if exists {
+		return fmt.Errorf("path already exists: %s", path)
+	}
+
+	err = os.MkdirAll(path, 0755) // 0755 is standard directory permissions
+	if err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", path, err)
+	}
+	return nil
+}
+
+// CopyDirectory recursively copies a directory from src to dst.
+func (s *FileSystemService) CopyDirectory(src string, dst string) error {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
+
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	dirents, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, dirent := range dirents {
+		srcPath := filepath.Join(src, dirent.Name())
+		dstPath := filepath.Join(dst, dirent.Name())
+
+		if dirent.IsDir() {
+			err = s.CopyDirectory(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = s.copyFile(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// copyFile copies a file from src to dst.
+func (s *FileSystemService) copyFile(src string, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
+}

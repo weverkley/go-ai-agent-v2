@@ -47,6 +47,10 @@ func main() {
 	extensionsUninstallCmd := flag.NewFlagSet("uninstall", flag.ExitOnError)
 	extensionsUninstallName := extensionsUninstallCmd.String("name", "", "The name of the extension to uninstall.")
 
+	extensionsNewCmd := flag.NewFlagSet("new", flag.ExitOnError)
+	extensionsNewPath := extensionsNewCmd.String("path", "", "The path to create the extension in.")
+	extensionsNewTemplate := extensionsNewCmd.String("template", "", "The boilerplate template to use.")
+
 	mcpCmd := flag.NewFlagSet("mcp", flag.ExitOnError)
 	mcpListCmd := flag.NewFlagSet("list", flag.ExitOnError)
 
@@ -207,6 +211,22 @@ func main() {
 					fmt.Printf("Error uninstalling extension: %v\n", err)
 					os.Exit(1)
 				}
+			case "new":
+				extensionsNewCmd.Parse(extensionsCmd.Args()[1:])
+				if *extensionsNewPath == "" {
+					fmt.Println("Error: --path is required for new command.")
+					extensionsNewCmd.PrintDefaults()
+					os.Exit(1)
+				}
+				extensions := commands.NewExtensionsCommand()
+				err := extensions.New(extension.NewArgs{
+					Path:     *extensionsNewPath,
+					Template: *extensionsNewTemplate,
+				})
+				if err != nil {
+					fmt.Printf("Error creating new extension: %v\n", err)
+					os.Exit(1)
+				}
 			default:
 				fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
 				extensionsCmd.PrintDefaults()
@@ -265,6 +285,7 @@ func main() {
 			fmt.Println("  extensions list           List installed extensions.")
 			fmt.Println("  extensions install --source <src> [--ref <ref>] [--auto-update] [--pre-release] [--consent] Install an extension.")
 			fmt.Println("  extensions uninstall --name <name> Uninstall an extension.")
+			fmt.Println("  extensions new --path <path> [--template <template>] Create a new extension.")
 			fmt.Println("  mcp list                  List MCP items.")
 			fmt.Println("  list-models               List available Gemini models.")
 			os.Exit(0)

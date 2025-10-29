@@ -9,6 +9,12 @@ type InstallArgs struct {
 	Consent       bool
 }
 
+// NewArgs represents the arguments for the new command.
+type NewArgs struct {
+	Path     string
+	Template string
+}
+
 // ExtensionInstallMetadata represents metadata about an extension to be installed.
 type ExtensionInstallMetadata struct {
 	Source        string
