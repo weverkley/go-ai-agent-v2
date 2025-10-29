@@ -102,7 +102,7 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 	}
 
 	extensionManager := extension.NewExtensionManager(workspaceDir)
-	name, err := extensionManager.InstallOrUpdateExtension(installMetadata)
+	name, err := extensionManager.InstallOrUpdateExtension(installMetadata, args.Force)
 	if err != nil {
 		return fmt.Errorf("failed to install/update extension: %w", err)
 	}

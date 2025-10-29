@@ -152,7 +152,7 @@ func (em *ExtensionManager) ToOutputString(ext Extension) string {
 }
 
 // InstallOrUpdateExtension installs or updates an extension.
-func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata) (string, error) {
+func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata, force bool) (string, error) {
 	fmt.Printf("Installing/updating extension from source: %s (type: %s)\n", metadata.Source, metadata.Type)
 
 	// Determine installation path
@@ -167,33 +167,53 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 	} else {
 		extensionName = filepath.Base(metadata.Source)
 	}
-	installPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extensionName) // For simplicity, use first extension path
-
-	if metadata.Type == "git" {
-		fmt.Printf("Cloning/fetching git repository %s to %s\n", metadata.Source, installPath)
-		// Check if directory already exists
-		exists, err := em.fsService.PathExists(installPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
-		}
-
-		if exists {
-			// If exists, assume update (for now, just pull)
-			fmt.Printf("Repository already exists, pulling latest changes in %s\n", installPath)
-			r, err := git.PlainOpen(installPath)
+		installPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extensionName) // For simplicity, use first extension path
+	
+		if metadata.Type == "git" {
+			fmt.Printf("Cloning/fetching git repository %s to %s\n", metadata.Source, installPath)
+			// Check if directory already exists
+			exists, err := em.fsService.PathExists(installPath)
 			if err != nil {
-				return "", fmt.Errorf("failed to open git repository at %s for update: %w", installPath, err)
+				return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
 			}
-			w, err := r.Worktree()
-			if err != nil {
-				return "", fmt.Errorf("failed to get worktree for %s: %w", installPath, err)
+	
+			if exists {
+				if force {
+					fmt.Printf("Force flag is true. Removing existing repository at %s before re-cloning.\n", installPath)
+					err = os.RemoveAll(installPath)
+					if err != nil {
+						return "", fmt.Errorf("failed to remove existing repository at %s: %w", installPath, err)
+					}
+					// Proceed to clone
+				} else {
+					// If exists and not force, assume update (just pull)
+					fmt.Printf("Repository already exists, pulling latest changes in %s\n", installPath)
+					r, err := git.PlainOpen(installPath)
+					if err != nil {
+						return "", fmt.Errorf("failed to open git repository at %s for update: %w", installPath, err)
+					}
+					w, err := r.Worktree()
+					if err != nil {
+						return "", fmt.Errorf("failed to get worktree for %s: %w", installPath, err)
+					}
+					err = w.Pull(&git.PullOptions{})
+					if err != nil && err != git.NoErrAlreadyUpToDate {
+						return "", fmt.Errorf("failed to pull latest changes for %s: %w", installPath, err)
+					}
+					// Read the extension config from the source to get the real name before returning
+					configPath := em.fsService.JoinPaths(installPath, "gemini-extension.json")
+					configBytes, readErr := em.fsService.ReadFile(configPath)
+					if readErr != nil {
+						return "", fmt.Errorf("failed to read extension config file after pull: %w", readErr)
+					}
+					var pulledExtConfig ExtensionConfig
+					if unmarshalErr := json.Unmarshal([]byte(configBytes), &pulledExtConfig); unmarshalErr != nil {
+						return "", fmt.Errorf("failed to parse extension config file after pull: %w", unmarshalErr)
+					}
+					return pulledExtConfig.Name, nil // Return early after pull
+				}
 			}
-			err = w.Pull(&git.PullOptions{})
-			if err != nil && err != git.NoErrAlreadyUpToDate {
-				return "", fmt.Errorf("failed to pull latest changes for %s: %w", installPath, err)
-			}
-		} else {
-			// If not exists, clone
+			// If not exists, or if force was true and existing repo was removed, clone
 			fmt.Printf("Cloning repository %s to %s\n", metadata.Source, installPath)
 			_, err = git.PlainClone(installPath, false, &git.CloneOptions{
 				URL:               metadata.Source,
@@ -202,60 +222,64 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 			if err != nil {
 				return "", fmt.Errorf("failed to clone git repository %s to %s: %w", metadata.Source, installPath, err)
 			}
-		}
-
-	} else if metadata.Type == "local" {
-		fmt.Printf("Copying local extension from %s to %s\n", metadata.Source, installPath)
-		// Ensure destination directory is clean before copying
-		exists, err := em.fsService.PathExists(installPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
-		}
-		if exists {
-			fmt.Printf("Removing existing local extension at %s for update.\n", installPath)
-			err = os.RemoveAll(installPath)
+	
+		} else if metadata.Type == "local" {
+			fmt.Printf("Copying local extension from %s to %s\n", metadata.Source, installPath)
+			// Ensure destination directory is clean before copying
+			exists, err := em.fsService.PathExists(installPath)
 			if err != nil {
-				return "", fmt.Errorf("failed to remove existing local extension at %s: %w", installPath, err)
+				return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
+			}
+			if exists {
+				if !force {
+					return "", fmt.Errorf("local extension already exists at %s. Use --force to overwrite.", installPath)
+				}
+				fmt.Printf("Removing existing local extension at %s for update (force).", installPath)
+				err = os.RemoveAll(installPath)
+				if err != nil {
+					return "", fmt.Errorf("failed to remove existing local extension at %s: %w", installPath, err)
+				}
+			}
+			// Implement actual file copying
+			err = em.fsService.CopyDirectory(metadata.Source, installPath)
+			if err != nil {
+				return "", fmt.Errorf("failed to copy local extension: %w", err)
 			}
 		}
-		// Implement actual file copying
-		err = em.fsService.CopyDirectory(metadata.Source, installPath)
+	
+		// Read the extension config from the source to get the real name
+		configPath := em.fsService.JoinPaths(installPath, "gemini-extension.json")
+		configBytes, err := em.fsService.ReadFile(configPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to copy local extension: %w", err)
+			return "", fmt.Errorf("failed to read extension config file from source: %w", err)
 		}
-	}
-
-	// Read the extension config from the source to get the real name
-	configPath := em.fsService.JoinPaths(installPath, "gemini-extension.json")
-	configBytes, err := em.fsService.ReadFile(configPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read extension config file from source: %w", err)
-	}
-
-	var extConfig ExtensionConfig
-	err = json.Unmarshal([]byte(configBytes), &extConfig)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse extension config file from source: %w", err)
-	}
-
-	// Potentially update the config file if needed (e.g., with installation metadata)
-	// For now, we'll just use the name from the config
-	err = em.fsService.WriteFile(configPath, configBytes)
-	if err != nil {
-		return "", fmt.Errorf("failed to write extension config file: %w", err)
-	}
-
-	// Rename the extension directory to the name from the config
-	newInstallPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extConfig.Name)
-	if installPath != newInstallPath {
-		fmt.Printf("Renaming extension directory from %s to %s\n", installPath, newInstallPath)
-		if err := os.Rename(installPath, newInstallPath); err != nil {
-			return "", fmt.Errorf("failed to rename extension directory: %w", err)
+	
+		var extConfig ExtensionConfig
+		err = json.Unmarshal([]byte(configBytes), &extConfig)
+		if err != nil {
+			return "", fmt.Errorf("failed to parse extension config file from source: %w", err)
 		}
-	}
-
-	return extConfig.Name, nil
-}
+	
+		// Potentially update the config file if needed (e.g., with installation metadata)
+		// For now, we'll just use the name from the config
+		// The original code had a WriteFile here, but it was writing the original configBytes back.
+		// If we want to update the config file with install metadata, we should re-marshal extConfig.
+		// For now, I'll remove this WriteFile as it doesn’t seem to serve a purpose here.
+		// err = em.fsService.WriteFile(configPath, configBytes)
+		// if err != nil {
+		// 	return "", fmt.Errorf("failed to write extension config file: %w", err)
+		// }
+	
+		// Rename the extension directory to the name from the config
+		newInstallPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extConfig.Name)
+		if installPath != newInstallPath {
+			fmt.Printf("Renaming extension directory from %s to %s\n", installPath, newInstallPath)
+			if err := os.Rename(installPath, newInstallPath); err != nil {
+				return "", fmt.Errorf("failed to rename extension directory: %w", err)
+			}
+		}
+	
+		return extConfig.Name, nil}
 
 // UpdateExtension updates an installed extension.
 func (em *ExtensionManager) UpdateExtension(name string) error {

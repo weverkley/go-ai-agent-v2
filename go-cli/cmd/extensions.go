@@ -20,6 +20,7 @@ var (
 	extensionsInstallAllowPreRelease bool
 
 	extensionsInstallConsent     bool
+	extensionsInstallForce       bool
 
 	extensionsUninstallName    string
 
@@ -66,6 +67,7 @@ func init() {
 	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallAllowPreRelease, "pre-release", false, "Enable pre-release versions for this extension.")
 
 	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallConsent, "consent", false, "Acknowledge security risks and skip confirmation prompt.")
+	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallForce, "force", false, "Force overwrite of existing extension.")
 
 	extensionsInstallCmd.MarkFlagRequired("source")
 
@@ -185,11 +187,13 @@ var extensionsInstallCmd = &cobra.Command{
 
 			AutoUpdate:      extensionsInstallAutoUpdate,
 
-			AllowPreRelease: extensionsInstallAllowPreRelease,
+						AllowPreRelease: extensionsInstallAllowPreRelease,
 
-			Consent:         extensionsInstallConsent,
+						Consent:         extensionsInstallConsent,
 
-		})
+						Force:           extensionsInstallForce,
+
+					})
 
 		if err != nil {
 

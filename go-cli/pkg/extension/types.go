@@ -7,6 +7,7 @@ type InstallArgs struct {
 	AutoUpdate    bool
 	AllowPreRelease bool
 	Consent       bool
+	Force         bool
 }
 
 // NewArgs represents the arguments for the new command.
