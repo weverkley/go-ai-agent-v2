@@ -245,6 +245,15 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 		return "", fmt.Errorf("failed to write extension config file: %w", err)
 	}
 
+	// Rename the extension directory to the name from the config
+	newInstallPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extConfig.Name)
+	if installPath != newInstallPath {
+		fmt.Printf("Renaming extension directory from %s to %s\n", installPath, newInstallPath)
+		if err := os.Rename(installPath, newInstallPath); err != nil {
+			return "", fmt.Errorf("failed to rename extension directory: %w", err)
+		}
+	}
+
 	return extConfig.Name, nil
 }
 
