@@ -146,7 +146,7 @@ The `extensions` and `mcp` command groups are the primary CLI functionalities to
 
 Translate the logic from the following JavaScript files into Go:
 
-- `install.ts`: **In Progress**. Core logic in `pkg/extension/manager.go` needs to be completed (git clone/local copy). Argument parsing in `main.go` is ready.
+- `install.ts`: **Functional**. Implemented with `force` flag support. Core logic in `pkg/extension/manager.go` handles git clone/pull and local copy/overwrite. Argument parsing in `main.go` is ready.
 - `list.ts`: **Functional**.
 - `new.ts`: **Functional**.
 - `enable.ts`: **Placeholder**.
