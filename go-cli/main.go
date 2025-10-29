@@ -92,7 +92,7 @@ func main() {
 		switch os.Args[1] {
 		case "generate":
 			generateCmd.Parse(os.Args[2:])
-			if *prompt == "" {
+			if *promptName == "" {
 				fmt.Println("Error: --prompt is required for generate command.")
 				generateCmd.PrintDefaults()
 				os.Exit(1)
@@ -314,11 +314,12 @@ func main() {
 									if err != nil {
 										fmt.Printf("Error linking extension: %v\n", err)
 										os.Exit(1)
-									}			default:
-				fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
-				extensionsCmd.PrintDefaults()
-				os.Exit(1)
-			}
+									}
+								default:
+									fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
+									extensionsCmd.PrintDefaults()
+									os.Exit(1)
+								}
 
 		case "mcp":
 			mcpCmd.Parse(os.Args[2:])
@@ -333,36 +334,37 @@ func main() {
 				mcpListCmd.Parse(mcpCmd.Args()[1:])
 				mcp := commands.NewMcpCommand()
 				err := mcp.ListMcpItems()
-									if err != nil {
-										fmt.Printf("Error listing MCP items: %v\n", err)
-										os.Exit(1)
-									}
-								case "add":
-									mcpAddCmd.Parse(mcpCmd.Args()[1:])
-									if *mcpAddName == "" || *mcpAddUrl == "" {
-										fmt.Println("Error: --name and --url are required for add command.")
-										mcpAddCmd.PrintDefaults()
-										os.Exit(1)
-									}
-									mcp := commands.NewMcpCommand()
-									err := mcp.AddMcpItem(*mcpAddName, *mcpAddUrl)
-									if err != nil {
-										fmt.Printf("Error adding MCP item: %v\n", err)
-										os.Exit(1)
-									}
-								case "remove":
-									mcpRemoveCmd.Parse(mcpCmd.Args()[1:])
-									if *mcpRemoveName == "" {
-										fmt.Println("Error: --name is required for remove command.")
-										mcpRemoveCmd.PrintDefaults()
-										os.Exit(1)
-									}
-									mcp := commands.NewMcpCommand()
-									err := mcp.RemoveMcpItem(*mcpRemoveName)
-									if err != nil {
-										fmt.Printf("Error removing MCP item: %v\n", err)
-										os.Exit(1)
-									}			default:
+				if err != nil {
+					fmt.Printf("Error listing MCP items: %v\n", err)
+					os.Exit(1)
+				}
+			case "add":
+				mcpAddCmd.Parse(mcpCmd.Args()[1:])
+				if *mcpAddName == "" || *mcpAddUrl == "" {
+					fmt.Println("Error: --name and --url are required for add command.")
+					mcpAddCmd.PrintDefaults()
+					os.Exit(1)
+				}
+				mcp := commands.NewMcpCommand()
+				err := mcp.AddMcpItem(*mcpAddName, *mcpAddUrl)
+				if err != nil {
+					fmt.Printf("Error adding MCP item: %v\n", err)
+					os.Exit(1)
+				}
+			case "remove":
+				mcpRemoveCmd.Parse(mcpCmd.Args()[1:])
+				if *mcpRemoveName == "" {
+					fmt.Println("Error: --name is required for remove command.")
+					mcpRemoveCmd.PrintDefaults()
+					os.Exit(1)
+				}
+				mcp := commands.NewMcpCommand()
+				err := mcp.RemoveMcpItem(*mcpRemoveName)
+				if err != nil {
+					fmt.Printf("Error removing MCP item: %v\n", err)
+					os.Exit(1)
+				}
+			default:
 				fmt.Printf("Unknown mcp subcommand: %s\n", subcommand)
 				mcpCmd.PrintDefaults()
 				os.Exit(1)
