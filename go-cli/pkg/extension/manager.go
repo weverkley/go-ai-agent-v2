@@ -305,29 +305,45 @@ func (em *ExtensionManager) UpdateExtension(name string) error {
 	return nil
 }
 
-// UninstallExtension removes an installed extension.
+	// UninstallExtension removes an installed extension.
 func (em *ExtensionManager) UninstallExtension(name string, _ bool) error {
 	// For now, we ignore the `_ bool` (force) argument as we don't have interactive consent.
 
-	extensionPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], name)
-
-	exists, err := em.fsService.PathExists(extensionPath)
+	installedExtensions, err := em.LoadExtensions()
 	if err != nil {
-		return fmt.Errorf("failed to check existence of extension path %s: %w", extensionPath, err)
-	}
-	if !exists {
-		return fmt.Errorf("extension \"%s\" not found at %s", name, extensionPath)
+		return fmt.Errorf("failed to load installed extensions: %w", err)
 	}
 
-	fmt.Printf("Removing extension directory: %s\n", extensionPath)
-	err = os.RemoveAll(extensionPath)
-	if err != nil {
-		return fmt.Errorf("failed to remove extension directory %s: %w", extensionPath, err)
+	var targetExtension *Extension
+	for _, ext := range installedExtensions {
+		if ext.Name == name {
+			targetExtension = &ext
+			break
+		}
 	}
 
+	if targetExtension == nil {
+		return fmt.Errorf("extension \"%s\" not found", name)
+	}
+
+	if targetExtension.InstallType == "link" {
+		// For linked extensions, remove the symlink itself
+		symlinkPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], name)
+		fmt.Printf("Removing extension symlink: %s\n", symlinkPath)
+		if err := os.Remove(symlinkPath); err != nil {
+			return fmt.Errorf("failed to remove extension symlink %s: %w", symlinkPath, err)
+		}
+	} else {
+		// For other types, remove the directory
+		fmt.Printf("Removing extension directory: %s\n", targetExtension.Path)
+		if err := os.RemoveAll(targetExtension.Path); err != nil {
+			return fmt.Errorf("failed to remove extension directory %s: %w", targetExtension.Path, err)
+		}
+	}
+
+	fmt.Printf("Extension \"%s\" successfully uninstalled.\n", name)
 	return nil
 }
-
 // EnableExtension enables an extension.
 func (em *ExtensionManager) EnableExtension(name string, scope config.SettingScope) error {
 	// For now, this is a placeholder. In a real implementation, this would modify
