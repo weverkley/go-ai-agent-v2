@@ -44,6 +44,9 @@ func main() {
 	extensionsInstallAllowPreRelease := extensionsInstallCmd.Bool("pre-release", false, "Enable pre-release versions for this extension.")
 	extensionsInstallConsent := extensionsInstallCmd.Bool("consent", false, "Acknowledge security risks and skip confirmation prompt.")
 
+	extensionsUninstallCmd := flag.NewFlagSet("uninstall", flag.ExitOnError)
+	extensionsUninstallName := extensionsUninstallCmd.String("name", "", "The name of the extension to uninstall.")
+
 	mcpCmd := flag.NewFlagSet("mcp", flag.ExitOnError)
 	mcpListCmd := flag.NewFlagSet("list", flag.ExitOnError)
 
@@ -191,6 +194,19 @@ func main() {
 					fmt.Printf("Error installing extension: %v\n", err)
 					os.Exit(1)
 				}
+			case "uninstall":
+				extensionsUninstallCmd.Parse(extensionsCmd.Args()[1:])
+				if *extensionsUninstallName == "" {
+					fmt.Println("Error: --name is required for uninstall command.")
+					extensionsUninstallCmd.PrintDefaults()
+					os.Exit(1)
+				}
+				extensions := commands.NewExtensionsCommand()
+				err := extensions.Uninstall(*extensionsUninstallName)
+				if err != nil {
+					fmt.Printf("Error uninstalling extension: %v\n", err)
+					os.Exit(1)
+				}
 			default:
 				fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
 				extensionsCmd.PrintDefaults()
@@ -248,6 +264,7 @@ func main() {
 			fmt.Println("  git-branch [--path <path>] Get the current Git branch name.")
 			fmt.Println("  extensions list           List installed extensions.")
 			fmt.Println("  extensions install --source <src> [--ref <ref>] [--auto-update] [--pre-release] [--consent] Install an extension.")
+			fmt.Println("  extensions uninstall --name <name> Uninstall an extension.")
 			fmt.Println("  mcp list                  List MCP items.")
 			fmt.Println("  list-models               List available Gemini models.")
 			os.Exit(0)

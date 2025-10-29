@@ -45,7 +45,6 @@ func (c *ExtensionsCommand) ListExtensions() error {
 	return nil
 }
 
-// Install installs an extension.
 func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 	fmt.Printf("Installing extension from source: %s\n", args.Source)
 
@@ -81,8 +80,15 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 		}
 	}
 
-	// Consent handling (for now, always assume consent or bypass if flag is set)
-	// The JS version uses requestConsentNonInteractive, which we'll skip for now.
+	// Consent handling
+	if args.Consent {
+		fmt.Println("You have consented to the installation.")
+		// In a real scenario, you might log INSTALL_WARNING_MESSAGE here
+	} else {
+		// For now, we are skipping interactive consent. In a full implementation,
+		// this would involve a prompt to the user.
+		fmt.Println("Skipping interactive consent for now. Proceeding with installation.")
+	}
 
 	workspaceDir, err := os.Getwd()
 	if err != nil {
@@ -96,5 +102,22 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 	}
 
 	fmt.Printf("Extension \"%s\" installed successfully and enabled.\n", name)
+	return nil
+}
+
+// Uninstall uninstalls an extension.
+func (c *ExtensionsCommand) Uninstall(name string) error {
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	extensionManager := extension.NewExtensionManager(workspaceDir)
+	err = extensionManager.UninstallExtension(name, false) // false for no interactive consent for now
+	if err != nil {
+		return fmt.Errorf("failed to uninstall extension: %w", err)
+	}
+
+	fmt.Printf("Extension \"%s\" successfully uninstalled.\n", name)
 	return nil
 }

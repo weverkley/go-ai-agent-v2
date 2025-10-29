@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/go-git/go-git/v5"
 )
@@ -120,7 +121,18 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 	fmt.Printf("Installing/updating extension from source: %s (type: %s)\n", metadata.Source, metadata.Type)
 
 	// Determine installation path
-	installPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], filepath.Base(metadata.Source)) // For simplicity, use first extension path
+	var extensionName string
+	if metadata.Type == "git" {
+		// Extract repository name from git URL
+		repoName := filepath.Base(metadata.Source)
+		if strings.HasSuffix(repoName, ".git") {
+			repoName = strings.TrimSuffix(repoName, ".git")
+		}
+		extensionName = repoName
+	} else {
+		extensionName = filepath.Base(metadata.Source)
+	}
+	installPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extensionName) // For simplicity, use first extension path
 
 	if metadata.Type == "git" {
 		fmt.Printf("Cloning/fetching git repository %s to %s\n", metadata.Source, installPath)
@@ -150,7 +162,7 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 			fmt.Printf("Cloning repository %s to %s\n", metadata.Source, installPath)
 			_, err = git.PlainClone(installPath, false, &git.CloneOptions{
 				URL:      metadata.Source,
-				RecurseSubmodules: git.Default  // Handle submodules
+				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth,  // Handle submodules
 			})
 			if err != nil {
 				return "", fmt.Errorf("failed to clone git repository %s to %s: %w", metadata.Source, installPath, err)
@@ -190,6 +202,29 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 	}
 
 	return filepath.Base(metadata.Source), nil
+}
+
+// UninstallExtension removes an installed extension.
+func (em *ExtensionManager) UninstallExtension(name string, _ bool) error {
+	// For now, we ignore the `_ bool` (force) argument as we don't have interactive consent.
+
+	extensionPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], name)
+
+	exists, err := em.fsService.PathExists(extensionPath)
+	if err != nil {
+		return fmt.Errorf("failed to check existence of extension path %s: %w", extensionPath, err)
+	}
+	if !exists {
+		return fmt.Errorf("extension \"%s\" not found at %s", name, extensionPath)
+	}
+
+	fmt.Printf("Removing extension directory: %s\n", extensionPath)
+	err = os.RemoveAll(extensionPath)
+	if err != nil {
+		return fmt.Errorf("failed to remove extension directory %s: %w", extensionPath, err)
+	}
+
+	return nil
 }
 
 // copyDir recursively copies a directory from src to dst.
