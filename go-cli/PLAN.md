@@ -83,7 +83,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `tool-registry.ts`
   - `tools.ts`
   - `web-fetch.ts`: **Functional**.
-  - `web-search.ts`: **Functional** (simulated).
+  - `web-search.ts`: **Functional**.
   - `write-file.ts`
   - `write-todos.ts`
 - **Config (`pkg/core/config`)**: Robust configuration management beyond just reading an environment variable (e.g., loading from files).
