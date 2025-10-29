@@ -56,7 +56,7 @@ func NewExtensionManager(workspaceDir string) *ExtensionManager {
 func (em *ExtensionManager) LoadExtensions() ([]Extension, error) {
 	var loadedExtensions []Extension
 	for _, extPath := range em.settings.ExtensionPaths {
-		entries, err := em.fsService.ListDirectory(extPath)
+		entries, err := em.fsService.ListDirectory(extPath, []string{}, true, true)
 		if err != nil {
 			// Log error but continue with other paths
 			fmt.Printf("Warning: Failed to list directory %s: %v\n", extPath, err)

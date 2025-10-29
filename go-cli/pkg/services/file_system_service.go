@@ -1,10 +1,15 @@
 package services
 
 import (
+	"bufio"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
+
+	"github.com/gobwas/glob"
 )
 
 // FileSystemService provides functionality to interact with the file system.
@@ -15,17 +20,125 @@ func NewFileSystemService() *FileSystemService {
 	return &FileSystemService{}
 }
 
+// getIgnorePatterns reads .gitignore and .geminiignore files and returns a list of glob patterns.
+func (s *FileSystemService) getIgnorePatterns(searchDir string, respectGitIgnore, respectGeminiIgnore bool) ([]glob.Glob, error) {
+	var ignorePatterns []glob.Glob
+
+	// Read .gitignore
+	if respectGitIgnore {
+		gitIgnorePath := filepath.Join(searchDir, ".gitignore")
+		if _, err := os.Stat(gitIgnorePath); err == nil {
+			patterns, err := s.readIgnoreFile(gitIgnorePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read .gitignore: %w", err)
+			}
+			ignorePatterns = append(ignorePatterns, patterns...)
+		}
+	}
+
+	// Read .geminiignore
+	if respectGeminiIgnore {
+		geminiIgnorePath := filepath.Join(searchDir, ".geminiignore")
+		if _, err := os.Stat(geminiIgnorePath); err == nil {
+			patterns, err := s.readIgnoreFile(geminiIgnorePath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read .geminiignore: %w", err)
+			}
+			ignorePatterns = append(ignorePatterns, patterns...)
+		}
+	}
+
+	return ignorePatterns, nil
+}
+
+// readIgnoreFile reads an ignore file and compiles its patterns.
+func (s *FileSystemService) readIgnoreFile(filePath string) ([]glob.Glob, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var patterns []glob.Glob
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue // Skip empty lines and comments
+		}
+		g, err := glob.Compile(line)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile ignore pattern %s from %s: %w", line, filePath, err)
+		}
+		patterns = append(patterns, g)
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return patterns, nil
+}
+
 // ListDirectory lists the contents of a directory.
-func (s *FileSystemService) ListDirectory(dirPath string) ([]string, error) {
+func (s *FileSystemService) ListDirectory(dirPath string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
 	}
 
 	var names []string
+	var compiledIgnoreGlobs []glob.Glob
+
+	// Compile ignore patterns from argument
+	for _, p := range ignorePatterns {
+		g, err := glob.Compile(p)
+		if err != nil {
+			return nil, fmt.Errorf("failed to compile ignore pattern %s: %w", p, err)
+		}
+		compiledIgnoreGlobs = append(compiledIgnoreGlobs, g)
+	}
+
+	// Get ignore patterns from files
+	fileIgnoreGlobs, err := s.getIgnorePatterns(dirPath, respectGitIgnore, respectGeminiIgnore)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ignore patterns from files: %w", err)
+	}
+	compiledIgnoreGlobs = append(compiledIgnoreGlobs, fileIgnoreGlobs...)
+
 	for _, entry := range entries {
+		// Check against ignore patterns
+		shouldIgnore := false
+		for _, ignoreG := range compiledIgnoreGlobs {
+			if ignoreG.Match(entry.Name()) {
+				shouldIgnore = true
+				break
+			}
+		}
+		if shouldIgnore {
+			continue
+		}
 		names = append(names, entry.Name())
 	}
+
+	// Sort entries (directories first, then alphabetically)
+	sort.Slice(names, func(i, j int) bool {
+		pathI := filepath.Join(dirPath, names[i])
+		pathJ := filepath.Join(dirPath, names[j])
+
+		infoI, errI := os.Stat(pathI)
+		infoJ, errJ := os.Stat(pathJ)
+
+		isDirI := errI == nil && infoI.IsDir()
+		isDirJ := errJ == nil && infoJ.IsDir()
+
+		if isDirI && !isDirJ {
+			return true
+		}
+		if !isDirI && isDirJ {
+			return false
+		}
+		return names[i] < names[j]
+	})
 
 	return names, nil
 }

@@ -63,17 +63,17 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `mcp-prompts.ts`: **Functional** (basic prompt management with `DiscoveredMCPPrompt` support and `GetPromptsByServer` method).
   - `prompt-registry.ts`: **Functional** (basic prompt management with `DiscoveredMCPPrompt` support).
 - **Tools (other than file I/O)**: Specialized tools such as `grep`, `glob`, `web-fetch`, `memoryTool`, `web-search`, `read-many-files`, etc., need to be implemented.
-  - `diffOptions.ts`
-  - `edit.ts`
+  - `diffOptions.ts`: **Functional** (implemented by `pkg/utils/diff_utils.go`).
+  - `edit.ts`: **Functional** (implemented by `smart-edit` tool).
   - `glob.ts`: **Functional**.
   - `grep.ts`: **Functional**.
   - `ls.ts`
   - `mcp-client-manager.ts`
   - `mcp-client.ts`
   - `mcp-tool.ts`
-  - `memoryTool.ts`: **Functional**.
+- `memoryTool.ts`: **Functional** (stores `GEMINI.md` in `os.UserHomeDir()`).
   - `modifiable-tool.ts`
-  - `read-file.ts`: **Functional**.
+  - `read-file.ts`
   - `read-many-files.ts`: **Functional**.
   - `ripGrep.ts`: **Functional** (implemented by `grep` tool).
   - `shell.ts`: **Functional** (implemented by `exec` command).
@@ -85,7 +85,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `web-fetch.ts`: **Functional**.
   - `web-search.ts`: **Functional**.
   - `write-file.ts`: **Functional** (implemented by `write` command).
-  - `write-todos.ts`
+  - `write-todos.ts`: **Functional** (stores `TODOS.md` in `os.UserHomeDir()`).
 - **Config (`pkg/core/config`)**: Robust configuration management beyond just reading an environment variable (e.g., loading from files).
   - `config.ts`
   - `constants.ts`

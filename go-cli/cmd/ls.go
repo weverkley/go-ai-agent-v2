@@ -19,10 +19,10 @@ func init() {
 var lsCmd = &cobra.Command{
 	Use:   "ls",
 	Short: "List directory contents",
-	Long:  `List the contents of a specified directory.`, 
+	Long:  `List the contents of a specified directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fsService := services.NewFileSystemService()
-		entries, err := fsService.ListDirectory(lsPath)
+		entries, err := fsService.ListDirectory(lsPath, []string{}, true, true)
 		if err != nil {
 			fmt.Printf("Error listing directory: %v\n", err)
 			os.Exit(1)

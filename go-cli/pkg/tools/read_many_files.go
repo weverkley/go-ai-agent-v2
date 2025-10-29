@@ -7,23 +7,24 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gobwas/glob"
 	"go-ai-agent-v2/go-cli/pkg/services"
+
+	"github.com/gobwas/glob"
 )
 
 // ReadManyFilesTool represents the read-many-files tool.
 type ReadManyFilesTool struct {
-	fsService *services.FileSystemService
+	fsService  *services.FileSystemService
 	gitService *services.GitService
 }
 
 // NewReadManyFilesTool creates a new instance of ReadManyFilesTool.
 func NewReadManyFilesTool() *ReadManyFilesTool {
 	return &ReadManyFilesTool{
-		fsService: services.NewFileSystemService(),
-				gitService: services.NewGitService(),
-			}
-		}
+		fsService:  services.NewFileSystemService(),
+		gitService: services.NewGitService(),
+	}
+}
 
 // SkippedFile represents a file that was skipped during processing.
 type SkippedFile struct {
@@ -60,6 +61,15 @@ func (t *ReadManyFilesTool) Execute(
 
 	// Combine all patterns for glob search
 	searchPatterns := append(patterns, includePatterns...)
+
+	// Get ignore patterns (from .gitignore and .geminiignore)
+	// var ignoreGlobs []glob.Glob
+	if respectGitIgnore {
+		// TODO: Implement reading .gitignore from multiple levels
+	}
+	if respectGeminiIgnore {
+		// TODO: Implement reading .geminiignore from multiple levels
+	}
 
 	// Default excludes (simplified for now)
 	if useDefaultExcludes {
