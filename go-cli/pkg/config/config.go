@@ -2,15 +2,7 @@ package config
 
 import (
 	"go-ai-agent-v2/go-cli/pkg/mcp"
-)
-
-// ApprovalMode defines the approval mode for tool calls.
-type ApprovalMode string
-
-const (
-	ApprovalModeDefault  ApprovalMode = "default"
-	ApprovalModeAutoEdit ApprovalMode = "autoEdit"
-	ApprovalModeYOLO     ApprovalMode = "yolo"
+	"go-ai-agent-v2/go-cli/pkg/types" // Import the new types package
 )
 
 // TelemetrySettings represents the telemetry settings.
@@ -37,7 +29,7 @@ type ConfigParameters struct {
 	DebugMode      bool
 	Model          string
 	McpServers     map[string]mcp.MCPServerConfig
-	ApprovalMode   ApprovalMode
+	ApprovalMode   types.ApprovalMode // Use ApprovalMode from types package
 	Telemetry      *TelemetrySettings
 	Output         *OutputSettings
 }
@@ -50,7 +42,7 @@ type Config struct {
 	debugMode      bool
 	model          string
 	mcpServers     map[string]mcp.MCPServerConfig
-	approvalMode   ApprovalMode
+	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
 	telemetry      *TelemetrySettings
 	output         *OutputSettings
 }

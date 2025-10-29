@@ -22,7 +22,7 @@ var generateCmd = &cobra.Command{
 	Long:  `Generate content using a specified prompt.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		promptManager := prompts.NewPromptManager()
-		promptManager.AddPrompt("default", "Translate the following Go code to Javascript:")
+		promptManager.AddPrompt(prompts.DiscoveredMCPPrompt{Name: "default", Description: "Translate the following Go code to Javascript:", ServerName: "cli"})
 
 		geminiClient, err := core.NewGeminiChat()
 		if err != nil {
@@ -36,7 +36,7 @@ var generateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		content, err := geminiClient.GenerateContent(prompt)
+		content, err := geminiClient.GenerateContent(prompt.Description)
 		if err != nil {
 			fmt.Printf("Error generating content: %v\n", err)
 			os.Exit(1)

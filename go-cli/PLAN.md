@@ -34,7 +34,7 @@ The foundational structure for the Go CLI has been established, and several core
   - `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories.
   - `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, but `EnableExtension` and `DisableExtension` are placeholders.
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
-    *   `pkg/config/settings.go`: **Functional** (basic functionality). Loads default settings and can read/write settings.json.
+    *   `pkg/config/settings.go`: **Functional** (extended functionality). Loads default settings, can read/write settings.json, and includes fields for DebugMode, UserMemory, ApprovalMode, ShowMemoryUsage, TelemetryEnabled, Model, and Proxy.
   - `pkg/mcp/types.go`: Defines `MCPServerStatus` and `MCPServerConfig`.
   - `pkg/mcp/client.go`: **Placeholder**. Simulates MCP connection.
 

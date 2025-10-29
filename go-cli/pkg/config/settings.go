@@ -6,6 +6,8 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"os"
 	"path/filepath"
+
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // SettingScope defines the scope of a setting.
@@ -20,6 +22,13 @@ const (
 type Settings struct {
 	ExtensionPaths []string                       `json:"extensionPaths"`
 	McpServers     map[string]mcp.MCPServerConfig `json:"mcpServers,omitempty"`
+	DebugMode      bool                           `json:"debugMode,omitempty"`
+	UserMemory     string                         `json:"userMemory,omitempty"`
+	ApprovalMode   types.ApprovalMode             `json:"approvalMode,omitempty"`
+	ShowMemoryUsage bool                          `json:"showMemoryUsage,omitempty"`
+	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
+	Model          string                         `json:"model,omitempty"`
+	Proxy          string                         `json:"proxy,omitempty"`
 }
 
 func getSettingsPath(workspaceDir string) string {
@@ -35,6 +44,13 @@ func LoadSettings(workspaceDir string) *Settings {
 		return &Settings{
 			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
 			McpServers:     make(map[string]mcp.MCPServerConfig),
+			DebugMode:      false,
+			UserMemory:     "",
+			ApprovalMode:   types.ApprovalModeDefault,
+			ShowMemoryUsage: false,
+			TelemetryEnabled: false,
+			Model:          "gemini-pro", // Default model
+			Proxy:          "",
 		}
 	}
 
@@ -45,7 +61,28 @@ func LoadSettings(workspaceDir string) *Settings {
 		return &Settings{
 			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
 			McpServers:     make(map[string]mcp.MCPServerConfig),
+			DebugMode:      false,
+			UserMemory:     "",
+			ApprovalMode:   types.ApprovalModeDefault,
+			ShowMemoryUsage: false,
+			TelemetryEnabled: false,
+			Model:          "gemini-pro", // Default model
+			Proxy:          "",
 		}
+	}
+
+	// Apply defaults if not set in the loaded settings
+	if len(settings.ExtensionPaths) == 0 {
+		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".gemini", "extensions")}
+	}
+	if settings.McpServers == nil {
+		settings.McpServers = make(map[string]mcp.MCPServerConfig)
+	}
+	if settings.ApprovalMode == "" {
+		settings.ApprovalMode = types.ApprovalModeDefault
+	}
+	if settings.Model == "" {
+		settings.Model = "gemini-pro"
 	}
 
 	return &settings
