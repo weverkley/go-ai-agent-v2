@@ -5,6 +5,14 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/mcp"
 )
 
+// SettingScope defines the scope of a setting.
+type SettingScope string
+
+const (
+	SettingScopeUser      SettingScope = "user"
+	SettingScopeWorkspace SettingScope = "workspace"
+)
+
 // Settings represents the application settings.
 type Settings struct {
 	// Add fields for various settings, e.g., extension paths, API keys, etc.

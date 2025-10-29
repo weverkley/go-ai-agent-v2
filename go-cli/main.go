@@ -51,6 +51,14 @@ func main() {
 	extensionsNewPath := extensionsNewCmd.String("path", "", "The path to create the extension in.")
 	extensionsNewTemplate := extensionsNewCmd.String("template", "", "The boilerplate template to use.")
 
+	extensionsEnableCmd := flag.NewFlagSet("enable", flag.ExitOnError)
+	extensionsEnableName := extensionsEnableCmd.String("name", "", "The name of the extension to enable.")
+	extensionsEnableScope := extensionsEnableCmd.String("scope", "", "The scope to enable the extension in.")
+
+	extensionsDisableCmd := flag.NewFlagSet("disable", flag.ExitOnError)
+	extensionsDisableName := extensionsDisableCmd.String("name", "", "The name of the extension to disable.")
+	extensionsDisableScope := extensionsDisableCmd.String("scope", "", "The scope to disable the extension in.")
+
 	mcpCmd := flag.NewFlagSet("mcp", flag.ExitOnError)
 	mcpListCmd := flag.NewFlagSet("list", flag.ExitOnError)
 
@@ -227,6 +235,38 @@ func main() {
 					fmt.Printf("Error creating new extension: %v\n", err)
 					os.Exit(1)
 				}
+			case "enable":
+				extensionsEnableCmd.Parse(extensionsCmd.Args()[1:])
+				if *extensionsEnableName == "" {
+					fmt.Println("Error: --name is required for enable command.")
+					extensionsEnableCmd.PrintDefaults()
+					os.Exit(1)
+				}
+				extensions := commands.NewExtensionsCommand()
+				err := extensions.Enable(extension.ExtensionScopeArgs{
+					Name:  *extensionsEnableName,
+					Scope: *extensionsEnableScope,
+				})
+				if err != nil {
+					fmt.Printf("Error enabling extension: %v\n", err)
+					os.Exit(1)
+				}
+			case "disable":
+				extensionsDisableCmd.Parse(extensionsCmd.Args()[1:])
+				if *extensionsDisableName == "" {
+					fmt.Println("Error: --name is required for disable command.")
+					extensionsDisableCmd.PrintDefaults()
+					os.Exit(1)
+				}
+				extensions := commands.NewExtensionsCommand()
+				err := extensions.Disable(extension.ExtensionScopeArgs{
+					Name:  *extensionsDisableName,
+					Scope: *extensionsDisableScope,
+				})
+				if err != nil {
+					fmt.Printf("Error disabling extension: %v\n", err)
+					os.Exit(1)
+				}
 			default:
 				fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
 				extensionsCmd.PrintDefaults()
@@ -286,6 +326,8 @@ func main() {
 			fmt.Println("  extensions install --source <src> [--ref <ref>] [--auto-update] [--pre-release] [--consent] Install an extension.")
 			fmt.Println("  extensions uninstall --name <name> Uninstall an extension.")
 			fmt.Println("  extensions new --path <path> [--template <template>] Create a new extension.")
+			fmt.Println("  extensions enable --name <name> [--scope <scope>] Enable an extension.")
+			fmt.Println("  extensions disable --name <name> [--scope <scope>] Disable an extension.")
 			fmt.Println("  mcp list                  List MCP items.")
 			fmt.Println("  list-models               List available Gemini models.")
 			os.Exit(0)

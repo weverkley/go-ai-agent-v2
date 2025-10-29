@@ -15,6 +15,12 @@ type NewArgs struct {
 	Template string
 }
 
+// ExtensionScopeArgs represents arguments for commands that operate on extension name and scope.
+type ExtensionScopeArgs struct {
+	Name  string
+	Scope string
+}
+
 // ExtensionInstallMetadata represents metadata about an extension to be installed.
 type ExtensionInstallMetadata struct {
 	Source        string

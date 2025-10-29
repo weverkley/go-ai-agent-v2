@@ -227,6 +227,22 @@ func (em *ExtensionManager) UninstallExtension(name string, _ bool) error {
 	return nil
 }
 
+// EnableExtension enables an extension.
+func (em *ExtensionManager) EnableExtension(name string, scope config.SettingScope) error {
+	// For now, this is a placeholder. In a real implementation, this would modify
+	// a settings file to mark the extension as enabled for the given scope.
+	fmt.Printf("Enabling extension \"%s\" for scope \"%s\" (placeholder)\n", name, scope)
+	return nil
+}
+
+// DisableExtension disables an extension.
+func (em *ExtensionManager) DisableExtension(name string, scope config.SettingScope) error {
+	// For now, this is a placeholder. In a real implementation, this would modify
+	// a settings file to mark the extension as disabled for the given scope.
+	fmt.Printf("Disabling extension \"%s\" for scope \"%s\" (placeholder)\n", name, scope)
+	return nil
+}
+
 // copyDir recursively copies a directory from src to dst.
 func copyDir(src string, dst string) error {
 	src = filepath.Clean(src)

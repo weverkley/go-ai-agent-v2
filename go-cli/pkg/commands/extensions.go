@@ -3,6 +3,7 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/extension"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"os"
@@ -14,7 +15,7 @@ const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/gemini-cli
 
 // ExtensionsCommand represents the extensions command group.
 type ExtensionsCommand struct {
-	// Dependencies can be added here, eg., FileSystemService, GitService
+	// Dependencies can be added here, e.g., FileSystemService, GitService
 }
 
 // NewExtensionsCommand creates a new instance of ExtensionsCommand.
@@ -167,6 +168,64 @@ func (c *ExtensionsCommand) New(args extension.NewArgs) error {
 	}
 
 	fmt.Printf("You can install this using \"gemini extensions link %s\" to test it out.\n", args.Path)
+	return nil
+}
+
+// Enable enables an extension.
+func (c *ExtensionsCommand) Enable(args extension.ExtensionScopeArgs) error {
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	extensionManager := extension.NewExtensionManager(workspaceDir)
+	_, err = extensionManager.LoadExtensions()
+	if err != nil {
+		return fmt.Errorf("failed to load extensions: %w", err)
+	}
+
+	scope := config.SettingScopeUser
+	if strings.ToLower(args.Scope) == "workspace" {
+		scope = config.SettingScopeWorkspace
+	}
+
+	err = extensionManager.EnableExtension(args.Name, scope)
+	if err != nil {
+		return fmt.Errorf("failed to enable extension: %w", err)
+	}
+
+	if args.Scope != "" {
+		fmt.Printf("Extension \"%s\" successfully enabled for scope \"%s\".\n", args.Name, args.Scope)
+	} else {
+		fmt.Printf("Extension \"%s\" successfully enabled in all scopes.\n", args.Name)
+	}
+	return nil
+}
+
+// Disable disables an extension.
+func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	extensionManager := extension.NewExtensionManager(workspaceDir)
+	_, err = extensionManager.LoadExtensions()
+	if err != nil {
+		return fmt.Errorf("failed to load extensions: %w", err)
+	}
+
+	scope := config.SettingScopeUser
+	if strings.ToLower(args.Scope) == "workspace" {
+		scope = config.SettingScopeWorkspace
+	}
+
+	err = extensionManager.DisableExtension(args.Name, scope)
+	if err != nil {
+		return fmt.Errorf("failed to disable extension: %w", err)
+	}
+
+	fmt.Printf("Extension \"%s\" successfully disabled for scope \"%s\".\n", args.Name, scope)
 	return nil
 }
 
