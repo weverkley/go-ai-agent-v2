@@ -159,10 +159,9 @@ Each command will require:1. **Argument Parsing**: Define flags specific to the 
 
 Translate the logic from the following JavaScript files into Go:
 
-- `add.ts`: Logic for adding MCP items.
+            *   `add`: **Functional**.
 - `list.ts`: **Functional** (simulated connection status).
-- `remove.ts`: Logic for removing MCP items.
-
+            *   `remove`: **Functional**.
 Similar to extensions, each MCP command will involve argument parsing, service interaction, and thorough analysis of the original JavaScript source.
 
 ## 4. JavaScript Source Code Location
@@ -175,7 +174,7 @@ The JavaScript source code to be translated is located in the `docs/gemini-cli-m
 ## 4. Next Steps
 
 2.  **Implement `extensions update`**: Translate the logic from the corresponding JavaScript files.
-3.  **Implement `mcp add` and `remove`**: Translate the logic from the corresponding JavaScript files.
+3.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
 4.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
 5.  **Testing**: Write unit and integration tests for the new features.
 
