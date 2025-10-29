@@ -21,21 +21,27 @@ type ReadManyFilesTool struct {
 func NewReadManyFilesTool() *ReadManyFilesTool {
 	return &ReadManyFilesTool{
 		fsService: services.NewFileSystemService(),
-		gitService: services.NewGitService(),
-	}
+				gitService: services.NewGitService(),
+			}
+		}
+
+// SkippedFile represents a file that was skipped during processing.
+type SkippedFile struct {
+	Path   string `json:"path"`
+	Reason string `json:"reason"`
+}
+
+// ReadManyFilesMetadata represents metadata about the files processed.
+type ReadManyFilesMetadata struct {
+	ProcessedFiles []string      `json:"processedFiles"`
+	SkippedFiles   []SkippedFile `json:"skippedFiles"`
 }
 
 // ReadManyFilesResult represents the structure of the read_many_files tool output.
 type ReadManyFilesResult struct {
-	Content string `json:"content"`
-	Metadata struct {
-		ProcessedFiles []string `json:"processedFiles"`
-		SkippedFiles   []struct {
-			Path   string `json:"path"`
-			Reason string `json:"reason"`
-		} `json:"skippedFiles"`
-	}
-} `json:"metadata"`
+	Content  string                `json:"content"`
+	Metadata ReadManyFilesMetadata `json:"metadata"`
+}
 
 // Execute performs a read-many-files operation.
 func (t *ReadManyFilesTool) Execute(
@@ -49,10 +55,7 @@ func (t *ReadManyFilesTool) Execute(
 ) (string, error) {
 	var allFiles []string
 	var processedFiles []string
-	var skippedFiles []struct {
-		Path   string
-		Reason string
-	}
+	var skippedFilesList []SkippedFile // Renamed to avoid conflict with local var
 	var contentBuilder strings.Builder
 
 	// Combine all patterns for glob search
@@ -138,10 +141,7 @@ func (t *ReadManyFilesTool) Execute(
 			// Read file content
 			content, err := ioutil.ReadFile(file)
 			if err != nil {
-				skippedFiles = append(skippedFiles, struct {
-					Path   string
-					Reason string
-				}{Path: file, Reason: fmt.Sprintf("failed to read: %v", err)})
+				skippedFilesList = append(skippedFilesList, SkippedFile{Path: file, Reason: fmt.Sprintf("failed to read: %v", err)})
 				continue
 			}
 
@@ -165,14 +165,14 @@ func (t *ReadManyFilesTool) Execute(
 		}
 	}
 
-	if len(skippedFiles) > 0 {
-		displayMessage.WriteString(fmt.Sprintf("\n**Skipped %d item(s):**\n", len(skippedFiles)))
-		for _, f := range skippedFiles {
+	if len(skippedFilesList) > 0 {
+		displayMessage.WriteString(fmt.Sprintf("\n**Skipped %d item(s):**\n", len(skippedFilesList)))
+		for _, f := range skippedFilesList {
 			displayMessage.WriteString(fmt.Sprintf("- `%s` (Reason: %s)\n", f.Path, f.Reason))
 		}
 	}
 
-	if len(processedFiles) == 0 && len(skippedFiles) == 0 {
+	if len(processedFiles) == 0 && len(skippedFilesList) == 0 {
 		displayMessage.WriteString("No files were read and concatenated based on the criteria.\n")
 	}
 
