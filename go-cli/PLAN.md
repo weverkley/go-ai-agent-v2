@@ -66,7 +66,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `diffOptions.ts`
   - `edit.ts`
   - `glob.ts`: **Functional**.
-  - `grep.ts`
+  - `grep.ts`: **Functional**.
   - `ls.ts`
   - `mcp-client-manager.ts`
   - `mcp-client.ts`
