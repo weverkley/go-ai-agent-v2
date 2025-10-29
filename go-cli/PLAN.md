@@ -71,7 +71,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `mcp-client-manager.ts`
   - `mcp-client.ts`
   - `mcp-tool.ts`
-  - `memoryTool.ts`
+  - `memoryTool.ts`: **Functional**.
   - `modifiable-tool.ts`
   - `read-file.ts`
   - `read-many-files.ts`
