@@ -67,7 +67,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `edit.ts`: **Functional** (implemented by `smart-edit` tool).
   - `glob.ts`: **Functional**.
   - `grep.ts`: **Functional**.
-  - `ls.ts`
+  - `ls.ts`: **Functional**.
   - `mcp-client-manager.ts`
   - `mcp-client.ts`
   - `mcp-tool.ts`
