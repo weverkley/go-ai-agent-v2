@@ -24,9 +24,9 @@ var webSearchCmd = &cobra.Command{
 	Long:  `Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		webSearchTool := tools.NewWebSearchTool()
-		result, err := webSearchTool.Execute(
-			webSearchQuery,
-		)
+		result, err := webSearchTool.Execute(map[string]any{
+			"query": webSearchQuery,
+		})
 		if err != nil {
 			fmt.Printf("Error executing web-search command: %v\n", err)
 			os.Exit(1)

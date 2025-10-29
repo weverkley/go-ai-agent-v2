@@ -3,7 +3,6 @@ package tools
 import (
 	"bufio"
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/services"
 	"os"
 	"path/filepath"
 	"sort"
@@ -11,19 +10,57 @@ import (
 	"time"
 
 	"github.com/gobwas/glob"
+	"github.com/google/generative-ai-go/genai"
 )
 
 // GlobTool represents the glob tool.
-type GlobTool struct {
-	fsService  *services.FileSystemService
-	gitService *services.GitService // Add GitService
-}
+type GlobTool struct{}
 
 // NewGlobTool creates a new instance of GlobTool.
 func NewGlobTool() *GlobTool {
-	return &GlobTool{
-		fsService:  services.NewFileSystemService(),
-		gitService: services.NewGitService(), // Initialize GitService
+	return &GlobTool{}
+}
+
+// Name returns the name of the tool.
+func (t *GlobTool) Name() string {
+	return "glob"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *GlobTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "Efficiently finds files matching specific glob patterns.",
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"pattern": {
+							Type:        genai.TypeString,
+							Description: "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
+						},
+						"path": {
+							Type:        genai.TypeString,
+							Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+						},
+						"case_sensitive": {
+							Type:        genai.TypeBoolean,
+							Description: "Optional: Whether the search should be case-sensitive. Defaults to false.",
+						},
+						"respect_git_ignore": {
+							Type:        genai.TypeBoolean,
+							Description: "Optional: Whether to respect .gitignore patterns. Defaults to true.",
+						},
+						"respect_gemini_ignore": {
+							Type:        genai.TypeBoolean,
+							Description: "Optional: Whether to respect .geminiignore patterns. Defaults to true.",
+						},
+					},
+					Required: []string{"pattern"},
+				},
+			},
+		},
 	}
 }
 
@@ -93,13 +130,32 @@ func (t *GlobTool) readIgnoreFile(filePath string) ([]glob.Glob, error) {
 }
 
 // Execute performs a glob search.
-func (t *GlobTool) Execute(
-	pattern string,
-	searchPath string,
-	caseSensitive bool,
-	respectGitIgnore bool,
-	respectGeminiIgnore bool,
-) (string, error) {
+func (t *GlobTool) Execute(args map[string]any) (string, error) {
+	pattern, ok := args["pattern"].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid or missing 'pattern' argument")
+	}
+
+	searchPath := "."
+	if p, ok := args["path"].(string); ok && p != "" {
+		searchPath = p
+	}
+
+	caseSensitive := false
+	if cs, ok := args["case_sensitive"].(bool); ok {
+		caseSensitive = cs
+	}
+
+	respectGitIgnore := true
+	if rgi, ok := args["respect_git_ignore"].(bool); ok {
+		respectGitIgnore = rgi
+	}
+
+	respectGeminiIgnore := true
+	if rgi, ok := args["respect_gemini_ignore"].(bool); ok {
+		respectGeminiIgnore = rgi
+	}
+
 	// Resolve the search path
 	absSearchPath, err := filepath.Abs(searchPath)
 	if err != nil {

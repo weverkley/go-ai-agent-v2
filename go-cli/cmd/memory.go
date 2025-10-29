@@ -24,9 +24,9 @@ var memoryCmd = &cobra.Command{
 	Long:  `Saves a specific piece of information or fact to your long-term memory. Use this when the user explicitly asks you to remember something, or when they state a clear, concise fact that seems important to retain for future interactions.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		memoryTool := tools.NewMemoryTool()
-		result, err := memoryTool.Execute(
-			memoryFact,
-		)
+		result, err := memoryTool.Execute(map[string]any{
+			"fact": memoryFact,
+		})
 		if err != nil {
 			fmt.Printf("Error executing memory command: %v\n", err)
 			os.Exit(1)

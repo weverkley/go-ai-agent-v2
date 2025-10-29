@@ -3,22 +3,54 @@ package tools
 import (
 	"bufio"
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/services"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/google/generative-ai-go/genai"
 )
 
 // GrepTool represents the grep tool.
-type GrepTool struct {
-	fsService *services.FileSystemService
-}
+type GrepTool struct{}
 
 // NewGrepTool creates a new instance of GrepTool.
 func NewGrepTool() *GrepTool {
-	return &GrepTool{
-		fsService: services.NewFileSystemService(),
+	return &GrepTool{}
+}
+
+// Name returns the name of the tool.
+func (t *GrepTool) Name() string {
+	return "grep"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *GrepTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "Searches for a regular expression pattern within files in a specified directory.",
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"pattern": {
+							Type:        genai.TypeString,
+							Description: "The regular expression (regex) pattern to search for.",
+						},
+						"path": {
+							Type:        genai.TypeString,
+							Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+						},
+						"include": {
+							Type:        genai.TypeString,
+							Description: "Optional: A glob pattern to filter which files are searched (e.g., '*.js', 'src/**').",
+						},
+					},
+					Required: []string{"pattern"},
+				},
+			},
+		},
 	}
 }
 
@@ -30,11 +62,23 @@ type GrepMatch struct {
 }
 
 // Execute performs a grep search.
-func (t *GrepTool) Execute(
-	pattern string,
-	searchPath string,
-	include string,
-) (string, error) {
+func (t *GrepTool) Execute(args map[string]any) (string, error) {
+	// Extract arguments
+	pattern, ok := args["pattern"].(string)
+	if !ok {
+		return "", fmt.Errorf("invalid or missing 'pattern' argument")
+	}
+
+	searchPath := "." // Default to current directory
+	if p, ok := args["path"].(string); ok && p != "" {
+		searchPath = p
+	}
+
+	var include string
+	if i, ok := args["include"].(string); ok {
+		include = i
+	}
+
 	// Compile the regex pattern
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -73,7 +117,8 @@ func (t *GrepTool) Execute(
 
 		file, err := os.Open(path)
 		if err != nil {
-			return err
+			// Silently ignore files that can't be opened
+			return nil
 		}
 		defer file.Close()
 
@@ -94,7 +139,8 @@ func (t *GrepTool) Execute(
 		}
 
 		if err := scanner.Err(); err != nil {
-			return err
+			// Silently ignore read errors
+			return nil
 		}
 
 		return nil

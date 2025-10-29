@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"os"
 	"path/filepath"
 
@@ -21,7 +20,7 @@ const (
 // Settings represents the application settings.
 type Settings struct {
 	ExtensionPaths []string                       `json:"extensionPaths"`
-	McpServers     map[string]mcp.MCPServerConfig `json:"mcpServers,omitempty"`
+	McpServers     map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
 	DebugMode      bool                           `json:"debugMode,omitempty"`
 	UserMemory     string                         `json:"userMemory,omitempty"`
 	ApprovalMode   types.ApprovalMode             `json:"approvalMode,omitempty"`
@@ -43,7 +42,7 @@ func LoadSettings(workspaceDir string) *Settings {
 		// Return default settings if file doesn't exist or can't be read
 		return &Settings{
 			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
-			McpServers:     make(map[string]mcp.MCPServerConfig),
+			McpServers:     make(map[string]types.MCPServerConfig),
 			DebugMode:      false,
 			UserMemory:     "",
 			ApprovalMode:   types.ApprovalModeDefault,
@@ -60,7 +59,7 @@ func LoadSettings(workspaceDir string) *Settings {
 		// Return default settings on parsing error
 		return &Settings{
 			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
-			McpServers:     make(map[string]mcp.MCPServerConfig),
+			McpServers:     make(map[string]types.MCPServerConfig),
 			DebugMode:      false,
 			UserMemory:     "",
 			ApprovalMode:   types.ApprovalModeDefault,
@@ -76,7 +75,7 @@ func LoadSettings(workspaceDir string) *Settings {
 		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".gemini", "extensions")}
 	}
 	if settings.McpServers == nil {
-		settings.McpServers = make(map[string]mcp.MCPServerConfig)
+		settings.McpServers = make(map[string]types.MCPServerConfig)
 	}
 	if settings.ApprovalMode == "" {
 		settings.ApprovalMode = types.ApprovalModeDefault

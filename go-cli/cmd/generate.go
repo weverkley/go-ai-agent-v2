@@ -6,6 +6,8 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/prompts"
+	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +26,10 @@ var generateCmd = &cobra.Command{
 		promptManager := prompts.NewPromptManager()
 		promptManager.AddPrompt(prompts.DiscoveredMCPPrompt{Name: "default", Description: "Translate the following Go code to Javascript:", ServerName: "cli"})
 
-		geminiClient, err := core.NewGeminiChat()
+		// Initialize the tool registry
+		toolRegistry := tools.RegisterAllTools()
+
+		geminiClient, err := core.NewGeminiChat(toolRegistry)
 		if err != nil {
 			fmt.Printf("Error initializing GeminiChat: %v\n", err)
 			os.Exit(1)
@@ -36,7 +41,15 @@ var generateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		content, err := geminiClient.GenerateContent(prompt.Description)
+		// If there are command-line arguments, use them as the prompt
+		var finalPrompt string
+		if len(args) > 0 {
+			finalPrompt = args[0]
+		} else {
+			finalPrompt = prompt.Description
+		}
+
+		content, err := geminiClient.GenerateContent(finalPrompt)
 		if err != nil {
 			fmt.Printf("Error generating content: %v\n", err)
 			os.Exit(1)

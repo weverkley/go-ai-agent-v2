@@ -11,7 +11,7 @@ The foundational structure for the Go CLI has been established, and several core
   - Command-line argument parsing is implemented using the `cobra` library.
   - `--version` flag implemented.
   - Top-level commands implemented:
-    - `generate`: **Functional**, generates content using `pkg/core/gemini.go` (real Gemini API integration).
+    - `generate`: **Functional** (with tool-calling capabilities), generates content using `pkg/core/gemini.go` (real Gemini API integration).
     - `read`: **Functional**, reads file content using `pkg/services/file_system_service.go`.
     - `write`: **Functional**, writes content to a file using `pkg/services/file_system_service.go`.
     - `exec`: **Functional**, executes shell commands (uses `pkg/services/shell_service.go`).
@@ -28,15 +28,16 @@ The foundational structure for the Go CLI has been established, and several core
       - `list`: **Functional**, lists configured MCP servers, merging from settings and extensions, and simulates connection status.
     - `list-models`: **Functional**, lists available Gemini models using `pkg/core/gemini.go`.
 - **Core Services & Tools (pkg/core, pkg/extension, pkg/config, pkg/mcp, pkg/services)**:
-  - `pkg/core/gemini.go`: **Functional**, uses `google.golang.org/genai` for Gemini API interaction.
+  - `pkg/core/gemini.go`: **Functional** (with tool-calling capabilities), uses `google.golang.org/genai` for Gemini API interaction.
   - `pkg/services/shell_service.go`: **Functional**, provides `ExecuteCommand` for shell operations.
   - `pkg/services/file_system_service.go`: **Functional**, provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, `WriteFile`, and `ReadFile`.
   - `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories.
   - `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, but `EnableExtension` and `DisableExtension` are placeholders.
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
     *   `pkg/config/settings.go`: **Functional** (extended functionality). Loads default settings, can read/write settings.json, and includes fields for DebugMode, UserMemory, ApprovalMode, ShowMemoryUsage, TelemetryEnabled, Model, and Proxy.
-  - `pkg/mcp/types.go`: Defines `MCPServerStatus`, `MCPServerConfig`, `MCPOAuthConfig`, and `AuthProviderType`.
-  - `pkg/mcp/client.go`: **Placeholder**. Simulates MCP connection.
+  - `pkg/mcp/types.go`: **Moved to `pkg/types/types.go`**.
+  - `pkg/mcp/client.go`: **Functional** (renamed `Client` to `McpClient`). Simulates MCP connection.
+  - `pkg/types/types.go`: **Updated** to include `MCPServerConfig`, `MCPServerStatus`, `MCPOAuthConfig`, and `AuthProviderType` to resolve import cycles.
 
 ## 2. Remaining Core Components for Translation
 
@@ -65,27 +66,27 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
 - **Tools (other than file I/O)**: Specialized tools such as `grep`, `glob`, `web-fetch`, `memoryTool`, `web-search`, `read-many-files`, etc., need to be implemented.
   - `diffOptions.ts`: **Functional** (implemented by `pkg/utils/diff_utils.go`).
   - `edit.ts`: **Functional** (implemented by `smart-edit` tool).
-  - `glob.ts`: **Functional**.
-  - `grep.ts`: **Functional**.
-  - `ls.ts`: **Functional**.
+  - `glob.ts`: **Functional** (implements `tools.Tool` interface).
+  - `grep.ts`: **Functional** (implements `tools.Tool` interface).
+  - `ls.ts`: **Functional**.: **Functional**.: **Functional**.: **Functional**.
   - `mcp-client-manager.ts`
   - `mcp-client.ts`
   - `mcp-tool.ts`
-- `memoryTool.ts`: **Functional** (stores `GEMINI.md` in `os.UserHomeDir()`).
-  - `modifiable-tool.ts`
-  - `read-file.ts`
-  - `read-many-files.ts`: **Functional**.
+- `memoryTool.ts`: **Functional** (implements `tools.Tool` interface, stores `GEMINI.md` in `os.UserHomeDir()`).
+  - `modifiable-tool.ts`: **Not Applicable** (requires GUI interaction for external editor integration).
+  - `read-file.ts`: **Functional** (implements `tools.Tool` interface).
+  - `read-many-files.ts`: **Functional** (implements `tools.Tool` interface).
   - `ripGrep.ts`: **Functional** (implemented by `grep` tool).
   - `shell.ts`: **Functional** (implemented by `exec` command).
-  - `smart-edit.ts`: **Functional**.
-  - `tool-error.ts`
-  - `tool-names.ts`
-  - `tool-registry.ts`
-  - `tools.ts`
-  - `web-fetch.ts`: **Functional**.
-  - `web-search.ts`: **Functional**.
+  - `smart-edit.ts`: **Functional** (implements `tools.Tool` interface).
+  - `tool-error.ts`: **Functional** (implicitly handled by Go error types).
+  - `tool-names.ts`: **Functional** (implicitly handled by tool `Name()` methods).
+  - `tool-registry.ts`: **Functional** (implemented by `pkg/tools/tool_registry.go` and `pkg/tools/register.go`).
+  - `tools.ts`: **Functional** (implemented by `pkg/tools/types.go` `Tool` interface).
+  - `web-fetch.ts`: **Functional** (implements `tools.Tool` interface).
+  - `web-search.ts`: **Functional** (implements `tools.Tool` interface).
   - `write-file.ts`: **Functional** (implemented by `write` command).
-  - `write-todos.ts`: **Functional** (stores `TODOS.md` in `os.UserHomeDir()`).
+  - `write-todos.ts`: **Functional** (implements `tools.Tool` interface, stores `TODOS.md` in `os.UserHomeDir()`).
 - **Config (`pkg/core/config`)**: Robust configuration management beyond just reading an environment variable (e.g., loading from files).
   - `config.ts`
   - `constants.ts`
@@ -183,7 +184,7 @@ The JavaScript source code to be translated is located in the `docs/gemini-cli-m
 
 ## 5. API Integration Strategy
 
-- **Gemini API Client**: **Functional**, uses `google.golang.org/genai` for Gemini API interaction. `GEMINI_API_KEY` is read from the environment.
+- **Gemini API Client**: **Functional** (with tool-calling capabilities), uses `google.golang.org/genai` for Gemini API interaction. `GEMINI_API_KEY` is read from the environment.
 - **Error Handling**: Implement robust error handling for API calls, including retries and clear error messages.
 
 ## 6. Testing Strategy

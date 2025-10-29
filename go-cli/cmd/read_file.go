@@ -28,11 +28,11 @@ var readFileCmd = &cobra.Command{
 	Long:  `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		readFileTool := tools.NewReadFileTool()
-		result, err := readFileTool.Execute(
-			readFileAbsolutePath,
-			readFileOffset,
-			readFileLimit,
-		)
+		result, err := readFileTool.Execute(map[string]any{
+			"absolute_path": readFileAbsolutePath,
+			"offset":        readFileOffset,
+			"limit":         readFileLimit,
+		})
 		if err != nil {
 			fmt.Printf("Error executing read-file command: %v\n", err)
 			os.Exit(1)

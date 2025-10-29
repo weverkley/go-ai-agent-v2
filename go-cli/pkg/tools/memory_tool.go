@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/google/generative-ai-go/genai"
 )
 
 const (
@@ -14,12 +16,38 @@ const (
 )
 
 // MemoryTool represents the memory tool.
-type MemoryTool struct {
-}
+type MemoryTool struct{}
 
 // NewMemoryTool creates a new instance of MemoryTool.
 func NewMemoryTool() *MemoryTool {
 	return &MemoryTool{}
+}
+
+// Name returns the name of the tool.
+func (t *MemoryTool) Name() string {
+	return "save_memory"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *MemoryTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "Saves a specific piece of information or fact to your long-term memory.",
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"fact": {
+							Type:        genai.TypeString,
+							Description: "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
+						},
+					},
+					Required: []string{"fact"},
+				},
+			},
+		},
+	}
 }
 
 // getGlobalMemoryFilePath returns the path to the GEMINI.md file.
@@ -93,9 +121,12 @@ func computeNewContent(currentContent, fact string) string {
 }
 
 // Execute saves a fact to long-term memory.
-func (t *MemoryTool) Execute(
-	fact string,
-) (string, error) {
+func (t *MemoryTool) Execute(args map[string]any) (string, error) {
+	fact, ok := args["fact"].(string)
+	if !ok || fact == "" {
+		return "", fmt.Errorf("invalid or missing 'fact' argument")
+	}
+
 	memoryFilePath, err := getGlobalMemoryFilePath()
 	if err != nil {
 		return "", err

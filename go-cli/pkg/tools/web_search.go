@@ -6,30 +6,53 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/customsearch/v1"
 	"google.golang.org/api/option"
 )
 
 // WebSearchTool represents the web-search tool.
-type WebSearchTool struct {
-}
+type WebSearchTool struct{}
 
 // NewWebSearchTool creates a new instance of WebSearchTool.
 func NewWebSearchTool() *WebSearchTool {
 	return &WebSearchTool{}
 }
 
-// WebSearchResult represents the structure of a single web search result.
-type WebSearchResult struct {
-	Title   string `json:"title"`
-	URI     string `json:"uri"`
-	Snippet string `json:"snippet"`
+// Name returns the name of the tool.
+func (t *WebSearchTool) Name() string {
+	return "web_search"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *WebSearchTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "Performs a web search using Google Search and returns the results.",
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"query": {
+							Type:        genai.TypeString,
+							Description: "The search query to find information on the web.",
+						},
+					},
+					Required: []string{"query"},
+				},
+			},
+		},
+	}
 }
 
 // Execute performs a web search operation.
-func (t *WebSearchTool) Execute(
-	query string,
-) (string, error) {
+func (t *WebSearchTool) Execute(args map[string]any) (string, error) {
+	query, ok := args["query"].(string)
+	if !ok || query == "" {
+		return "", fmt.Errorf("invalid or missing 'query' argument")
+	}
+
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	cx := os.Getenv("GOOGLE_CUSTOM_SEARCH_CX")
 

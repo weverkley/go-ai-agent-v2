@@ -7,22 +7,61 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/services"
-
 	"github.com/gobwas/glob"
+	"github.com/google/generative-ai-go/genai"
 )
 
 // ReadManyFilesTool represents the read-many-files tool.
-type ReadManyFilesTool struct {
-	fsService  *services.FileSystemService
-	gitService *services.GitService
-}
+type ReadManyFilesTool struct{}
 
 // NewReadManyFilesTool creates a new instance of ReadManyFilesTool.
 func NewReadManyFilesTool() *ReadManyFilesTool {
-	return &ReadManyFilesTool{
-		fsService:  services.NewFileSystemService(),
-		gitService: services.NewGitService(),
+	return &ReadManyFilesTool{}
+}
+
+// Name returns the name of the tool.
+func (t *ReadManyFilesTool) Name() string {
+	return "read_many_files"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *ReadManyFilesTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "Reads content from multiple files specified by paths or glob patterns...", // Truncated for brevity
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"paths": {
+							Type:        genai.TypeArray,
+							Description: "Required. An array of glob patterns or paths relative to the tool's target directory.",
+							Items:       &genai.Schema{Type: genai.TypeString},
+						},
+						"include": {
+							Type:        genai.TypeArray,
+							Description: "Optional. Additional glob patterns to include.",
+							Items:       &genai.Schema{Type: genai.TypeString},
+						},
+						"exclude": {
+							Type:        genai.TypeArray,
+							Description: "Optional. Glob patterns for files/directories to exclude.",
+							Items:       &genai.Schema{Type: genai.TypeString},
+						},
+						"recursive": {
+							Type:        genai.TypeBoolean,
+							Description: "Optional. Whether to search recursively. Defaults to true.",
+						},
+						"useDefaultExcludes": {
+							Type:        genai.TypeBoolean,
+							Description: "Optional. Apply default exclusion patterns. Defaults to true.",
+						},
+					},
+					Required: []string{"paths"},
+				},
+			},
+		},
 	}
 }
 
@@ -32,51 +71,52 @@ type SkippedFile struct {
 	Reason string `json:"reason"`
 }
 
-// ReadManyFilesMetadata represents metadata about the files processed.
-type ReadManyFilesMetadata struct {
-	ProcessedFiles []string      `json:"processedFiles"`
-	SkippedFiles   []SkippedFile `json:"skippedFiles"`
-}
-
-// ReadManyFilesResult represents the structure of the read_many_files tool output.
-type ReadManyFilesResult struct {
-	Content  string                `json:"content"`
-	Metadata ReadManyFilesMetadata `json:"metadata"`
-}
-
 // Execute performs a read-many-files operation.
-func (t *ReadManyFilesTool) Execute(
-	patterns []string,
-	includePatterns []string,
-	excludePatterns []string,
-	recursive bool,
-	useDefaultExcludes bool,
-	respectGitIgnore bool,
-	respectGeminiIgnore bool,
-) (string, error) {
+func (t *ReadManyFilesTool) Execute(args map[string]any) (string, error) {
+	patterns, ok := args["paths"].([]any)
+	if !ok || len(patterns) == 0 {
+		return "", fmt.Errorf("invalid or missing 'paths' argument")
+	}
+	pathStrings := make([]string, len(patterns))
+	for i, v := range patterns {
+		pathStrings[i] = fmt.Sprint(v)
+	}
+
+	var includePatterns []string
+	if include, ok := args["include"].([]any); ok {
+		for _, v := range include {
+			includePatterns = append(includePatterns, fmt.Sprint(v))
+		}
+	}
+
+	var excludePatterns []string
+	if exclude, ok := args["exclude"].([]any); ok {
+		for _, v := range exclude {
+			excludePatterns = append(excludePatterns, fmt.Sprint(v))
+		}
+	}
+
+	recursive := true
+	if r, ok := args["recursive"].(bool); ok {
+		recursive = r
+	}
+
+	useDefaultExcludes := true
+	if ude, ok := args["useDefaultExcludes"].(bool); ok {
+		useDefaultExcludes = ude
+	}
+
 	var allFiles []string
 	var processedFiles []string
-	var skippedFilesList []SkippedFile // Renamed to avoid conflict with local var
+	var skippedFilesList []SkippedFile
 	var contentBuilder strings.Builder
 
-	// Combine all patterns for glob search
-	searchPatterns := append(patterns, includePatterns...)
+	searchPatterns := append(pathStrings, includePatterns...)
 
-	// Get ignore patterns (from .gitignore and .geminiignore)
-	// var ignoreGlobs []glob.Glob
-	if respectGitIgnore {
-		// TODO: Implement reading .gitignore from multiple levels
-	}
-	if respectGeminiIgnore {
-		// TODO: Implement reading .geminiignore from multiple levels
-	}
-
-	// Default excludes (simplified for now)
 	if useDefaultExcludes {
 		excludePatterns = append(excludePatterns, "node_modules", ".git", ".gemini")
 	}
 
-	// Compile exclude patterns
 	var compiledExcludeGlobs []glob.Glob
 	for _, p := range excludePatterns {
 		g, err := glob.Compile(p)
@@ -86,9 +126,8 @@ func (t *ReadManyFilesTool) Execute(
 		compiledExcludeGlobs = append(compiledExcludeGlobs, g)
 	}
 
-	// Walk through each search pattern
 	for _, searchPattern := range searchPatterns {
-		absSearchPath, err := filepath.Abs(".") // Start from current directory
+		absSearchPath, err := filepath.Abs(".")
 		if err != nil {
 			return "", fmt.Errorf("failed to get absolute path: %w", err)
 		}
@@ -99,11 +138,9 @@ func (t *ReadManyFilesTool) Execute(
 			}
 
 			if info.IsDir() {
-				// If not recursive and it's a directory, skip
 				if !recursive && path != absSearchPath {
 					return filepath.SkipDir
 				}
-				// Check if directory is excluded
 				for _, excludeG := range compiledExcludeGlobs {
 					relPath, _ := filepath.Rel(absSearchPath, path)
 					if excludeG.Match(relPath) {
@@ -118,14 +155,12 @@ func (t *ReadManyFilesTool) Execute(
 				return err
 			}
 
-			// Check against exclude patterns
 			for _, excludeG := range compiledExcludeGlobs {
 				if excludeG.Match(relPath) {
-					return nil // Skip this file
+					return nil
 				}
 			}
 
-			// Match against the current search pattern
 			g, err := glob.Compile(searchPattern)
 			if err != nil {
 				return fmt.Errorf("failed to compile search pattern %s: %w", searchPattern, err)
@@ -142,21 +177,17 @@ func (t *ReadManyFilesTool) Execute(
 		}
 	}
 
-	// Process unique files
 	uniqueFiles := make(map[string]bool)
 	for _, file := range allFiles {
 		if _, exists := uniqueFiles[file]; !exists {
 			uniqueFiles[file] = true
 
-			// Read file content
 			content, err := ioutil.ReadFile(file)
 			if err != nil {
 				skippedFilesList = append(skippedFilesList, SkippedFile{Path: file, Reason: fmt.Sprintf("failed to read: %v", err)})
 				continue
 			}
 
-			// For now, assume all are text files.
-			// TODO: Implement image/pdf handling.
 			contentBuilder.WriteString(fmt.Sprintf("--- %s ---\n", file))
 			contentBuilder.WriteString(string(content))
 			contentBuilder.WriteString("\n")
@@ -186,5 +217,5 @@ func (t *ReadManyFilesTool) Execute(
 		displayMessage.WriteString("No files were read and concatenated based on the criteria.\n")
 	}
 
-	return contentBuilder.String() + "\n\n" + displayMessage.String(), nil
+	return contentBuilder.String() + "\n--- End of content ---\n\n" + displayMessage.String(), nil
 }

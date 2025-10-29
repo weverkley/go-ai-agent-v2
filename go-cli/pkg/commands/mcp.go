@@ -5,6 +5,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/extension"
 	"go-ai-agent-v2/go-cli/pkg/mcp"
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"strings"
 	"time"
@@ -28,7 +29,7 @@ func NewMcpCommand() *McpCommand {
 }
 
 // getMcpServersFromConfig loads and merges MCP server configurations.
-func (c *McpCommand) getMcpServersFromConfig(workspaceDir string) (map[string]mcp.MCPServerConfig, error) {
+func (c *McpCommand) getMcpServersFromConfig(workspaceDir string) (map[string]types.MCPServerConfig, error) {
 	settings := config.LoadSettings(workspaceDir)
 	extensionManager := extension.NewExtensionManager(workspaceDir)
 	extensions, err := extensionManager.LoadExtensions()
@@ -36,7 +37,7 @@ func (c *McpCommand) getMcpServersFromConfig(workspaceDir string) (map[string]mc
 		return nil, fmt.Errorf("failed to load extensions: %w", err)
 	}
 
-	mcpServers := make(map[string]mcp.MCPServerConfig)
+	mcpServers := make(map[string]types.MCPServerConfig)
 
 	// Merge MCP servers from settings
 	for k, v := range settings.McpServers {
@@ -56,8 +57,8 @@ func (c *McpCommand) getMcpServersFromConfig(workspaceDir string) (map[string]mc
 }
 
 // testMCPConnection simulates testing an MCP connection.
-func (c *McpCommand) testMCPConnection(serverName string, config mcp.MCPServerConfig) (mcp.MCPServerStatus, error) {
-	client := mcp.NewClient("mcp-test-client", "0.0.1")
+func (c *McpCommand) testMCPConnection(serverName string, config types.MCPServerConfig) (types.MCPServerStatus, error) {
+	client := mcp.NewMcpClient("mcp-test-client", "0.0.1")
 
 	// Simulate transport creation (for now, just a placeholder)
 	// In a real implementation, createTransport would be called here.
@@ -65,21 +66,21 @@ func (c *McpCommand) testMCPConnection(serverName string, config mcp.MCPServerCo
 	err := client.Connect(config, 5*time.Second) // 5s timeout
 	if err != nil {
 		client.Close()
-		return mcp.DISCONNECTED, nil // Return nil error as status indicates disconnection
+		return types.DISCONNECTED, nil // Return nil error as status indicates disconnection
 	}
 
 	err = client.Ping()
 	if err != nil {
 		client.Close()
-		return mcp.DISCONNECTED, nil // Return nil error as status indicates disconnection
+		return types.DISCONNECTED, nil // Return nil error as status indicates disconnection
 	}
 
 	client.Close()
-	return mcp.CONNECTED, nil
+	return types.CONNECTED, nil
 }
 
 // getServerStatus gets the status of an MCP server.
-func (c *McpCommand) getServerStatus(serverName string, serverConfig mcp.MCPServerConfig) (mcp.MCPServerStatus, error) {
+func (c *McpCommand) getServerStatus(serverName string, serverConfig types.MCPServerConfig) (types.MCPServerStatus, error) {
 	return c.testMCPConnection(serverName, serverConfig)
 }
 
@@ -121,13 +122,13 @@ func (c *McpCommand) ListMcpItems() error {
 		var statusIndicator string
 		var statusText string
 		switch status {
-		case mcp.CONNECTED:
+		case types.CONNECTED:
 			statusIndicator = COLOR_GREEN + "✓" + RESET_COLOR
 			statusText = "Connected"
-		case mcp.CONNECTING:
+		case types.CONNECTING:
 			statusIndicator = COLOR_YELLOW + "…" + RESET_COLOR
 			statusText = "Connecting"
-		case mcp.DISCONNECTED:
+		case types.DISCONNECTED:
 			statusIndicator = COLOR_RED + "✗" + RESET_COLOR
 			statusText = "Disconnected"
 		default:
@@ -177,7 +178,7 @@ func (c *McpCommand) AddMcpItem(
 
 	settings := config.LoadSettings(workspaceDir)
 	if settings.McpServers == nil {
-		settings.McpServers = make(map[string]mcp.MCPServerConfig)
+		settings.McpServers = make(map[string]types.MCPServerConfig)
 	}
 
 	if _, exists := settings.McpServers[name]; exists {
@@ -203,7 +204,7 @@ func (c *McpCommand) AddMcpItem(
 		}
 	}
 
-	newServer := mcp.MCPServerConfig{
+	newServer := types.MCPServerConfig{
 		Timeout:      timeout,
 		Trust:        trust,
 		Description:  description,

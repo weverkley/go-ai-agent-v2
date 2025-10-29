@@ -1,7 +1,6 @@
 package config
 
 import (
-	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"go-ai-agent-v2/go-cli/pkg/types" // Import the new types package
 )
 
@@ -28,7 +27,7 @@ type ConfigParameters struct {
 	TargetDir      string
 	DebugMode      bool
 	Model          string
-	McpServers     map[string]mcp.MCPServerConfig
+	McpServers     map[string]types.MCPServerConfig
 	ApprovalMode   types.ApprovalMode // Use ApprovalMode from types package
 	Telemetry      *TelemetrySettings
 	Output         *OutputSettings
@@ -41,7 +40,7 @@ type Config struct {
 	targetDir      string
 	debugMode      bool
 	model          string
-	mcpServers     map[string]mcp.MCPServerConfig
+	mcpServers     map[string]types.MCPServerConfig
 	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
 	telemetry      *TelemetrySettings
 	output         *OutputSettings

@@ -36,15 +36,15 @@ var readManyFilesCmd = &cobra.Command{
 	Long:  `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		readManyFilesTool := tools.NewReadManyFilesTool()
-		result, err := readManyFilesTool.Execute(
-			readManyFilesPaths,
-			readManyFilesInclude,
-			readManyFilesExclude,
-			readManyFilesRecursive,
-			readManyFilesUseDefaultExcludes,
-			readManyFilesRespectGitIgnore,
-			readManyFilesRespectGeminiIgnore,
-		)
+		result, err := readManyFilesTool.Execute(map[string]any{
+			"paths":                readManyFilesPaths,
+			"include":              readManyFilesInclude,
+			"exclude":              readManyFilesExclude,
+			"recursive":            readManyFilesRecursive,
+			"useDefaultExcludes":   readManyFilesUseDefaultExcludes,
+			"respectGitIgnore":     readManyFilesRespectGitIgnore,
+			"respectGeminiIgnore":  readManyFilesRespectGeminiIgnore,
+		})
 		if err != nil {
 			fmt.Printf("Error executing read-many-files command: %v\n", err)
 			os.Exit(1)

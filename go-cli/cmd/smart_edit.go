@@ -33,12 +33,12 @@ var smartEditCmd = &cobra.Command{
 	Long:  `Replaces text within a file using smart strategies (exact, flexible, regex) and includes self-correction logic.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		smartEditTool := tools.NewSmartEditTool()
-		result, err := smartEditTool.Execute(
-			smartEditFilePath,
-			smartEditInstruction,
-			smartEditOldString,
-			smartEditNewString,
-		)
+		result, err := smartEditTool.Execute(map[string]any{
+			"file_path":   smartEditFilePath,
+			"instruction": smartEditInstruction,
+			"old_string":  smartEditOldString,
+			"new_string":  smartEditNewString,
+		})
 		if err != nil {
 			fmt.Printf("Error executing smart-edit command: %v\n", err)
 			os.Exit(1)

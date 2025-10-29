@@ -2,35 +2,36 @@ package mcp
 
 import (
 	"fmt"
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"time"
 )
 
-// Client represents a simplified MCP client.
-type Client struct {
+// McpClient represents a simplified MCP client.
+type McpClient struct {
 	name    string
 	version string
 }
 
-// NewClient creates a new instance of Client.
-func NewClient(name, version string) *Client {
-	return &Client{name: name, version: version}
+// NewMcpClient creates a new instance of McpClient.
+func NewMcpClient(name, version string) *McpClient {
+	return &McpClient{name: name, version: version}
 }
 
 // Connect simulates connecting to an MCP server.
-func (c *Client) Connect(config MCPServerConfig, timeout time.Duration) error {
+func (c *McpClient) Connect(config types.MCPServerConfig, timeout time.Duration) error {
 	fmt.Printf("Simulating connection to MCP server (name: %s, config: %+v) with timeout %v\n", c.name, config, timeout)
 	// For now, always succeed.
 	return nil
 }
 
 // Ping simulates pinging the MCP server.
-func (c *Client) Ping() error {
+func (c *McpClient) Ping() error {
 	fmt.Println("Simulating ping to MCP server.")
 	return nil
 }
 
 // Close simulates closing the MCP client connection.
-func (c *Client) Close() error {
+func (c *McpClient) Close() error {
 	fmt.Println("Simulating closing MCP client.")
 	return nil
 }

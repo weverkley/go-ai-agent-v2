@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -18,17 +18,17 @@ import (
 type Extension struct {
 	Name          string `json:"name"`
 	Path          string
-	Description   string                         `json:"description"`
-	McpServers    map[string]mcp.MCPServerConfig `json:"mcpServers,omitempty"`
+	Description   string                       `json:"description"`
+	McpServers    map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
 	InstallType   string
 	InstallSource string
 }
 
 // ExtensionConfig represents the structure of gemini-extension.json
 type ExtensionConfig struct {
-	Name        string                         `json:"name"`
-	Description string                         `json:"description"`
-	McpServers  map[string]mcp.MCPServerConfig `json:"mcpServers,omitempty"`
+	Name        string                           `json:"name"`
+	Description string                           `json:"description"`
+	McpServers  map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
 	// Add other fields as needed from the JSON config
 }
 

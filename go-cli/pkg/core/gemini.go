@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
@@ -17,12 +19,13 @@ type ContentGenerator interface {
 
 // GeminiChat represents a Gemini chat client.
 type GeminiChat struct {
-	client *genai.Client
-	model  *genai.GenerativeModel
+	client       *genai.Client
+	model        *genai.GenerativeModel
+	toolRegistry *tools.ToolRegistry
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
-func NewGeminiChat() (*GeminiChat, error) {
+func NewGeminiChat(registry *tools.ToolRegistry) (*GeminiChat, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -34,30 +37,70 @@ func NewGeminiChat() (*GeminiChat, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	model := client.GenerativeModel("gemini-pro-latest") // Using gemini-pro-latest model
-
-	return &GeminiChat{client: client, model: model}, nil
-}
-
-// GenerateContent generates content using the Gemini API.
-func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
-	ctx := context.Background()
-
-	resp, err := gc.model.GenerateContent(ctx, genai.Text(prompt))
-	if err != nil {
-		return "", fmt.Errorf("failed to generate content: %w", err)
+	model := client.GenerativeModel("gemini-pro-latest")
+	if registry != nil && len(registry.GetTools()) > 0 {
+		model.Tools = registry.GetTools()
 	}
 
-	if len(resp.Candidates) == 0 || len(resp.Candidates[0].Content.Parts) == 0 {
-		return "", fmt.Errorf("no content generated")
+	return &GeminiChat{client: client, model: model, toolRegistry: registry}, nil
+}
+
+// GenerateContent generates content using the Gemini API, handling tool calls.
+func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
+	ctx := context.Background()
+	chat := gc.model.StartChat()
+
+	// Send initial prompt
+	resp, err := chat.SendMessage(ctx, genai.Text(prompt))
+	if err != nil {
+		return "", fmt.Errorf("failed to send initial message: %w", err)
 	}
 
 	var generatedText string
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if txt, ok := part.(genai.Text);
-			ok {
-			generatedText += string(txt)
+	for {
+		if resp == nil || len(resp.Candidates) == 0 {
+			break // No more responses
 		}
+
+		candidate := resp.Candidates[0]
+		if candidate.Content == nil {
+			break
+		}
+
+		// Aggregate text parts
+		for _, part := range candidate.Content.Parts {
+			if txt, ok := part.(genai.Text); ok {
+				generatedText += string(txt)
+			}
+		}
+
+		// Check for function calls
+		if len(candidate.Content.Parts) > 0 {
+			if fc, ok := candidate.Content.Parts[0].(genai.FunctionCall); ok {
+				tool, err := gc.toolRegistry.GetTool(fc.Name)
+				if err != nil {
+					return "", fmt.Errorf("unknown tool called: %s", fc.Name)
+				}
+
+				toolOutput, err := tool.Execute(fc.Args)
+				if err != nil {
+					return "", fmt.Errorf("error executing tool %s: %w", fc.Name, err)
+				}
+
+				// Send tool output back to the model
+				resp, err = chat.SendMessage(ctx, &genai.FunctionResponse{
+					Name:     fc.Name,
+					Response: map[string]any{"output": toolOutput},
+				})
+				if err != nil {
+					return "", fmt.Errorf("failed to send tool response: %w", err)
+				}
+				continue // Continue the loop to process the model's response to the tool output
+			}
+		}
+
+		// If there are no more function calls, we are done.
+		break
 	}
 
 	return generatedText, nil

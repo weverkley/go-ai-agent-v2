@@ -34,8 +34,18 @@ var todosCmd = &cobra.Command{
 			todos = append(todos, tools.Todo{Description: parts[0], Status: parts[1]})
 		}
 
+		var todosForExecute []any
+		for _, t := range todos {
+			todosForExecute = append(todosForExecute, map[string]any{
+				"description": t.Description,
+				"status":      t.Status,
+			})
+		}
+
 		writeTodosTool := tools.NewWriteTodosTool()
-		result, err := writeTodosTool.Execute(todos)
+		result, err := writeTodosTool.Execute(map[string]any{
+			"todos": todosForExecute,
+		})
 		if err != nil {
 			fmt.Printf("Error executing todos command: %v\n", err)
 			os.Exit(1)

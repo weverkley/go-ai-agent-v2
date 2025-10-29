@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/google/generative-ai-go/genai"
 )
 
 const (
@@ -19,12 +21,46 @@ type Todo struct {
 }
 
 // WriteTodosTool represents the write-todos tool.
-type WriteTodosTool struct {
-}
+type WriteTodosTool struct{}
 
 // NewWriteTodosTool creates a new instance of WriteTodosTool.
 func NewWriteTodosTool() *WriteTodosTool {
 	return &WriteTodosTool{}
+}
+
+// Name returns the name of the tool.
+func (t *WriteTodosTool) Name() string {
+	return "write_todos"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *WriteTodosTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "This tool can help you list out the current subtasks that are required to be completed for a given user request.",
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"todos": {
+							Type:        genai.TypeArray,
+							Description: "The complete list of todo items. This will replace the existing list.",
+							Items: &genai.Schema{
+								Type: genai.TypeObject,
+								Properties: map[string]*genai.Schema{
+									"description": {Type: genai.TypeString},
+									"status":      {Type: genai.TypeString, Enum: []string{"pending", "in_progress", "completed", "cancelled"}},
+								},
+								Required: []string{"description", "status"},
+							},
+						},
+					},
+					Required: []string{"todos"},
+				},
+			},
+		},
+	}
 }
 
 // getTodosFilePath returns the path to the TODOS.md file.
@@ -37,9 +73,23 @@ func getTodosFilePath() (string, error) {
 }
 
 // Execute writes the todos to a file.
-func (t *WriteTodosTool) Execute(
-	todos []Todo,
-) (string, error) {
+func (t *WriteTodosTool) Execute(args map[string]any) (string, error) {
+	todosData, ok := args["todos"].([]any)
+	if !ok {
+		return "", fmt.Errorf("invalid or missing 'todos' argument")
+	}
+
+	var todos []Todo
+	for _, item := range todosData {
+		todoMap, ok := item.(map[string]any)
+		if !ok {
+			return "", fmt.Errorf("invalid todo item format")
+		}
+		desc, _ := todoMap["description"].(string)
+		status, _ := todoMap["status"].(string)
+		todos = append(todos, Todo{Description: desc, Status: status})
+	}
+
 	// Validate todos
 	inProgressCount := 0
 	for _, todo := range todos {

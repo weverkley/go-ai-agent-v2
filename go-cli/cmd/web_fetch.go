@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
 	"github.com/spf13/cobra"
@@ -27,12 +28,22 @@ var webFetchCmd = &cobra.Command{
 	Short: "Fetches content from URL(s)",
 	Long:  `Fetches content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt.`, 
 	Run: func(cmd *cobra.Command, args []string) {
+		var promptBuilder strings.Builder
+		promptBuilder.WriteString("Fetch content from:")
+		for _, url := range webFetchUrls {
+			promptBuilder.WriteString(fmt.Sprintf(" %s", url))
+		}
+		if webFetchSummarize {
+			promptBuilder.WriteString(" and summarize it.")
+		}
+		if webFetchExtractKeyPoints {
+			promptBuilder.WriteString(" and extract key points.")
+		}
+
 		webFetchTool := tools.NewWebFetchTool()
-		result, err := webFetchTool.Execute(
-			webFetchUrls,
-			webFetchSummarize,
-			webFetchExtractKeyPoints,
-		)
+		result, err := webFetchTool.Execute(map[string]any{
+			"prompt": promptBuilder.String(),
+		})
 		if err != nil {
 			fmt.Printf("Error executing web-fetch command: %v\n", err)
 			os.Exit(1)

@@ -28,11 +28,11 @@ var grepCmd = &cobra.Command{
 	Long:  `Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		grepTool := tools.NewGrepTool()
-		result, err := grepTool.Execute(
-			grepPattern,
-			grepPath,
-			grepInclude,
-		)
+		result, err := grepTool.Execute(map[string]any{
+			"pattern": grepPattern,
+			"path":    grepPath,
+			"include": grepInclude,
+		})
 		if err != nil {
 			fmt.Printf("Error executing grep command: %v\n", err)
 			os.Exit(1)

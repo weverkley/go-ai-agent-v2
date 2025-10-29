@@ -6,23 +6,70 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/google/generative-ai-go/genai"
 )
 
 // ReadFileTool represents the read-file tool.
-type ReadFileTool struct {
-}
+type ReadFileTool struct{}
 
 // NewReadFileTool creates a new instance of ReadFileTool.
 func NewReadFileTool() *ReadFileTool {
 	return &ReadFileTool{}
 }
 
+// Name returns the name of the tool.
+func (t *ReadFileTool) Name() string {
+	return "read_file"
+}
+
+// Definition returns the tool's definition for the Gemini API.
+func (t *ReadFileTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        t.Name(),
+				Description: "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
+				Parameters: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"absolute_path": {
+							Type:        genai.TypeString,
+							Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+						},
+						"offset": {
+							Type:        genai.TypeNumber,
+							Description: "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+						},
+						"limit": {
+							Type:        genai.TypeNumber,
+							Description: "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+						},
+					},
+					Required: []string{"absolute_path"},
+				},
+			},
+		},
+	}
+}
+
 // Execute performs a read-file operation.
-func (t *ReadFileTool) Execute(
-	absolutePath string,
-	offset int,
-	limit int,
-) (string, error) {
+func (t *ReadFileTool) Execute(args map[string]any) (string, error) {
+	absolutePath, ok := args["absolute_path"].(string)
+	if !ok || absolutePath == "" {
+		return "", fmt.Errorf("invalid or missing 'absolute_path' argument")
+	}
+
+	var offset int
+	if o, ok := args["offset"].(float64); ok {
+		offset = int(o)
+	}
+
+	var limit int
+	if l, ok := args["limit"].(float64); ok {
+		limit = int(l)
+	}
+
 	// Check if file exists
 	info, err := os.Stat(absolutePath)
 	if err != nil {
@@ -39,8 +86,6 @@ func (t *ReadFileTool) Execute(
 
 	// For now, assume all are text files.
 	// TODO: Implement image/pdf handling.
-	// If it's not a text file, return a placeholder message. 
-	// For simplicity, we'll just check extension for now.
 	ext := strings.ToLower(filepath.Ext(absolutePath))
 	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".pdf" {
 		return fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath), nil
@@ -93,9 +138,10 @@ func (t *ReadFileTool) Execute(
 
 	var llmContent strings.Builder
 	if isTruncated {
+		nextOffset := linesShownEnd
 		llmContent.WriteString("\nIMPORTANT: The file content has been truncated.\n")
 		llmContent.WriteString(fmt.Sprintf("Status: Showing lines %d-%d of %d total lines.\n", linesShownStart+1, linesShownEnd, originalLineCount))
-		llmContent.WriteString(fmt.Sprintf("Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: %d.\n", linesShownEnd+1))
+		llmContent.WriteString(fmt.Sprintf("Action: To read more of the file, you can use the 'offset' and 'limit' parameters in a subsequent 'read_file' call. For example, to read the next section of the file, use offset: %d.\n", nextOffset))
 		llmContent.WriteString("\n--- FILE CONTENT (truncated) ---\n")
 	}
 	llmContent.WriteString(contentBuilder.String())
