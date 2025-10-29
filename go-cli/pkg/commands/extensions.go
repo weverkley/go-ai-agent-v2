@@ -229,15 +229,35 @@ func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
 	return nil
 }
 
-// Update updates an extension.
-func (c *ExtensionsCommand) Update(name string) error {
+// Update updates an extension or all extensions.
+func (c *ExtensionsCommand) Update(name string, all bool) error {
 	workspaceDir, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("failed to get current working directory: %w", err)
 	}
 
 	extensionManager := extension.NewExtensionManager(workspaceDir)
-	return extensionManager.UpdateExtension(name)
+
+	if all {
+		extensions, err := extensionManager.LoadExtensions()
+		if err != nil {
+			return fmt.Errorf("failed to load extensions: %w", err)
+		}
+		for _, ext := range extensions {
+			err := extensionManager.UpdateExtension(ext.Name)
+			if err != nil {
+				fmt.Printf("Error updating extension %s: %v\n", ext.Name, err)
+			}
+		}
+		fmt.Println("All extensions updated.")
+	} else {
+		err := extensionManager.UpdateExtension(name)
+		if err != nil {
+			return fmt.Errorf("failed to update extension: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Link links a local extension.

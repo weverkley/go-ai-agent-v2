@@ -8,7 +8,7 @@ The foundational structure for the Go CLI has been established, and several core
 
 *   **Go Project Setup**: An empty Go module (`go-ai-agent-v2/go-cli`) has been initialized.
 *   **Core CLI Structure (main.go)**:
-    *   Basic command-line argument parsing is in place using Go's `flag` package.
+    *   Command-line argument parsing is implemented using the `cobra` library.
     *   `--version` flag implemented.
     *   Top-level commands implemented:
         *   `generate`: **Functional**, generates content using `pkg/core/gemini.go` (real Gemini API integration).
@@ -19,8 +19,7 @@ The foundational structure for the Go CLI has been established, and several core
         *   `git-branch`: **Functional**, gets the current Git branch name (uses `pkg/services/git_service.go` with `go-git`).
         *   `extensions`: Command group with subcommands:
             *   `list`: **Functional**, lists discovered extensions by reading `gemini-extension.json` files.
-            *   `install`: **In Progress**, command structure and argument parsing in `main.go` are ready. Core logic in `pkg/commands/extensions.go` and `pkg/extension/manager.go` is partially implemented with git clone and local copy functionality.
-            *   `uninstall`: **Functional**.
+                         *   `install`: **Functional** (bug in renaming directory after install fixed), command structure and argument parsing in `main.go` are ready. Core logic in `pkg/commands/extensions.go` and `pkg/extension/manager.go` is implemented with git clone and local copy functionality.            *   `uninstall`: **Functional** (with linked extension support).
             *   `new`: **Functional**.
             *   `enable`: **Placeholder**.
             *   `disable`: **Placeholder**.
@@ -152,8 +151,7 @@ Translate the logic from the following JavaScript files into Go:
 *   `disable.ts`: **Placeholder**.
 *   `uninstall.ts`: **Functional**.
 *   `update.ts`: Logic for updating extensions.
-*   `link.ts`: Logic for linking local extensions.
-
+            *   `link`: **Functional**.
 Each command will require:
 1.  **Argument Parsing**: Define flags specific to the subcommand.
 2.  **Service Interaction**: Utilize the core services (`FileSystemService`, `GitService`, etc.) as needed.
@@ -178,8 +176,7 @@ The JavaScript source code to be translated is located in the `docs/gemini-cli-m
 
 ## 4. Next Steps
 
-1.  **Complete `extensions install`**: Remove placeholder logic in `pkg/extension/manager.go` and `pkg/commands/extensions.go`.
-2.  **Implement `extensions update` and `link`**: Translate the logic from the corresponding JavaScript files.
+2.  **Implement `extensions update`**: Translate the logic from the corresponding JavaScript files.
 3.  **Implement `mcp add` and `remove`**: Translate the logic from the corresponding JavaScript files.
 4.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
 5.  **Testing**: Write unit and integration tests for the new features.

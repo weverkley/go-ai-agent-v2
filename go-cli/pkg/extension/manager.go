@@ -298,8 +298,12 @@ func (em *ExtensionManager) UpdateExtension(name string) error {
 			return fmt.Errorf("failed to pull latest changes for %s: %w", targetExtension.Path, err)
 		}
 		fmt.Printf("Extension \"%s\" updated successfully.\n", name)
-	} else {
+	} else if targetExtension.InstallType == "local" {
 		fmt.Printf("Extension \"%s\" at %s is a local extension and cannot be updated automatically.\n", name, targetExtension.Path)
+	} else if targetExtension.InstallType == "link" {
+		fmt.Printf("Extension \"%s\" at %s is a linked extension and cannot be updated automatically.\n", name, targetExtension.Path)
+	} else {
+		return fmt.Errorf("unsupported extension type \"%s\" for update", targetExtension.InstallType)
 	}
 
 	return nil
