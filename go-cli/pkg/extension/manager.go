@@ -6,8 +6,12 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"go-ai-agent-v2/go-cli/pkg/services"
+	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
+
+	"github.com/go-git/go-git/v5"
 )
 
 // Extension represents a simplified extension structure.
@@ -111,7 +115,7 @@ func (em *ExtensionManager) ToOutputString(ext Extension) string {
 	return fmt.Sprintf("Name: %s\nPath: %s\nDescription: %s", ext.Name, ext.Path, ext.Description)
 }
 
-// installOrUpdateExtension installs or updates an extension.
+// InstallOrUpdateExtension installs or updates an extension.
 func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata) (string, error) {
 	fmt.Printf("Installing/updating extension from source: %s (type: %s)\n", metadata.Source, metadata.Type)
 
@@ -120,12 +124,58 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 
 	if metadata.Type == "git" {
 		fmt.Printf("Cloning/fetching git repository %s to %s\n", metadata.Source, installPath)
-		// TODO: Implement actual git clone/fetch using go-git
-		// For now, simulate success
+		// Check if directory already exists
+		exists, err := em.fsService.PathExists(installPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
+		}
+
+		if exists {
+			// If exists, assume update (for now, just pull)
+			fmt.Printf("Repository already exists, pulling latest changes in %s\n", installPath)
+			r, err := git.PlainOpen(installPath)
+			if err != nil {
+				return "", fmt.Errorf("failed to open git repository at %s for update: %w", installPath, err)
+			}
+			w, err := r.Worktree()
+			if err != nil {
+				return "", fmt.Errorf("failed to get worktree for %s: %w", installPath, err)
+			}
+			err = w.Pull(&git.PullOptions{})
+			if err != nil && err != git.NoErrAlreadyUpToDate {
+				return "", fmt.Errorf("failed to pull latest changes for %s: %w", installPath, err)
+			}
+		} else {
+			// If not exists, clone
+			fmt.Printf("Cloning repository %s to %s\n", metadata.Source, installPath)
+			_, err = git.PlainClone(installPath, false, &git.CloneOptions{
+				URL:      metadata.Source,
+				RecurseSubmodules: git.Default  // Handle submodules
+			})
+			if err != nil {
+				return "", fmt.Errorf("failed to clone git repository %s to %s: %w", metadata.Source, installPath, err)
+			}
+		}
+
 	} else if metadata.Type == "local" {
 		fmt.Printf("Copying local extension from %s to %s\n", metadata.Source, installPath)
-		// TODO: Implement actual file copying
-		// For now, simulate success
+		// Ensure destination directory is clean before copying
+		exists, err := em.fsService.PathExists(installPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
+		}
+		if exists {
+			fmt.Printf("Removing existing local extension at %s for update.\n", installPath)
+			err = os.RemoveAll(installPath)
+			if err != nil {
+				return "", fmt.Errorf("failed to remove existing local extension at %s: %w", installPath, err)
+			}
+		}
+		// Implement actual file copying
+		err = copyDir(metadata.Source, installPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to copy local extension: %w", err)
+		}
 	}
 
 	// Simulate creating/updating gemini-extension.json
@@ -134,7 +184,69 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal dummy extension config: %w", err)
 	}
-	em.fsService.WriteFile(em.fsService.JoinPaths(installPath, "gemini-extension.json"), string(configBytes))
+	err = em.fsService.WriteFile(em.fsService.JoinPaths(installPath, "gemini-extension.json"), string(configBytes))
+	if err != nil {
+		return "", fmt.Errorf("failed to write extension config file: %w", err)
+	}
 
 	return filepath.Base(metadata.Source), nil
+}
+
+// copyDir recursively copies a directory from src to dst.
+func copyDir(src string, dst string) error {
+	src = filepath.Clean(src)
+	dst = filepath.Clean(dst)
+
+	srcInfo, err := os.Stat(src)
+	if err != nil {
+		return err
+	}
+
+	if err = os.MkdirAll(dst, srcInfo.Mode()); err != nil {
+		return err
+	}
+
+	dirents, err := ioutil.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, dirent := range dirents {
+		srcPath := filepath.Join(src, dirent.Name())
+		dstPath := filepath.Join(dst, dirent.Name())
+
+		if dirent.IsDir() {
+			err = copyDir(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+		} else {
+			err = copyFile(srcPath, dstPath)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// copyFile copies a file from src to dst.
+func copyFile(src string, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	if err != nil {
+		return err
+	}
+	return out.Close()
 }

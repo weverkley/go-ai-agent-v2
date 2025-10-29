@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/extension"
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"os"
 	"strings"
 )

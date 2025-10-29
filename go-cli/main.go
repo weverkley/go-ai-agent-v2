@@ -9,7 +9,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/commands"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/extension"
-	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/services"
 )
 
@@ -66,7 +65,7 @@ func main() {
 				generateCmd.PrintDefaults()
 				os.Exit(1)
 			}
-			
+
 			// Initialize GeminiChat client (API key will be from env var later)
 			geminiClient, err := core.NewGeminiChat()
 			if err != nil {
@@ -87,7 +86,8 @@ func main() {
 				readCmd.PrintDefaults()
 				os.Exit(1)
 			}
-			content, err := tools.ReadFile(*readFilePath)
+			fsService := services.NewFileSystemService()
+			content, err := fsService.ReadFile(*readFilePath)
 			if err != nil {
 				fmt.Printf("Error reading file: %v\n", err)
 				os.Exit(1)
@@ -101,13 +101,14 @@ func main() {
 				writeCmd.PrintDefaults()
 				os.Exit(1)
 			}
-			err := tools.WriteFile(*writeFilePath, *writeContent)
+			fsService := services.NewFileSystemService()
+			err := fsService.WriteFile(*writeFilePath, *writeContent)
 			if err != nil {
 				fmt.Printf("Error writing file: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Printf("Successfully wrote to %s\n", *writeFilePath)
-			
+
 		case "exec":
 			execCmd.Parse(os.Args[2:])
 			if *execCommand == "" {
@@ -119,12 +120,20 @@ func main() {
 			stdout, stderr, err := shellService.ExecuteCommand(*execCommand, *execWorkingDir)
 			if err != nil {
 				fmt.Printf("Error executing command: %v\n", err)
-				if stdout != "" { fmt.Printf("Stdout:\n%s\n", stdout) }
-				if stderr != "" { fmt.Printf("Stderr:\n%s\n", stderr) }
+				if stdout != "" {
+					fmt.Printf("Stdout:\n%s\n", stdout)
+				}
+				if stderr != "" {
+					fmt.Printf("Stderr:\n%s\n", stderr)
+				}
 				os.Exit(1)
 			}
-			if stdout != "" { fmt.Printf("Stdout:\n%s\n", stdout) }
-			if stderr != "" { fmt.Printf("Stderr:\n%s\n", stderr) }
+			if stdout != "" {
+				fmt.Printf("Stdout:\n%s\n", stdout)
+			}
+			if stderr != "" {
+				fmt.Printf("Stderr:\n%s\n", stderr)
+			}
 
 		case "ls":
 			lsCmd.Parse(os.Args[2:])
@@ -172,16 +181,16 @@ func main() {
 				}
 				extensions := commands.NewExtensionsCommand()
 				err := extensions.Install(extension.InstallArgs{
-				Source:        *extensionsInstallSource,
-				Ref:           *extensionsInstallRef,
-				AutoUpdate:    *extensionsInstallAutoUpdate,
-				AllowPreRelease: *extensionsInstallAllowPreRelease,
-				Consent:       *extensionsInstallConsent,
-			})
-			if err != nil {
-				fmt.Printf("Error installing extension: %v\n", err)
-				os.Exit(1)
-			}
+					Source:          *extensionsInstallSource,
+					Ref:             *extensionsInstallRef,
+					AutoUpdate:      *extensionsInstallAutoUpdate,
+					AllowPreRelease: *extensionsInstallAllowPreRelease,
+					Consent:         *extensionsInstallConsent,
+				})
+				if err != nil {
+					fmt.Printf("Error installing extension: %v\n", err)
+					os.Exit(1)
+				}
 			default:
 				fmt.Printf("Unknown extensions subcommand: %s\n", subcommand)
 				extensionsCmd.PrintDefaults()
