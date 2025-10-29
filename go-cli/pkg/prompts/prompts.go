@@ -23,6 +23,17 @@ func NewPromptManager() *PromptManager {
 	}
 }
 
+// GetPromptsByServer retrieves prompts by server name.
+func (pm *PromptManager) GetPromptsByServer(serverName string) []DiscoveredMCPPrompt {
+	var serverPrompts []DiscoveredMCPPrompt
+	for _, prompt := range pm.prompts {
+		if prompt.ServerName == serverName {
+			serverPrompts = append(serverPrompts, prompt)
+		}
+	}
+	return serverPrompts
+}
+
 // AddPrompt adds a prompt to the manager.
 func (pm *PromptManager) AddPrompt(prompt DiscoveredMCPPrompt) {
 	pm.prompts[prompt.Name] = prompt

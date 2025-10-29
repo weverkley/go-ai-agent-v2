@@ -25,3 +25,17 @@ func Execute() {
 		os.Exit(1)
 	}
 }
+
+func init() {
+	rootCmd.AddCommand(generateCmd)
+	rootCmd.AddCommand(readCmd)
+	rootCmd.AddCommand(writeCmd)
+	rootCmd.AddCommand(execCmd)
+	rootCmd.AddCommand(lsCmd)
+	rootCmd.AddCommand(gitBranchCmd)
+	rootCmd.AddCommand(extensionsCmd)
+	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(listModelsCmd)
+	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(globCmd)
+}

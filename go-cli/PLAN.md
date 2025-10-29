@@ -60,8 +60,8 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
   - `setup.ts`
   - `types.ts`
 - **Prompts (`pkg/core/prompts`)**: Management and rendering of prompts for AI models or user interactions.
-  - `mcp-prompts.ts`
-  - `prompt-registry.ts`
+  - `mcp-prompts.ts`: **Functional** (basic prompt management with DiscoveredMCPPrompt support).
+  - `prompt-registry.ts`: **Functional** (basic prompt management with DiscoveredMCPPrompt support).
 - **Tools (other than file I/O)**: Specialized tools such as `grep`, `glob`, `web-fetch`, `memoryTool`, `web-search`, `read-many-files`, etc., need to be implemented.
   - `diffOptions.ts`
   - `edit.ts`
@@ -150,18 +150,23 @@ Translate the logic from the following JavaScript files into Go:
 - `new.ts`: **Functional**.
 - `enable.ts`: **Placeholder**.
 - `disable.ts`: **Placeholder**.
-  _ `uninstall`: **Functional** (with linked extension support).
-  _ `update.ts`: **Functional**. \* `link`: **Functional**.
+      - `uninstall`: **Functional** (with linked extension support).
+      - `update.ts`: **Functional**.
+      - `link`: **Functional**.
 
-Each command will require:1. **Argument Parsing**: Define flags specific to the subcommand. 2. **Service Interaction**: Utilize the core services (`FileSystemService`, `GitService`, etc.) as needed. 3. **JavaScript File Analysis**: For each command, the corresponding JavaScript file will be read and analyzed to understand its functionality and internal logic before translation to Go.
+Each command will require:
+1.  **Argument Parsing**: Define flags specific to the subcommand.
+2.  **Service Interaction**: Utilize the core services (`FileSystemService`, `GitService`, etc.) as needed.
+3.  **JavaScript File Analysis**: For each command, the corresponding JavaScript file will be read and analyzed to understand its functionality and internal logic before translation to Go.
 
 ### 3.2. MCP Commands (`pkg/commands/mcp.go`)
 
 Translate the logic from the following JavaScript files into Go:
 
-            *   `add`: **Functional**.
-- `list.ts`: **Functional** (simulated connection status).
-            *   `remove`: **Functional**.
+      - `add`: **Functional**.
+      - `list.ts`: **Functional** (simulated connection status).
+      - `remove`: **Functional**.
+
 Similar to extensions, each MCP command will involve argument parsing, service interaction, and thorough analysis of the original JavaScript source.
 
 ## 4. JavaScript Source Code Location
@@ -173,10 +178,8 @@ The JavaScript source code to be translated is located in the `docs/gemini-cli-m
 
 ## 4. Next Steps
 
-2.  **Implement `extensions update`**: Translate the logic from the corresponding JavaScript files.
-3.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
-4.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
-5.  **Testing**: Write unit and integration tests for the new features.
+1.  **Implement Core Components**: Begin translating core components like `config`, `prompts`, and other tools.
+2.  **Testing**: Write unit and integration tests for the new features.
 
 ## 5. API Integration Strategy
 
