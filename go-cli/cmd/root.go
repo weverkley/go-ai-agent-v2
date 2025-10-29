@@ -38,4 +38,5 @@ func init() {
 	rootCmd.AddCommand(listModelsCmd)
 	rootCmd.AddCommand(versionCmd)
 	rootCmd.AddCommand(globCmd)
+	rootCmd.AddCommand(grepCmd)
 }

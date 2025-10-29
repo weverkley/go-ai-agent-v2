@@ -65,7 +65,7 @@ Based on the analysis of `gemini-cli-main/packages/core/src/index.ts`, the follo
 - **Tools (other than file I/O)**: Specialized tools such as `grep`, `glob`, `web-fetch`, `memoryTool`, `web-search`, `read-many-files`, etc., need to be implemented.
   - `diffOptions.ts`
   - `edit.ts`
-  - `glob.ts`
+  - `glob.ts`: **Functional**.
   - `grep.ts`
   - `ls.ts`
   - `mcp-client-manager.ts`
