@@ -231,15 +231,29 @@ func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
 
 // Update updates an extension.
 func (c *ExtensionsCommand) Update(name string) error {
-	fmt.Printf("Updating extension \"%s\" (placeholder)\n", name)
-	// In a real implementation, this would involve pulling the latest version of a git-based extension.
-	return nil
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	extensionManager := extension.NewExtensionManager(workspaceDir)
+	return extensionManager.UpdateExtension(name)
 }
 
 // Link links a local extension.
 func (c *ExtensionsCommand) Link(path string) error {
-	fmt.Printf("Linking extension at path \"%s\" (placeholder)\n", path)
-	// In a real implementation, this would involve creating a symlink or otherwise registering the local extension.
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current working directory: %w", err)
+	}
+
+	extensionManager := extension.NewExtensionManager(workspaceDir)
+	err = extensionManager.LinkExtension(path)
+	if err != nil {
+		return fmt.Errorf("failed to link extension: %w", err)
+	}
+
+	fmt.Printf("Extension at \"%s\" linked successfully.\n", path)
 	return nil
 }
 
