@@ -37,7 +37,8 @@ func NewGeminiChat(registry *tools.ToolRegistry) (*GeminiChat, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	model := client.GenerativeModel("gemini-pro-latest")
+	// model := client.GenerativeModel("gemini-pro-latest")
+	model := client.GenerativeModel("gemini-flash-latest")
 	if registry != nil && len(registry.GetTools()) > 0 {
 		model.Tools = registry.GetTools()
 	}
