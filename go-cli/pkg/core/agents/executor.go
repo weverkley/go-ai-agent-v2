@@ -3,10 +3,15 @@ package agents
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types" // Added
+
+	"github.com/google/generative-ai-go/genai"
 )
 
 // AgentTerminateMode defines the reasons an agent might terminate.
@@ -59,23 +64,25 @@ func (ae *AgentExecutor) Run(inputs AgentInputs, ctx context.Context) (OutputObj
 		logAgentFinish(
 			ae.RuntimeContext,
 			AgentFinishEvent{
-				AgentID:       ae.AgentID,
-				AgentName:     ae.Definition.Name,
-				DurationMs:    time.Since(startTime).Milliseconds(),
-				TurnCounter:   turnCounter,
+				AgentID:         ae.AgentID,
+				AgentName:       ae.Definition.Name,
+				DurationMs:      time.Since(startTime).Milliseconds(),
+				TurnCounter:     turnCounter,
 				TerminateReason: terminateReason,
 			},
 		)
 	}()
 
-	// Placeholder for chat object
-	// chat, err := ae.createChatObject(inputs)
-	// if err != nil {
-	// 	ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
-	// 	return OutputObject{}, err
-	// }
-	// Placeholder for tools
-	// tools := ae.prepareToolsList()
+	chat, err := ae.createChatObject(inputs)
+	if err != nil {
+		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+		return OutputObject{}, err
+	}
+	tools, err := ae.prepareToolsList()
+	if err != nil {
+		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+		return OutputObject{}, err
+	}
 
 	query := "Get Started!"
 	if ae.Definition.PromptConfig.Query != "" {
@@ -98,37 +105,45 @@ func (ae *AgentExecutor) Run(inputs AgentInputs, ctx context.Context) (OutputObj
 		promptId := fmt.Sprintf("%s#%d", ae.AgentID, turnCounter)
 		turnCounter++
 
-		// Placeholder for callModel
-		// functionCalls, err := ae.callModel(chat, currentMessage, tools, ctx, promptId)
-		// if err != nil {
-		// 	ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
-		// 	return OutputObject{}, err
-		// }
-		// if ctx.Err() != nil {
-		// 	terminateReason = AgentTerminateModeAborted
-		// 	break
-		// }
+		functionCalls, textResponse, err := ae.callModel(chat, currentMessage, tools, ctx, promptId)
+		if err != nil {
+			ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+			return OutputObject{}, err
+		}
+		if ctx.Err() != nil {
+			terminateReason = AgentTerminateModeAborted
+			break
+		}
 
-		// Placeholder for processFunctionCalls
-		// nextMessage, submittedOutput, taskCompleted, err := ae.processFunctionCalls(functionCalls, ctx, promptId)
-		// if err != nil {
-		// 	ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
-		// 	return OutputObject{}, err
-		// }
+		// If the model stops calling tools without calling complete_task, it's an error.
+		if len(functionCalls) == 0 {
+			terminateReason = AgentTerminateModeError
+			finalResult = stringPtr(fmt.Sprintf("Agent stopped calling tools but did not call '%s' to finalize the session.", TASK_COMPLETE_TOOL_NAME))
+			ae.emitActivity("ERROR", map[string]interface{}{
+				"error":   *finalResult,
+				"context": "protocol_violation",
+			})
+			break
+		}
 
-		// if taskCompleted {
-		// 	if submittedOutput != nil {
-		// 		finalResult = submittedOutput
-		// 	} else {
-		// 		temp := "Task completed successfully."
-		// 		finalResult = &temp
-		// 	}
-		// 	terminateReason = AgentTerminateModeGoal
-		// 	break
-		// }
+		nextMessageParts, submittedOutputVal, taskCompleted, err := ae.processFunctionCalls(functionCalls, ctx, promptId)
+		if err != nil {
+			ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+			return OutputObject{}, err
+		}
 
-		// currentMessage = nextMessage
-		break // Temporary break to avoid infinite loop with placeholders
+		if taskCompleted {
+			if submittedOutputVal != nil {
+				finalResult = submittedOutputVal
+			} else {
+				temp := "Task completed successfully."
+				finalResult = &temp
+			}
+			terminateReason = AgentTerminateModeGoal
+			break
+		}
+
+		currentMessage = nextMessageParts
 	}
 
 	if terminateReason == AgentTerminateModeGoal {
@@ -167,10 +182,10 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (*core.GeminiChat,
 		}
 	}
 
-	generationConfig := agents.GenerateContentConfig{
+	generationConfig := types.GenerateContentConfig{
 		Temperature: modelConfig.Temperature,
 		TopP:        modelConfig.TopP,
-		ThinkingConfig: &agents.ThinkingConfig{
+		ThinkingConfig: &types.ThinkingConfig{
 			IncludeThoughts: true,
 			ThinkingBudget:  modelConfig.ThinkingBudget,
 		},
@@ -192,7 +207,7 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (*core.GeminiChat,
 
 // applyTemplateToInitialMessages applies template strings to initial messages.
 func (ae *AgentExecutor) applyTemplateToInitialMessages(
-	initialMessages []agents.Part,
+	initialMessages []Part,
 	inputs AgentInputs,
 ) []genai.Content {
 	templatedMessages := make([]genai.Content, len(initialMessages))
@@ -218,7 +233,50 @@ func (ae *AgentExecutor) applyTemplateToInitialMessages(
 	return templatedMessages
 }
 
-// Placeholder for checkTermination
+// prepareToolsList prepares the list of tool function declarations to be sent to the model.
+func (ae *AgentExecutor) prepareToolsList() ([]genai.FunctionDeclaration, error) {
+	toolsList := []genai.FunctionDeclaration{}
+	toolConfig := ae.Definition.ToolConfig
+	outputConfig := ae.Definition.OutputConfig
+
+	if toolConfig != nil {
+		toolNamesToLoad := []string{}
+		for _, toolRef := range toolConfig.Tools {
+			// For now, we only handle tool names (strings).
+			// The JS version also handles direct FunctionDeclaration objects and tool instances with schema.
+			toolNamesToLoad = append(toolNamesToLoad, toolRef)
+		}
+		// Add schemas from tools that were registered by name.
+
+		toolsList = append(toolsList, ae.ToolRegistry.GetFunctionDeclarationsFiltered(toolNamesToLoad)...)
+	}
+
+	// Always inject complete_task.
+	// Configure its schema based on whether output is expected.
+	completeTool := genai.FunctionDeclaration{
+		Name:        TASK_COMPLETE_TOOL_NAME,
+		Description: "Call this tool to signal that you have completed your task. This is the ONLY way to finish.",
+		Parameters: &genai.Schema{
+			Type:       genai.TypeObject,
+			Properties: make(map[string]*genai.Schema),
+			Required:   []string{},
+		},
+	}
+
+	if outputConfig != nil {
+		completeTool.Description = "Call this tool to submit your final answer and complete the task. This is the ONLY way to finish."
+		// For now, we'll use a generic string schema for the output.
+		// In a full implementation, this would involve converting outputConfig.Schema (Zod schema) to genai.Schema.
+		completeTool.Parameters.Properties[outputConfig.OutputName] = &genai.Schema{Type: genai.TypeString}
+		completeTool.Parameters.Required = append(completeTool.Parameters.Required, outputConfig.OutputName)
+	}
+
+	toolsList = append(toolsList, completeTool)
+
+	return toolsList, nil
+}
+
+// checkTermination checks if the agent should terminate due to exceeding configured limits.
 func (ae *AgentExecutor) checkTermination(startTime time.Time, turnCounter int) *AgentTerminateMode {
 	runConfig := ae.Definition.RunConfig
 
@@ -236,14 +294,283 @@ func (ae *AgentExecutor) checkTermination(startTime time.Time, turnCounter int) 
 	return nil
 }
 
-// Placeholder for callModel
-func (ae *AgentExecutor) callModel(chat interface{}, currentMessage []Part, tools interface{}, ctx context.Context, promptId string) ([]interface{}, error) {
-	return nil, nil
+// callModel calls the generative model with the current context and tools.
+func (ae *AgentExecutor) callModel(
+	chat *core.GeminiChat,
+	message []Part,
+	tools []genai.FunctionDeclaration,
+	ctx context.Context,
+	promptId string,
+) ([]FunctionCall, string, error) {
+	messageParams := types.MessageParams{
+		Message:     message,
+		AbortSignal: ctx,
+	}
+	if len(tools) > 0 {
+		messageParams.Tools = tools
+	}
+
+	responseStream, err := chat.SendMessageStream(
+		ae.Definition.ModelConfig.Model,
+		messageParams,
+		promptId,
+	)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to send message stream: %w", err)
+	}
+
+	functionCalls := []FunctionCall{}
+	textResponse := ""
+
+	for resp := range responseStream {
+		if ctx.Err() != nil { // Check for context cancellation
+			break
+		}
+
+		if resp.Type == types.StreamEventTypeChunk {
+			chunk := resp.Value
+			if chunk == nil || len(chunk.Candidates) == 0 || chunk.Candidates[0].Content == nil {
+				continue
+			}
+
+			// Extract and emit any subject "thought" content from the model.
+			for _, part := range chunk.Candidates[0].Content.Parts {
+				if p, ok := part.(genai.Text); ok && strings.HasPrefix(string(p), "thought") { // Simplified thought detection
+					thoughtResult := parseThought(string(p))
+					if thoughtResult.Subject != "" {
+						ae.emitActivity("THOUGHT_CHUNK", map[string]interface{}{"text": thoughtResult.Subject})
+					}
+				}
+			}
+
+			// Collect any function calls requested by the model.
+			for _, part := range chunk.Candidates[0].Content.Parts {
+				if fc, ok := part.(genai.FunctionCall); ok {
+					// Convert genai.FunctionCall to agents.FunctionCall
+					argsMap := make(map[string]interface{})
+					for k, v := range fc.Args {
+						argsMap[k] = v
+					}
+					functionCalls = append(functionCalls, FunctionCall{
+						ID:   fc.ID,
+						Name: fc.Name,
+						Args: argsMap,
+					})
+				}
+			}
+
+			// Handle text response (non-thought text)
+			for _, part := range chunk.Candidates[0].Content.Parts {
+				if p, ok := part.(genai.Text); ok {
+					// Check if it's not a thought part (simplified)
+					if !strings.HasPrefix(string(p), "thought") {
+						textResponse += string(p)
+					}
+				}
+			}
+		} else if resp.Type == types.StreamEventTypeError {
+			return nil, "", resp.Error
+		}
+	}
+
+	return functionCalls, textResponse, nil
 }
 
-// Placeholder for processFunctionCalls
-func (ae *AgentExecutor) processFunctionCalls(functionCalls []interface{}, ctx context.Context, promptId string) ([]Part, *string, bool, error) {
-	return nil, nil, false, nil
+// processFunctionCalls executes function calls requested by the model and returns the results.
+func (ae *AgentExecutor) processFunctionCalls(
+	functionCalls []FunctionCall,
+	ctx context.Context,
+	promptId string,
+) ([]Part, *string, bool, error) {
+	allowedToolNames := make(map[string]bool)
+	for _, name := range ae.ToolRegistry.GetAllToolNames() {
+		allowedToolNames[name] = true
+	}
+	// Always allow the completion tool
+	allowedToolNames[TASK_COMPLETE_TOOL_NAME] = true
+
+	var submittedOutput *string = nil
+	taskCompleted := false
+
+	// We'll collect results from tool executions
+	toolResponseParts := []Part{}
+
+	for i, functionCall := range functionCalls {
+		callId := functionCall.ID
+		if callId == "" {
+			callId = fmt.Sprintf("%s-%d", promptId, i)
+		}
+		args := functionCall.Args
+
+		ae.emitActivity("TOOL_CALL_START", map[string]interface{}{
+			"name": functionCall.Name,
+			"args": args,
+		})
+
+		if functionCall.Name == TASK_COMPLETE_TOOL_NAME {
+			if taskCompleted {
+				// We already have a completion from this turn. Ignore subsequent ones.
+				errorMsg := "Task already marked complete in this turn. Ignoring duplicate call."
+				toolResponseParts = append(toolResponseParts, Part{
+					FunctionResponse: &FunctionResponse{
+						Name:     TASK_COMPLETE_TOOL_NAME,
+						Response: map[string]interface{}{"error": errorMsg},
+						ID:       callId,
+					},
+				})
+				ae.emitActivity("ERROR", map[string]interface{}{
+					"context": "protocol_violation",
+					"name":    functionCall.Name,
+					"error":   errorMsg,
+				})
+				continue
+			}
+
+			outputConfig := ae.Definition.OutputConfig
+			taskCompleted = true // Signal completion regardless of output presence
+
+			if outputConfig != nil {
+				outputName := outputConfig.OutputName
+				outputValue, ok := args[outputName]
+				if ok {
+					// TODO: Implement schema validation (equivalent of Zod schema validation)
+					// For now, assume validation passes.
+					// const validationResult = outputConfig.schema.safeParse(outputValue);
+					// if (!validationResult.success) { ... }
+
+					// Simplified output processing
+					// if ae.Definition.ProcessOutput != nil { // Assuming ProcessOutput is a field in AgentDefinition
+					// 	// submittedOutput = ae.Definition.ProcessOutput(outputValue)
+					// } else {
+					if strVal, isString := outputValue.(string); isString {
+						submittedOutput = &strVal
+					} else {
+						// Fallback to JSON stringify if not a string
+						// jsonBytes, _ := json.MarshalIndent(outputValue, "", "  ")
+						// strVal := string(jsonBytes)
+						// submittedOutput = &strVal
+					}
+					// }
+
+					toolResponseParts = append(toolResponseParts, Part{
+						FunctionResponse: &FunctionResponse{
+							Name:     TASK_COMPLETE_TOOL_NAME,
+							Response: map[string]interface{}{"result": "Output submitted and task completed."},
+							ID:       callId,
+						},
+					})
+					ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
+						"name":   functionCall.Name,
+						"output": "Output submitted and task completed.",
+					})
+				} else {
+					// Failed to provide required output.
+					taskCompleted = false // Revoke completion status
+					errorMsg := fmt.Sprintf("Missing required argument '%s' for completion.", outputName)
+					toolResponseParts = append(toolResponseParts, Part{
+						FunctionResponse: &FunctionResponse{
+							Name:     TASK_COMPLETE_TOOL_NAME,
+							Response: map[string]interface{}{"error": errorMsg},
+							ID:       callId,
+						},
+					})
+					ae.emitActivity("ERROR", map[string]interface{}{
+						"context": "tool_call",
+						"name":    functionCall.Name,
+						"error":   errorMsg,
+					})
+				}
+			} else {
+				// No output expected. Just signal completion.
+				temp := "Task completed successfully."
+				submittedOutput = &temp
+				toolResponseParts = append(toolResponseParts, Part{
+					FunctionResponse: &FunctionResponse{
+						Name:     TASK_COMPLETE_TOOL_NAME,
+						Response: map[string]interface{}{"status": "Task marked complete."},
+						ID:       callId,
+					},
+				})
+				ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
+					"name":   functionCall.Name,
+					"output": "Task marked complete.",
+				})
+			}
+			continue
+		}
+
+		// Handle standard tools
+		if !allowedToolNames[functionCall.Name] {
+			errorMsg := fmt.Sprintf("Unauthorized tool call: '%s' is not available to this agent.", functionCall.Name)
+			// debugLogger.warn(fmt.Sprintf("[AgentExecutor] Blocked call: %s", errorMsg)) // TODO: Implement debugLogger
+
+			toolResponseParts = append(toolResponseParts, Part{
+				FunctionResponse: &FunctionResponse{
+					Name:     functionCall.Name,
+					ID:       callId,
+					Response: map[string]interface{}{"error": errorMsg},
+				},
+			})
+
+			ae.emitActivity("ERROR", map[string]interface{}{
+				"context": "tool_call_unauthorized",
+				"name":    functionCall.Name,
+				"callId":  callId,
+				"error":   errorMsg,
+			})
+			continue
+		}
+
+		requestInfo := ToolCallRequestInfo{
+			CallID:            callId,
+			Name:              functionCall.Name,
+			Args:              args,
+			IsClientInitiated: true,
+			PromptID:          promptId,
+		}
+
+		// Execute the tool call
+		completedCall, err := ExecuteToolCall(ae.RuntimeContext, requestInfo, ctx)
+		if err != nil {
+			errorMsg := fmt.Sprintf("tool execution failed: %v", err)
+			toolResponseParts = append(toolResponseParts, Part{
+				FunctionResponse: &FunctionResponse{
+					Name:     functionCall.Name,
+					ID:       callId,
+					Response: map[string]interface{}{"error": errorMsg},
+				},
+			})
+			ae.emitActivity("ERROR", map[string]interface{}{
+				"context": "tool_call",
+				"name":    functionCall.Name,
+				"error":   errorMsg,
+			})
+			continue
+		}
+
+		if completedCall.GetResponse().Error != nil {
+			ae.emitActivity("ERROR", map[string]interface{}{
+				"context": "tool_call",
+				"name":    functionCall.Name,
+				"error":   completedCall.GetResponse().Error.Error(),
+			})
+		} else {
+			ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
+				"name":   functionCall.Name,
+				"output": completedCall.GetResponse().ResultDisplay, // Assuming ResultDisplay is a string
+			})
+		}
+		toolResponseParts = append(toolResponseParts, completedCall.GetResponse().ResponseParts...)
+	}
+
+	// If all authorized tool calls failed (and task isn't complete), provide a generic error.
+	if len(functionCalls) > 0 && len(toolResponseParts) == 0 && !taskCompleted {
+		toolResponseParts = append(toolResponseParts, Part{
+			Text: "All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach.",
+		})
+	}
+
+	return []Part{{Text: "user", FunctionCall: nil, FunctionResponse: nil, InlineData: nil, FileData: nil, Thought: ""}}, submittedOutput, taskCompleted, nil // Simplified nextMessage
 }
 
 // Placeholder for emitActivity

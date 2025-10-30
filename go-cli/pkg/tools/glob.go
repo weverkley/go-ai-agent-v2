@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
+
 	"github.com/gobwas/glob"
 	"github.com/google/generative-ai-go/genai"
 )
@@ -130,10 +132,10 @@ func (t *GlobTool) readIgnoreFile(filePath string) ([]glob.Glob, error) {
 }
 
 // Execute performs a glob search.
-func (t *GlobTool) Execute(args map[string]any) (string, error) {
+func (t *GlobTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	pattern, ok := args["pattern"].(string)
 	if !ok {
-		return "", fmt.Errorf("invalid or missing 'pattern' argument")
+		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")
 	}
 
 	searchPath := "."
@@ -159,7 +161,7 @@ func (t *GlobTool) Execute(args map[string]any) (string, error) {
 	// Resolve the search path
 	absSearchPath, err := filepath.Abs(searchPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
+		return agents.ToolResult{}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
 	}
 
 	// Compile the glob pattern
@@ -169,13 +171,13 @@ func (t *GlobTool) Execute(args map[string]any) (string, error) {
 	}
 	g, err := glob.Compile(compiledPattern)
 	if err != nil {
-		return "", fmt.Errorf("failed to compile glob pattern %s: %w", pattern, err)
+		return agents.ToolResult{}, fmt.Errorf("failed to compile glob pattern %s: %w", pattern, err)
 	}
 
 	// Get ignore patterns
 	ignorePatterns, err := t.getIgnorePatterns(absSearchPath, respectGitIgnore, respectGeminiIgnore)
 	if err != nil {
-		return "", fmt.Errorf("failed to get ignore patterns: %w", err)
+		return agents.ToolResult{}, fmt.Errorf("failed to get ignore patterns: %w", err)
 	}
 
 	var matchedFiles []FileInfo
@@ -219,7 +221,7 @@ func (t *GlobTool) Execute(args map[string]any) (string, error) {
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
+		return agents.ToolResult{}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
 	}
 
 	// Sort files by modification time (newest first)
@@ -233,11 +235,17 @@ func (t *GlobTool) Execute(args map[string]any) (string, error) {
 	}
 
 	if len(resultPaths) == 0 {
-		return fmt.Sprintf("No files found matching pattern \"%s\" in path \"%s\"", pattern, searchPath), nil
+		return agents.ToolResult{
+			LLMContent:    fmt.Sprintf("No files found matching pattern \"%s\" in path \"%s\"", pattern, searchPath),
+			ReturnDisplay: fmt.Sprintf("No files found matching pattern \"%s\" in path \"%s\"", pattern, searchPath),
+		}, nil
 	}
 
 	resultMessage := fmt.Sprintf("Found %d file(s) matching \"%s\" in path \"%s\":\n%s",
 		len(resultPaths), pattern, searchPath, strings.Join(resultPaths, "\n"))
 
-	return resultMessage, nil
+	return agents.ToolResult{
+		LLMContent:    resultMessage,
+		ReturnDisplay: resultMessage,
+	}, nil
 }

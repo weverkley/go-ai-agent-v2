@@ -3,6 +3,8 @@ package tools
 import (
 	"fmt"
 
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
+
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -43,7 +45,10 @@ func (t *LsTool) Definition() *genai.Tool {
 }
 
 // Execute runs the tool with the given arguments.
-func (t *LsTool) Execute(args map[string]any) (string, error) {
+func (t *LsTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	// TODO: Implement the actual tool execution logic
-	return fmt.Sprintf("LsTool executed with args: %v (placeholder)", args), nil
+	return agents.ToolResult{
+		LLMContent:    fmt.Sprintf("LsTool executed with args: %v (placeholder)", args),
+		ReturnDisplay: fmt.Sprintf("LsTool executed with args: %v (placeholder)", args),
+	}, nil
 }

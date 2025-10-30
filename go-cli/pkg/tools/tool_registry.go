@@ -54,6 +54,15 @@ func (r *ToolRegistry) GetAllRegisteredTools() []Tool {
 	return registeredTools
 }
 
+// GetAllToolNames returns a slice of all registered tool names.
+func (tr *ToolRegistry) GetAllToolNames() []string {
+	names := make([]string, 0, len(tr.tools))
+	for name := range tr.tools {
+		names = append(names, name)
+	}
+	return names
+}
+
 // GetFunctionDeclarationsFiltered returns FunctionDeclarations for a given list of tool names.
 func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []genai.FunctionDeclaration {
 	var declarations []genai.FunctionDeclaration

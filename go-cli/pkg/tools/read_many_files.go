@@ -1,11 +1,14 @@
 package tools
 
 import (
+	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
 
 	"github.com/gobwas/glob"
 	"github.com/google/generative-ai-go/genai"
@@ -72,10 +75,10 @@ type SkippedFile struct {
 }
 
 // Execute performs a read-many-files operation.
-func (t *ReadManyFilesTool) Execute(args map[string]any) (string, error) {
+func (t *ReadManyFilesTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	patterns, ok := args["paths"].([]any)
 	if !ok || len(patterns) == 0 {
-		return "", fmt.Errorf("invalid or missing 'paths' argument")
+		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'paths' argument")
 	}
 	pathStrings := make([]string, len(patterns))
 	for i, v := range patterns {
@@ -121,7 +124,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (string, error) {
 	for _, p := range excludePatterns {
 		g, err := glob.Compile(p)
 		if err != nil {
-			return "", fmt.Errorf("failed to compile exclude pattern %s: %w", p, err)
+			return agents.ToolResult{}, fmt.Errorf("failed to compile exclude pattern %s: %w", p, err)
 		}
 		compiledExcludeGlobs = append(compiledExcludeGlobs, g)
 	}
@@ -129,7 +132,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (string, error) {
 	for _, searchPattern := range searchPatterns {
 		absSearchPath, err := filepath.Abs(".")
 		if err != nil {
-			return "", fmt.Errorf("failed to get absolute path: %w", err)
+			return agents.ToolResult{}, fmt.Errorf("failed to get absolute path: %w", err)
 		}
 
 		err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
@@ -173,7 +176,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (string, error) {
 		})
 
 		if err != nil {
-			return "", fmt.Errorf("error walking path for pattern %s: %w", searchPattern, err)
+			return agents.ToolResult{}, fmt.Errorf("error walking path for pattern %s: %w", searchPattern, err)
 		}
 	}
 
@@ -217,5 +220,8 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (string, error) {
 		displayMessage.WriteString("No files were read and concatenated based on the criteria.\n")
 	}
 
-	return contentBuilder.String() + "\n--- End of content ---\n\n" + displayMessage.String(), nil
+	return agents.ToolResult{
+		LLMContent:    contentBuilder.String() + "\n--- End of content ---\n\n" + displayMessage.String(),
+		ReturnDisplay: displayMessage.String(),
+	}, nil
 }

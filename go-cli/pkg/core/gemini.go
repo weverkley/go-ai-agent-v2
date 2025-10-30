@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types" // Added
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/iterator"
@@ -23,13 +23,14 @@ type ContentGenerator interface {
 type GeminiChat struct {
 	client           *genai.Client
 	model            *genai.GenerativeModel
+	Name             string // Added
 	generationConfig agents.GenerateContentConfig
 	startHistory     []genai.Content
 	// toolRegistry *tools.ToolRegistry // Removed, passed directly to SendMessageStream
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
-func NewGeminiChat(cfg *config.Config, generationConfig agents.GenerateContentConfig, startHistory []genai.Content) (*GeminiChat, error) {
+func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []genai.Content) (*GeminiChat, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -48,9 +49,48 @@ func NewGeminiChat(cfg *config.Config, generationConfig agents.GenerateContentCo
 	model.SetTopP(generationConfig.TopP)
 	// TODO: Handle ThinkingConfig and SystemInstruction
 
+// GenerateContent generates content using the Gemini API, handling tool calls.
+func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
+	ctx := context.Background()
+
+	messageParams := types.MessageParams{
+		Message:     []agents.Part{{Text: prompt}},
+		AbortSignal: ctx,
+	}
+
+	responseStream, err := gc.SendMessageStream(
+		gc.Name, // Using gc.Name
+		messageParams,
+		"generate-command", // Dummy promptId
+	)
+	if err != nil {
+		return "", fmt.Errorf("failed to send message stream: %w", err)
+	}
+
+	var generatedText string
+	for resp := range responseStream {
+		if resp.Type == types.StreamEventTypeChunk {
+			chunk := resp.Value
+			if chunk == nil || len(chunk.Candidates) == 0 || chunk.Candidates[0].Content == nil {
+				continue
+			}
+			for _, part := range chunk.Candidates[0].Content.Parts {
+				if txt, ok := part.(genai.Text); ok {
+					generatedText += string(txt)
+				}
+			}
+		} else if resp.Type == types.StreamEventTypeError {
+			return "", resp.Error
+		}
+	}
+
+	return generatedText, nil
+}
+
 	return &GeminiChat{
 		client:           client,
 		model:            model,
+		Name:             cfg.Model(), // Initialized
 		generationConfig: generationConfig,
 		startHistory:     startHistory,
 	}, nil

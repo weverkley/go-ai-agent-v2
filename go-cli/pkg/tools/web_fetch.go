@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/core/agents" // Added import
+
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -48,21 +50,24 @@ func (t *WebFetchTool) Definition() *genai.Tool {
 // extractUrls finds all URLs in a given text.
 func extractUrls(text string) []string {
 	// A simple regex to find URLs. This can be improved.
-	re := regexp.MustCompile(`https?://[^
-]+`)
+	re := regexp.MustCompile(`https?://[^\n]+`)
 	return re.FindAllString(text, -1)
 }
 
 // Execute performs a web fetch operation.
-func (t *WebFetchTool) Execute(args map[string]any) (string, error) {
+func (t *WebFetchTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	prompt, ok := args["prompt"].(string)
 	if !ok || prompt == "" {
-		return "", fmt.Errorf("invalid or missing 'prompt' argument")
+		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'prompt' argument")
 	}
 
 	urls := extractUrls(prompt)
 	if len(urls) == 0 {
-		return "No URLs found in the prompt.", nil
+		return agents.ToolResult{
+			LLMContent:    "No URLs found in the prompt.",
+			ReturnDisplay: "No URLs found in the prompt.",
+		},
+	nil
 	}
 
 	var results strings.Builder
@@ -93,5 +98,10 @@ func (t *WebFetchTool) Execute(args map[string]any) (string, error) {
 		results.WriteString("\n--- End of Content ---\n")
 	}
 
-	return results.String(), nil
+	resultMessage := results.String()
+	return agents.ToolResult{
+		LLMContent:    resultMessage,
+		ReturnDisplay: resultMessage,
+	},
+	nil
 }

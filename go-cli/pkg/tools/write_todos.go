@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
+
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -73,17 +75,17 @@ func getTodosFilePath() (string, error) {
 }
 
 // Execute writes the todos to a file.
-func (t *WriteTodosTool) Execute(args map[string]any) (string, error) {
+func (t *WriteTodosTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	todosData, ok := args["todos"].([]any)
 	if !ok {
-		return "", fmt.Errorf("invalid or missing 'todos' argument")
+		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'todos' argument")
 	}
 
 	var todos []Todo
 	for _, item := range todosData {
 		todoMap, ok := item.(map[string]any)
 		if !ok {
-			return "", fmt.Errorf("invalid todo item format")
+			return agents.ToolResult{}, fmt.Errorf("invalid todo item format")
 		}
 		desc, _ := todoMap["description"].(string)
 		status, _ := todoMap["status"].(string)
@@ -94,10 +96,10 @@ func (t *WriteTodosTool) Execute(args map[string]any) (string, error) {
 	inProgressCount := 0
 	for _, todo := range todos {
 		if todo.Description == "" {
-			return "", fmt.Errorf("each todo must have a non-empty description")
+			return agents.ToolResult{}, fmt.Errorf("each todo must have a non-empty description")
 		}
 		if !isValidTodoStatus(todo.Status) {
-			return "", fmt.Errorf("invalid todo status: %s", todo.Status)
+			return agents.ToolResult{}, fmt.Errorf("invalid todo status: %s", todo.Status)
 		}
 		if todo.Status == "in_progress" {
 			inProgressCount++
@@ -105,17 +107,17 @@ func (t *WriteTodosTool) Execute(args map[string]any) (string, error) {
 	}
 
 	if inProgressCount > 1 {
-		return "", fmt.Errorf("only one task can be \"in_progress\" at a time")
+		return agents.ToolResult{}, fmt.Errorf("only one task can be \"in_progress\" at a time")
 	}
 
 	todosFilePath, err := getTodosFilePath()
 	if err != nil {
-		return "", err
+		return agents.ToolResult{}, err
 	}
 
 	err = os.MkdirAll(filepath.Dir(todosFilePath), 0755)
 	if err != nil {
-		return "", fmt.Errorf("failed to create todos directory: %w", err)
+		return agents.ToolResult{}, fmt.Errorf("failed to create todos directory: %w", err)
 	}
 
 	// Format todos for writing to file
@@ -129,7 +131,7 @@ func (t *WriteTodosTool) Execute(args map[string]any) (string, error) {
 
 	err = ioutil.WriteFile(todosFilePath, []byte(todoListBuilder.String()), 0644)
 	if err != nil {
-		return "", fmt.Errorf("failed to write todos file: %w", err)
+		return agents.ToolResult{}, fmt.Errorf("failed to write todos file: %w", err)
 	}
 
 	llmContent := "Successfully updated the todo list."
@@ -139,7 +141,10 @@ func (t *WriteTodosTool) Execute(args map[string]any) (string, error) {
 		llmContent = "Successfully cleared the todo list."
 	}
 
-	return llmContent, nil
+	return agents.ToolResult{
+		LLMContent:    llmContent,
+		ReturnDisplay: llmContent,
+	}, nil
 }
 
 func isValidTodoStatus(status string) bool {

@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
@@ -19,6 +22,8 @@ var rootCmd = &cobra.Command{
 	},
 }
 
+var cfg *config.Config
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -27,6 +32,22 @@ func Execute() {
 }
 
 func init() {
+	// Create a dummy config for initial tool registry creation
+	dummyConfig := config.NewConfig(&config.ConfigParameters{})
+	toolRegistry := tools.RegisterAllTools(dummyConfig)
+
+	// Initialize ConfigParameters
+	params := &config.ConfigParameters{
+		// Set default values or load from settings file
+		DebugMode: false,
+		Model:     config.DEFAULT_GEMINI_MODEL,
+		// Add other parameters as needed
+		ToolRegistryProvider: toolRegistry, // Pass the toolRegistry directly
+	}
+
+	// Create the final Config instance
+	cfg = config.NewConfig(params)
+
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(readCmd)
 	rootCmd.AddCommand(writeCmd)

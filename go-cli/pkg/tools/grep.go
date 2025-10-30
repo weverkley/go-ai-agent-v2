@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
+
 	"github.com/google/generative-ai-go/genai"
 )
 
@@ -62,11 +64,11 @@ type GrepMatch struct {
 }
 
 // Execute performs a grep search.
-func (t *GrepTool) Execute(args map[string]any) (string, error) {
+func (t *GrepTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	// Extract arguments
 	pattern, ok := args["pattern"].(string)
 	if !ok {
-		return "", fmt.Errorf("invalid or missing 'pattern' argument")
+		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")
 	}
 
 	searchPath := "." // Default to current directory
@@ -82,13 +84,13 @@ func (t *GrepTool) Execute(args map[string]any) (string, error) {
 	// Compile the regex pattern
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return "", fmt.Errorf("invalid regex pattern: %w", err)
+		return agents.ToolResult{}, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
 	// Resolve the search path
 	absSearchPath, err := filepath.Abs(searchPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
+		return agents.ToolResult{}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
 	}
 
 	var allMatches []GrepMatch
@@ -147,11 +149,14 @@ func (t *GrepTool) Execute(args map[string]any) (string, error) {
 	})
 
 	if err != nil {
-		return "", fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
+		return agents.ToolResult{}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
 	}
 
 	if len(allMatches) == 0 {
-		return fmt.Sprintf("No matches found for pattern \"%s\" in path \"%s\"", pattern, searchPath), nil
+		return agents.ToolResult{
+			LLMContent:    fmt.Sprintf("No matches found for pattern \"%s\" in path \"%s\"", pattern, searchPath),
+			ReturnDisplay: fmt.Sprintf("No matches found for pattern \"%s\" in path \"%s\"", pattern, searchPath),
+		}, nil
 	}
 
 	var llmContent strings.Builder
@@ -165,5 +170,8 @@ func (t *GrepTool) Execute(args map[string]any) (string, error) {
 		llmContent.WriteString("---\n\n")
 	}
 
-	return llmContent.String(), nil
+	return agents.ToolResult{
+		LLMContent:    llmContent.String(),
+		ReturnDisplay: llmContent.String(),
+	}, nil
 }

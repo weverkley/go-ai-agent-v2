@@ -3,7 +3,6 @@ package config
 import (
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/types" // Import the new types package
 	"go-ai-agent-v2/go-cli/pkg/tools"
 )
@@ -17,7 +16,7 @@ type WorkspaceContext interface {
 type FileService interface {
 	// shouldIgnoreFile checks if a file should be ignored based on filtering options.
 	// This is a placeholder and needs a proper implementation.
-	ShouldIgnoreFile(filePath string, options agents.FileFilteringOptions) bool
+	ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool
 }
 
 // TelemetrySettings represents the telemetry settings.
@@ -31,9 +30,23 @@ type TelemetrySettings struct {
 	UseCollector bool   `json:"useCollector,omitempty"`
 }
 
+// CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
+type CodebaseInvestigatorSettings struct {
+	Enabled        bool    `json:"enabled,omitempty"`
+	Model          string  `json:"model,omitempty"`
+	ThinkingBudget *int    `json:"thinkingBudget,omitempty"`
+	MaxTimeMinutes *int    `json:"maxTimeMinutes,omitempty"`
+	MaxNumTurns    *int    `json:"maxNumTurns,omitempty"`
+}
+
 // OutputSettings represents the output settings.
 type OutputSettings struct {
 	Format string `json:"format,omitempty"`
+}
+
+// ToolRegistryProvider defines an interface for providing the tool registry.
+type ToolRegistryProvider interface {
+	GetToolRegistry() *tools.ToolRegistry
 }
 
 // ConfigParameters represents the parameters for creating a new Config.
@@ -47,6 +60,8 @@ type ConfigParameters struct {
 	ApprovalMode   types.ApprovalMode // Use ApprovalMode from types package
 	Telemetry      *TelemetrySettings
 	Output         *OutputSettings
+	CodebaseInvestigator *CodebaseInvestigatorSettings
+	ToolRegistryProvider ToolRegistryProvider // Changed
 }
 
 // Config represents the application configuration.
@@ -60,6 +75,8 @@ type Config struct {
 	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
 	telemetry      *TelemetrySettings
 	output         *OutputSettings
+	codebaseInvestigatorSettings *CodebaseInvestigatorSettings
+	toolRegistryProvider ToolRegistryProvider // Changed
 }
 
 // NewConfig creates a new Config instance.
@@ -74,16 +91,27 @@ func NewConfig(params *ConfigParameters) *Config {
 		approvalMode:   params.ApprovalMode,
 		telemetry:      params.Telemetry,
 		output:         params.Output,
+		codebaseInvestigatorSettings: params.CodebaseInvestigator,
+		toolRegistryProvider: params.ToolRegistryProvider, // Changed
 	}
 }
 
+// GetCodebaseInvestigatorSettings returns the Codebase Investigator settings.
+func (c *Config) GetCodebaseInvestigatorSettings() *CodebaseInvestigatorSettings {
+	return c.codebaseInvestigatorSettings
+}
+
+// GetDebugMode returns true if debug mode is enabled.
+func (c *Config) GetDebugMode() bool {
+	return c.debugMode
+}
+
 // GetToolRegistry returns the global tool registry.
-// This is a temporary placeholder and should be replaced with a proper
-// mechanism to access the global tool registry.
 func (c *Config) GetToolRegistry() *tools.ToolRegistry {
-	// For now, return a new empty registry.
-	// In a real scenario, this would return the application's main tool registry.
-	return tools.NewToolRegistry()
+	if c.toolRegistryProvider == nil {
+		return nil // Or handle error appropriately
+	}
+	return c.toolRegistryProvider.GetToolRegistry()
 }
 
 // GetWorkspaceContext returns the workspace context.
@@ -116,7 +144,7 @@ func (c *Config) GetFileService() FileService {
 // dummyFileService is a placeholder implementation of FileService.
 type dummyFileService struct{}
 
-func (d *dummyFileService) ShouldIgnoreFile(filePath string, options agents.FileFilteringOptions) bool {
+func (d *dummyFileService) ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool {
 	// For now, always return false.
 	return false
 }

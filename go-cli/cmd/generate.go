@@ -5,9 +5,10 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/prompts"
-	"go-ai-agent-v2/go-cli/pkg/tools"
 
+	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 )
 
@@ -26,10 +27,10 @@ var generateCmd = &cobra.Command{
 		promptManager := prompts.NewPromptManager()
 		promptManager.AddPrompt(prompts.DiscoveredMCPPrompt{Name: "default", Description: "Translate the following Go code to Javascript:", ServerName: "cli"})
 
-		// Initialize the tool registry
-		toolRegistry := tools.RegisterAllTools()
-
-		geminiClient, err := core.NewGeminiChat(toolRegistry)
+		// Initialize GeminiChat using the global config
+		// For now, using default generation config and empty history.
+		// This will be properly set up when agent execution is integrated.
+		geminiClient, err := core.NewGeminiChat(cfg, agents.GenerateContentConfig{}, []genai.Content{})
 		if err != nil {
 			fmt.Printf("Error initializing GeminiChat: %v\n", err)
 			os.Exit(1)

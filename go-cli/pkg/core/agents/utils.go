@@ -43,6 +43,23 @@ type AgentFinishEvent struct {
 	TerminateReason AgentTerminateMode
 }
 
+// stringPtr returns a pointer to a string.
+func stringPtr(s string) *string {
+	return &s
+}
+
+// ThoughtParseResult represents the result of parsing a thought.
+type ThoughtParseResult struct {
+	Subject string
+	// Add other fields if needed
+}
+
+// parseThought is a placeholder for parsing thought content from the model.
+func parseThought(thoughtText string) ThoughtParseResult {
+	// For now, simply return the thoughtText as the subject.
+	return ThoughtParseResult{Subject: thoughtText}
+}
+
 // getDirectoryContextString generates a string describing the current workspace directories and their structures.
 func getDirectoryContextString(cfg *config.Config) (string, error) {
 	workspaceContext := cfg.GetWorkspaceContext()
