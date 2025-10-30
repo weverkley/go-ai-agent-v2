@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/google/generative-ai-go/genai"
@@ -19,13 +21,15 @@ type ContentGenerator interface {
 
 // GeminiChat represents a Gemini chat client.
 type GeminiChat struct {
-	client       *genai.Client
-	model        *genai.GenerativeModel
-	toolRegistry *tools.ToolRegistry
+	client           *genai.Client
+	model            *genai.GenerativeModel
+	generationConfig agents.GenerateContentConfig
+	startHistory     []genai.Content
+	// toolRegistry *tools.ToolRegistry // Removed, passed directly to SendMessageStream
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
-func NewGeminiChat(registry *tools.ToolRegistry) (*GeminiChat, error) {
+func NewGeminiChat(cfg *config.Config, generationConfig agents.GenerateContentConfig, startHistory []genai.Content) (*GeminiChat, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -37,74 +41,85 @@ func NewGeminiChat(registry *tools.ToolRegistry) (*GeminiChat, error) {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	// model := client.GenerativeModel("gemini-pro-latest")
-	model := client.GenerativeModel("gemini-flash-latest")
-	if registry != nil && len(registry.GetTools()) > 0 {
-		model.Tools = registry.GetTools()
-	}
+	model := client.GenerativeModel(cfg.Model())
 
-	return &GeminiChat{client: client, model: model, toolRegistry: registry}, nil
+	// Apply generation config
+	model.SetTemperature(generationConfig.Temperature)
+	model.SetTopP(generationConfig.TopP)
+	// TODO: Handle ThinkingConfig and SystemInstruction
+
+	return &GeminiChat{
+		client:           client,
+		model:            model,
+		generationConfig: generationConfig,
+		startHistory:     startHistory,
+	}, nil
 }
 
-// GenerateContent generates content using the Gemini API, handling tool calls.
-func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
-	ctx := context.Background()
-	chat := gc.model.StartChat()
+// SendMessageStream generates content using the Gemini API and streams responses.
+func (gc *GeminiChat) SendMessageStream(modelName string, messageParams agents.MessageParams, promptId string) (<-chan agents.StreamResponse, error) {
+	respChan := make(chan agents.StreamResponse)
 
-	// Send initial prompt
-	resp, err := chat.SendMessage(ctx, genai.Text(prompt))
-	if err != nil {
-		return "", fmt.Errorf("failed to send initial message: %w", err)
+	cs := gc.model.StartChat()
+
+	// Convert []genai.Content to []*genai.Content for history
+	historyPtrs := make([]*genai.Content, len(gc.startHistory))
+	for i := range gc.startHistory {
+		historyPtrs[i] = &gc.startHistory[i]
 	}
+	cs.History = historyPtrs
 
-	var generatedText string
-	for {
-		if resp == nil || len(resp.Candidates) == 0 {
-			break // No more responses
-		}
-
-		candidate := resp.Candidates[0]
-		if candidate.Content == nil {
-			break
-		}
-
-		// Aggregate text parts
-		for _, part := range candidate.Content.Parts {
-			if txt, ok := part.(genai.Text); ok {
-				generatedText += string(txt)
+	// Prepare tools for the model
+	if len(messageParams.Tools) > 0 {
+		genaiTools := make([]*genai.Tool, len(messageParams.Tools))
+		for i, tool := range messageParams.Tools {
+			genaiTools[i] = &genai.Tool{
+				FunctionDeclarations: []*genai.FunctionDeclaration{&tool},
 			}
 		}
-
-		// Check for function calls
-		if len(candidate.Content.Parts) > 0 {
-			if fc, ok := candidate.Content.Parts[0].(genai.FunctionCall); ok {
-				tool, err := gc.toolRegistry.GetTool(fc.Name)
-				if err != nil {
-					return "", fmt.Errorf("unknown tool called: %s", fc.Name)
-				}
-
-				toolOutput, err := tool.Execute(fc.Args)
-				if err != nil {
-					return "", fmt.Errorf("error executing tool %s: %w", fc.Name, err)
-				}
-
-				// Send tool output back to the model
-				resp, err = chat.SendMessage(ctx, &genai.FunctionResponse{
-					Name:     fc.Name,
-					Response: map[string]any{"output": toolOutput},
-				})
-				if err != nil {
-					return "", fmt.Errorf("failed to send tool response: %w", err)
-				}
-				continue // Continue the loop to process the model's response to the tool output
-			}
-		}
-
-		// If there are no more function calls, we are done.
-		break
+		gc.model.Tools = genaiTools
 	}
 
-	return generatedText, nil
+	// Convert agents.Part to genai.Part
+	genaiParts := make([]genai.Part, len(messageParams.Message))
+	for i, part := range messageParams.Message {
+		if part.Text != "" {
+			genaiParts[i] = genai.Text(part.Text)
+		} else if part.FunctionResponse != nil {
+			genaiParts[i] = genai.FunctionResponse{
+				Name:     part.FunctionResponse.Name,
+				Response: part.FunctionResponse.Response,
+			}
+		} else if part.InlineData != nil {
+			genaiParts[i] = genai.Blob{
+				MIMEType: part.InlineData.MimeType,
+				Data:     []byte(part.InlineData.Data),
+			}
+		} else if part.FileData != nil {
+			// Handle FileData if necessary, currently not directly supported by genai.Part
+			// For now, we'll skip or convert to text if possible.
+			genaiParts[i] = genai.Text(fmt.Sprintf("File data: %s (%s)", part.FileData.FileURL, part.FileData.MimeType))
+		}
+	}
+
+	go func() {
+		defer close(respChan)
+
+		iter := cs.SendMessageStream(messageParams.AbortSignal, genaiParts...)
+		for {
+			resp, err := iter.Next()
+			if err == iterator.Done {
+				return
+			}
+			if err != nil {
+				respChan <- agents.StreamResponse{Type: agents.StreamEventTypeError, Error: err}
+				return
+			}
+			respChan <- agents.StreamResponse{Type: agents.StreamEventTypeChunk, Value: resp}
+		}
+	}()
+
+	return respChan, nil
 }
 
 // ListModels lists available Gemini models.

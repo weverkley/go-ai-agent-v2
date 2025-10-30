@@ -1,0 +1,121 @@
+package agents
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/tools"
+)
+
+// CoreToolSchedulerOptions configures the CoreToolScheduler.
+type CoreToolSchedulerOptions struct {
+	Config                 *config.Config
+	OutputUpdateHandler    func(toolCallID string, outputChunk string)
+	OnAllToolCallsComplete func(completedToolCalls []CompletedToolCall)
+	OnToolCallsUpdate      func(toolCalls []ToolCall)
+	GetPreferredEditor     func() EditorType
+	OnEditorClose          func()
+}
+
+// CoreToolScheduler manages the lifecycle of tool calls.
+type CoreToolScheduler struct {
+	config *config.Config
+
+	toolCalls                  []ToolCall
+	outputUpdateHandler        func(toolCallID string, outputChunk string)
+	onAllToolCallsComplete     func(completedToolCalls []CompletedToolCall)
+	onToolCallsUpdate          func(toolCalls []ToolCall)
+	getPreferredEditor         func() EditorType
+	onEditorClose              func()
+	isFinalizingToolCalls      bool
+	isScheduling               bool
+	isCancelling               bool
+	requestQueue               []*schedulerRequest
+	toolCallQueue              []ToolCall
+	completedToolCallsForBatch []CompletedToolCall
+}
+
+// schedulerRequest represents a request in the scheduler's queue.
+type schedulerRequest struct {
+	Request ToolCallRequestInfo
+	Context context.Context
+	Resolve func()
+	Reject  func(error)
+}
+
+// NewCoreToolScheduler creates a new CoreToolScheduler instance.
+func NewCoreToolScheduler(options CoreToolSchedulerOptions) *CoreToolScheduler {
+	return &CoreToolScheduler{
+		config:                 options.Config,
+		outputUpdateHandler:    options.OutputUpdateHandler,
+		onAllToolCallsComplete: options.OnAllToolCallsComplete,
+		onToolCallsUpdate:      options.OnToolCallsUpdate,
+		getPreferredEditor:     options.GetPreferredEditor,
+		onEditorClose:          options.OnEditorClose,
+	}
+}
+
+// Schedule schedules a tool call for execution.
+func (s *CoreToolScheduler) Schedule(
+	request ToolCallRequestInfo,
+	ctx context.Context,
+) error {
+	// For now, a simplified implementation that directly processes the request.
+	// The full queuing and state management will be added later.
+
+	toolInstance := s.config.GetToolRegistry().GetTool(request.Name)
+	if toolInstance == nil {
+		return fmt.Errorf("tool \"%s\" not found in registry", request.Name)
+	}
+
+	// Assuming AnyDeclarativeTool has a Build method that returns AnyToolInvocation
+	invocation, err := toolInstance.(AnyDeclarativeTool).Build(request.Args)
+	if err != nil {
+		return fmt.Errorf("failed to build tool invocation: %w", err)
+	}
+
+	// Simulate execution and completion
+	startTime := time.Now()
+	// In a real scenario, this would involve calling invocation.Execute()
+	// and handling its output and potential errors.
+	// For now, we'll create a dummy successful completion.
+	dummyResult := ToolResult{
+		LLMContent:  "Tool executed successfully (dummy).",
+		ReturnDisplay: "Tool executed successfully (dummy).",
+	}
+
+	durationMs := time.Since(startTime).Milliseconds()
+
+	completedCall := &SuccessfulToolCall{
+		BaseToolCall: BaseToolCall{
+			Request:    request,
+			Tool:       toolInstance.(AnyDeclarativeTool),
+			Invocation: invocation,
+			StartTime:  &startTime,
+			Outcome:    ToolConfirmationOutcomeProceedAlways,
+		},
+		Response: ToolCallResponseInfo{
+			CallID:        request.CallID,
+			ResponseParts: []Part{{Text: "Tool executed successfully (dummy)."}},
+			ResultDisplay: &ToolResultDisplay{FileDiff: "dummy"},
+			ContentLength: len("Tool executed successfully (dummy)."),
+		},
+		DurationMs: &durationMs,
+	}
+
+	if s.onAllToolCallsComplete != nil {
+		s.onAllToolCallsComplete([]CompletedToolCall{completedCall})
+	}
+
+	return nil
+}
+
+// GetToolRegistry is a placeholder for now.
+// The actual implementation will be in config.Config.
+func (c *config.Config) GetToolRegistry() *tools.ToolRegistry {
+	// This is a temporary placeholder.
+	// In a real scenario, the config would hold a reference to the main ToolRegistry.
+	return tools.NewToolRegistry()
+}
