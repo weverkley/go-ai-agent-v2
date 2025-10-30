@@ -1,7 +1,9 @@
 read my @go-cli/PLAN.md and continue my execution plan, after implementing each command you must test 
 the command, also when creating or updating a new go file, read the source javasctipt file to address 
-the logic, and make sure the same logic is applied, it must have the same responses and behaviour
+the logic, and make sure the same logic is applied, it must have the same responses and behaviour.
 
-I have stopped implementing executor.go, you can continue by implementing it
+i want to replicate the same GUI for the cli which the javascript version already have, for terminal gui tasks i want to use https://github.com/charmbracelet/bubbletea as the main cli gui.
 
-i want to replicate the same GUI for the cli which the javascript version already have
+The javascript files reside in the folder docs/gemini-cli-main/packages folder The documentation about each the javascript verion feature redise in the folder docs/gemini-cli-main/docs.
+
+Before continuing, i want you to read my current progress and the files i have implemented already on the folder go-cli, start reading the folders and then proceed to read files.
