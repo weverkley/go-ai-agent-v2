@@ -1,8 +1,6 @@
 package agents
 
 import (
-	"fmt"
-
 	"go-ai-agent-v2/go-cli/pkg/config"
 )
 

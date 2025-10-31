@@ -3,7 +3,7 @@ package tools
 import (
 	"fmt"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -18,7 +18,7 @@ func NewLsTool() *LsTool {
 
 // Name returns the name of the tool.
 func (t *LsTool) Name() string {
-	return LS_TOOL_NAME
+	return types.LS_TOOL_NAME
 }
 
 // Definition returns the genai.Tool definition for the Gemini API.
@@ -27,7 +27,7 @@ func (t *LsTool) Definition() *genai.Tool {
 	return &genai.Tool{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
 			{
-				Name:        LS_TOOL_NAME,
+				Name:        types.LS_TOOL_NAME,
 				Description: "Lists the names of files and subdirectories directly within a specified directory path.",
 				Parameters: &genai.Schema{
 					Type: genai.TypeObject,
@@ -45,9 +45,9 @@ func (t *LsTool) Definition() *genai.Tool {
 }
 
 // Execute runs the tool with the given arguments.
-func (t *LsTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *LsTool) Execute(args map[string]any) (types.ToolResult, error) {
 	// TODO: Implement the actual tool execution logic
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    fmt.Sprintf("LsTool executed with args: %v (placeholder)", args),
 		ReturnDisplay: fmt.Sprintf("LsTool executed with args: %v (placeholder)", args),
 	}, nil

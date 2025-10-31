@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 const (
@@ -54,7 +55,7 @@ func (si *SubagentInvocation) Execute(
 	updateOutput func(output string), // Simplified from string | AnsiOutput
 	shellExecutionConfig interface{}, // Not used for subagents, but part of AnyToolInvocation interface
 	setPidCallback func(int), // Not used for subagents, but part of AnyToolInvocation interface
-) (ToolResult, error) {
+) (types.ToolResult, error) {
 	if updateOutput != nil {
 		updateOutput("Subagent starting...\n")
 	}
@@ -81,10 +82,10 @@ func (si *SubagentInvocation) Execute(
 		onActivity,
 	)
 	if err != nil {
-		return ToolResult{
-			Error: &ToolError{
+		return types.ToolResult{
+			Error: &types.ToolError{
 				Message: fmt.Sprintf("Failed to create agent executor: %v", err),
-				Type:    ToolErrorTypeExecutionFailed,
+				Type:    types.ToolErrorTypeExecutionFailed,
 			},
 		}, err
 	}
@@ -92,12 +93,12 @@ func (si *SubagentInvocation) Execute(
 	output, err := executor.Run(si.Params, ctx)
 	if err != nil {
 		errorMessage := err.Error()
-		return ToolResult{
+		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("Subagent '%s' failed. Error: %s", si.Definition.Name, errorMessage),
 			ReturnDisplay: fmt.Sprintf("Subagent Failed: %s\nError: %s", si.Definition.Name, errorMessage),
-			Error: &ToolError{
+			Error: &types.ToolError{
 				Message: errorMessage,
-				Type:    ToolErrorTypeExecutionFailed,
+				Type:    types.ToolErrorTypeExecutionFailed,
 			},
 		}, err
 	}
@@ -108,13 +109,13 @@ func (si *SubagentInvocation) Execute(
 	displayContent := fmt.Sprintf("\nSubagent %s Finished\n\nTermination Reason:\n %s\n\nResult:\n%s\n",
 		si.Definition.Name, output.TerminateReason, output.Result)
 
-	return ToolResult{
-		LLMContent:    []Part{{Text: resultContent}}, // Assuming LLMContent can be []Part
+	return types.ToolResult{
+		LLMContent:    []types.Part{{Text: resultContent}}, // Assuming LLMContent can be []Part
 		ReturnDisplay: displayContent,
 	}, nil
 }
 
 // ShouldConfirmExecute always returns false for subagents as they are non-interactive.
-func (si *SubagentInvocation) ShouldConfirmExecute(ctx context.Context) (ToolCallConfirmationDetails, error) {
-	return ToolCallConfirmationDetails{}, nil
+func (si *SubagentInvocation) ShouldConfirmExecute(ctx context.Context) (types.ToolCallConfirmationDetails, error) {
+	return types.ToolCallConfirmationDetails{}, nil
 }

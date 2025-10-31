@@ -1,25 +1,13 @@
 package agents
 
 import (
+	"context"
 	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
-// AgentTerminateMode defines the reasons an agent might terminate.
-type AgentTerminateMode string
-
-const (
-	AgentTerminateModeError    AgentTerminateMode = "ERROR"
-	AgentTerminateModeGoal     AgentTerminateMode = "GOAL"
-	AgentTerminateModeMaxTurns AgentTerminateMode = "MAX_TURNS"
-	AgentTerminateModeTimeout  AgentTerminateMode = "TIMEOUT"
-	AgentTerminateModeAborted  AgentTerminateMode = "ABORTED"
-
-	TASK_COMPLETE_TOOL_NAME = "complete_task"
-)
 
 // SubagentActivityEvent represents an activity event emitted by a subagent.
 type SubagentActivityEvent struct {
@@ -111,7 +99,7 @@ type AgentInputs map[string]interface{}
 // OutputObject represents the final output of an agent run.
 type OutputObject struct {
 	Result         string             `json:"result"`
-	TerminateReason AgentTerminateMode `json:"terminate_reason"`
+	TerminateReason types.AgentTerminateMode `json:"terminate_reason"`
 }
 
 // CodebaseInvestigationReportSchema represents the schema for the codebase investigation report.
@@ -125,36 +113,8 @@ type CodebaseInvestigationReportSchema struct {
 	} `json:"RelevantLocations"`
 }
 
-// FunctionCall represents a function call requested by the model.
-type FuncCall struct {
-	ID   string                 `json:"id,omitempty"`
-	Name string                 `json:"name"`
-	Args map[string]interface{} `json:"args"`
-}
-
-// FolderStructureOptions for customizing folder structure retrieval.
-type FolderStructureOptions struct {
-	MaxItems           *int    // Maximum number of files and folders combined to display. Defaults to 200.
-	IgnoredFolders     *[]string // Set of folder names to ignore completely. Case-sensitive.
-	FileIncludePattern *string // Optional regex to filter included files by name.
-	// FileService        FileDiscoveryService // For filtering files.
-	FileFilteringOptions *FileFilteringOptions // File filtering ignore options.
-}
 
 
-
-// FullFolderInfo represents the full, unfiltered information about a folder and its contents.
-type FullFolderInfo struct {
-	Name            string
-	Path            string
-	Files           []string
-	SubFolders      []FullFolderInfo
-	TotalChildren   int
-	TotalFiles      int
-	IsIgnored       bool // Flag to easily identify ignored folders later
-	HasMoreFiles    bool // Indicates if files were truncated for this specific folder
-	HasMoreSubfolders bool // Indicates if subfolders were truncated for this specific folder
-}
 
 
 
@@ -174,8 +134,8 @@ type AnyDeclarativeTool interface {
 
 // AnyToolInvocation is an interface for any tool invocation.
 type AnyToolInvocation interface {
-	Execute(ctx context.Context, liveOutputCallback func(string), shellExecutionConfig interface{}, setPidCallback func(int)) (ToolResult, error)
-	ShouldConfirmExecute(ctx context.Context) (ToolCallConfirmationDetails, error)
+	Execute(ctx context.Context, liveOutputCallback func(string), shellExecutionConfig interface{}, setPidCallback func(int)) (types.ToolResult, error)
+	ShouldConfirmExecute(ctx context.Context) (types.ToolCallConfirmationDetails, error)
 	// Add other methods as needed from the JS interface
 }
 
@@ -183,31 +143,31 @@ type AnyToolInvocation interface {
 // This will be a discriminated union in Go using an interface and concrete types.
 type ToolCall interface {
 	GetStatus() string
-	GetRequest() ToolCallRequestInfo
+	GetRequest() types.ToolCallRequestInfo
 	GetTool() AnyDeclarativeTool
 	GetInvocation() AnyToolInvocation
-	GetOutcome() ToolConfirmationOutcome
+	GetOutcome() types.ToolConfirmationOutcome
 	GetStartTime() *time.Time
 	GetDurationMs() *int64
-	GetResponse() *ToolCallResponseInfo
+	GetResponse() *types.ToolCallResponseInfo
 }
 
 // BaseToolCall provides common fields for all ToolCall types.
 type BaseToolCall struct {
-	Request    ToolCallRequestInfo
+	Request    types.ToolCallRequestInfo
 	Tool       AnyDeclarativeTool
 	Invocation AnyToolInvocation
 	StartTime  *time.Time
-	Outcome    ToolConfirmationOutcome
+	Outcome    types.ToolConfirmationOutcome
 }
 
-func (b *BaseToolCall) GetRequest() ToolCallRequestInfo { return b.Request }
+func (b *BaseToolCall) GetRequest() types.ToolCallRequestInfo { return b.Request }
 func (b *BaseToolCall) GetTool() AnyDeclarativeTool     { return b.Tool }
 func (b *BaseToolCall) GetInvocation() AnyToolInvocation { return b.Invocation }
-func (b *BaseToolCall) GetOutcome() ToolConfirmationOutcome { return b.Outcome }
+func (b *BaseToolCall) GetOutcome() types.ToolConfirmationOutcome { return b.Outcome }
 func (b *BaseToolCall) GetStartTime() *time.Time { return b.StartTime }
 func (b *BaseToolCall) GetDurationMs() *int64 { return nil } // Default, overridden by completed calls
-func (b *BaseToolCall) GetResponse() *ToolCallResponseInfo { return nil } // Default, overridden by completed calls
+func (b *BaseToolCall) GetResponse() *types.ToolCallResponseInfo { return nil } // Default, overridden by completed calls
 
 // ValidatingToolCall
 type ValidatingToolCall struct {
@@ -226,23 +186,23 @@ func (s *ScheduledToolCall) GetStatus() string { return "scheduled" }
 // ErroredToolCall
 type ErroredToolCall struct {
 	BaseToolCall
-	Response ToolCallResponseInfo
+	Response types.ToolCallResponseInfo
 	DurationMs *int64
 }
 
 func (e *ErroredToolCall) GetStatus() string { return "error" }
-func (e *ErroredToolCall) GetResponse() *ToolCallResponseInfo { return &e.Response }
+func (e *ErroredToolCall) GetResponse() *types.ToolCallResponseInfo { return &e.Response }
 func (e *ErroredToolCall) GetDurationMs() *int64 { return e.DurationMs }
 
 // SuccessfulToolCall
 type SuccessfulToolCall struct {
 	BaseToolCall
-	Response ToolCallResponseInfo
+	Response types.ToolCallResponseInfo
 	DurationMs *int64
 }
 
 func (s *SuccessfulToolCall) GetStatus() string { return "success" }
-func (s *SuccessfulToolCall) GetResponse() *ToolCallResponseInfo { return &s.Response }
+func (s *SuccessfulToolCall) GetResponse() *types.ToolCallResponseInfo { return &s.Response }
 func (s *SuccessfulToolCall) GetDurationMs() *int64 { return s.DurationMs }
 
 // ExecutingToolCall
@@ -257,43 +217,21 @@ func (e *ExecutingToolCall) GetStatus() string { return "executing" }
 // CancelledToolCall
 type CancelledToolCall struct {
 	BaseToolCall
-	Response ToolCallResponseInfo
+	Response types.ToolCallResponseInfo
 	DurationMs *int64
 }
 
 func (c *CancelledToolCall) GetStatus() string { return "cancelled" }
-func (c *CancelledToolCall) GetResponse() *ToolCallResponseInfo { return &c.Response }
+func (c *CancelledToolCall) GetResponse() *types.ToolCallResponseInfo { return &c.Response }
 func (c *CancelledToolCall) GetDurationMs() *int64 { return c.DurationMs }
 
 // WaitingToolCall
 type WaitingToolCall struct {
 	BaseToolCall
-	ConfirmationDetails ToolCallConfirmationDetails
+	ConfirmationDetails types.ToolCallConfirmationDetails
 }
 
 func (w *WaitingToolCall) GetStatus() string { return "awaiting_approval" }
 
 // CompletedToolCall is an alias for ToolCall that has reached a terminal state.
 type CompletedToolCall ToolCall
-
-// JsonOutput represents the JSON output structure.
-type JsonOutput struct {
-	Response *string        `json:"response,omitempty"`
-	Stats    *SessionMetrics `json:"stats,omitempty"`
-	Error    *JsonError     `json:"error,omitempty"`
-}
-
-// JsonError represents a JSON error structure.
-type JsonError struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-	Code    *string `json:"code,omitempty"`
-}
-
-// SessionMetrics represents session-related metrics for telemetry.
-type SessionMetrics struct {
-	// Add fields as needed based on uiTelemetry.js
-	// For now, a placeholder.
-	TotalTurns int `json:"totalTurns"`
-	TotalTimeMs int `json:"totalTimeMs"`
-}

@@ -5,13 +5,13 @@ import (
 	"fmt"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // SubagentToolWrapper is a tool wrapper that dynamically exposes a subagent as a standard,
 // strongly-typed DeclarativeTool.
 type SubagentToolWrapper struct {
-	*tools.BaseDeclarativeTool
+	*types.BaseDeclarativeTool
 	definition AgentDefinition
 	config     *config.Config
 }
@@ -28,11 +28,11 @@ func NewSubagentToolWrapper(
 		return nil, fmt.Errorf("failed to convert input config to JSON schema: %w", err)
 	}
 
-	baseTool := tools.NewBaseDeclarativeTool(
+	baseTool := types.NewBaseDeclarativeTool(
 		definition.Name,
 		definition.DisplayName,
 		definition.Description,
-		tools.KindThink, // Assuming subagents are "THINK" kind
+		types.KindThink, // Assuming subagents are "THINK" kind
 		parameterSchema,
 		true,        // isOutputMarkdown
 		true,        // canUpdateOutput
@@ -48,23 +48,23 @@ func NewSubagentToolWrapper(
 }
 
 // CreateInvocation creates an invocation instance for executing the subagent.
-func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs) tools.ToolInvocation {
+func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs) types.ToolInvocation {
 	return NewSubagentInvocation(
 		params,
 		stw.definition,
 		stw.config,
-		stw.messageBus,
+		stw.BaseDeclarativeTool.MessageBus,
 	)
 }
 
-// Execute is part of the tools.Tool interface. It delegates to the invocation.
-func (stw *SubagentToolWrapper) Execute(args map[string]interface{}) (ToolResult, error) {
+// Execute is part of the types.Tool interface. It delegates to the invocation.
+func (stw *SubagentToolWrapper) Execute(args map[string]interface{}) (types.ToolResult, error) {
 	invoCation := stw.CreateInvocation(args)
 	// For now, we'll call execute with a dummy context and updateOutput.
 	// The actual execution will happen within the AgentExecutor.
 	result, err := invoCation.Execute(context.Background(), nil, nil, nil)
 	if err != nil {
-		return ToolResult{}, err
+		return types.ToolResult{}, err
 	}
 	return result, nil
 }

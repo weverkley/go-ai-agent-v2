@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // CoreToolSchedulerOptions configures the CoreToolScheduler.
@@ -15,7 +15,7 @@ type CoreToolSchedulerOptions struct {
 	OutputUpdateHandler    func(toolCallID string, outputChunk string)
 	OnAllToolCallsComplete func(completedToolCalls []CompletedToolCall)
 	OnToolCallsUpdate      func(toolCalls []ToolCall)
-	GetPreferredEditor     func() EditorType
+	GetPreferredEditor     func() types.EditorType
 	OnEditorClose          func()
 }
 
@@ -27,7 +27,7 @@ type CoreToolScheduler struct {
 	outputUpdateHandler        func(toolCallID string, outputChunk string)
 	onAllToolCallsComplete     func(completedToolCalls []CompletedToolCall)
 	onToolCallsUpdate          func(toolCalls []ToolCall)
-	getPreferredEditor         func() EditorType
+	getPreferredEditor         func() types.EditorType
 	onEditorClose              func()
 	isFinalizingToolCalls      bool
 	isScheduling               bool
@@ -39,7 +39,7 @@ type CoreToolScheduler struct {
 
 // schedulerRequest represents a request in the scheduler's queue.
 type schedulerRequest struct {
-	Request ToolCallRequestInfo
+	Request types.ToolCallRequestInfo
 	Context context.Context
 	Resolve func()
 	Reject  func(error)
@@ -59,14 +59,14 @@ func NewCoreToolScheduler(options CoreToolSchedulerOptions) *CoreToolScheduler {
 
 // Schedule schedules a tool call for execution.
 func (s *CoreToolScheduler) Schedule(
-	request ToolCallRequestInfo,
+	request types.ToolCallRequestInfo,
 	ctx context.Context,
 ) error {
 	// For now, a simplified implementation that directly processes the request.
 	// The full queuing and state management will be added later.
 
-	toolInstance := s.config.GetToolRegistry().GetTool(request.Name)
-	if toolInstance == nil {
+	toolInstance, err := s.config.GetToolRegistry().GetTool(request.Name)
+	if err != nil {
 		return fmt.Errorf("tool \"%s\" not found in registry", request.Name)
 	}
 
@@ -81,10 +81,7 @@ func (s *CoreToolScheduler) Schedule(
 	// In a real scenario, this would involve calling invocation.Execute()
 	// and handling its output and potential errors.
 	// For now, we'll create a dummy successful completion.
-	dummyResult := ToolResult{
-		LLMContent:  "Tool executed successfully (dummy).",
-		ReturnDisplay: "Tool executed successfully (dummy).",
-	}
+	
 
 	durationMs := time.Since(startTime).Milliseconds()
 
@@ -94,12 +91,12 @@ func (s *CoreToolScheduler) Schedule(
 			Tool:       toolInstance.(AnyDeclarativeTool),
 			Invocation: invocation,
 			StartTime:  &startTime,
-			Outcome:    ToolConfirmationOutcomeProceedAlways,
+			Outcome:    types.ToolConfirmationOutcomeProceedAlways,
 		},
-		Response: ToolCallResponseInfo{
+		Response: types.ToolCallResponseInfo{
 			CallID:        request.CallID,
-			ResponseParts: []Part{{Text: "Tool executed successfully (dummy)."}},
-			ResultDisplay: &ToolResultDisplay{FileDiff: "dummy"},
+			ResponseParts: []types.Part{{Text: "Tool executed successfully (dummy)."}},
+			ResultDisplay: &types.ToolResultDisplay{FileDiff: "dummy"},
 			ContentLength: len("Tool executed successfully (dummy)."),
 		},
 		DurationMs: &durationMs,
@@ -110,12 +107,4 @@ func (s *CoreToolScheduler) Schedule(
 	}
 
 	return nil
-}
-
-// GetToolRegistry is a placeholder for now.
-// The actual implementation will be in config.Config.
-func (c *config.Config) GetToolRegistry() *tools.ToolRegistry {
-	// This is a temporary placeholder.
-	// In a real scenario, the config would hold a reference to the main ToolRegistry.
-	return tools.NewToolRegistry()
 }

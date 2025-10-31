@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -59,16 +59,16 @@ func (t *SmartEditTool) Definition() *genai.Tool {
 }
 
 // Execute performs a smart edit operation.
-func (t *SmartEditTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 	filePath, ok := args["file_path"].(string)
 	if !ok || filePath == "" {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'file_path' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'file_path' argument")
 	}
 
 	// instruction is mainly for the LLM, not used directly in this simplified Go version yet.
 	_, ok = args["instruction"].(string)
 	if !ok {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'instruction' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'instruction' argument")
 	}
 
 	oldString, ok := args["old_string"].(string)
@@ -78,7 +78,7 @@ func (t *SmartEditTool) Execute(args map[string]any) (agents.ToolResult, error) 
 
 	newString, ok := args["new_string"].(string)
 	if !ok {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'new_string' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'new_string' argument")
 	}
 
 	// Read the file content
@@ -88,38 +88,38 @@ func (t *SmartEditTool) Execute(args map[string]any) (agents.ToolResult, error) 
 		if os.IsNotExist(err) && oldString == "" {
 			err = ioutil.WriteFile(filePath, []byte(newString), 0644)
 			if err != nil {
-				return agents.ToolResult{}, fmt.Errorf("failed to create new file %s: %w", filePath, err)
+				return types.ToolResult{}, fmt.Errorf("failed to create new file %s: %w", filePath, err)
 			}
 			successMessage := fmt.Sprintf("Successfully created new file: %s", filePath)
-			return agents.ToolResult{
+			return types.ToolResult{
 				LLMContent:    successMessage,
 				ReturnDisplay: successMessage,
 			}, nil
 		}
-		return agents.ToolResult{}, fmt.Errorf("failed to read file %s: %w", filePath, err)
+		return types.ToolResult{}, fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
 	content := string(contentBytes)
 
 	// If old_string is empty but file exists, it's an error
 	if oldString == "" {
-		return agents.ToolResult{}, fmt.Errorf("file already exists, cannot create: %s. Use a non-empty old_string to modify.", filePath)
+		return types.ToolResult{}, fmt.Errorf("file already exists, cannot create: %s. Use a non-empty old_string to modify.", filePath)
 	}
 
 	// Perform the replacement
 	newContent := strings.Replace(content, oldString, newString, 1) // Replace only the first occurrence
 
 	if newContent == content {
-		return agents.ToolResult{}, fmt.Errorf("old_string not found or no changes made in file %s", filePath)
+		return types.ToolResult{}, fmt.Errorf("old_string not found or no changes made in file %s", filePath)
 	}
 
 	// Write the new content back to the file
 	err = ioutil.WriteFile(filePath, []byte(newContent), 0644)
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to write file %s: %w", filePath, err)
+		return types.ToolResult{}, fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
 
 	successMessage := fmt.Sprintf("Successfully modified file: %s", filePath)
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    successMessage,
 		ReturnDisplay: successMessage,
 	}, nil

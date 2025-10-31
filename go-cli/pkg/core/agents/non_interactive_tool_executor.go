@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // ExecuteToolCall executes a single tool call non-interactively.
 func ExecuteToolCall(
 	cfg *config.Config,
-	toolCallRequest ToolCallRequestInfo,
+	toolCallRequest types.ToolCallRequestInfo,
 	ctx context.Context,
 ) (CompletedToolCall, error) {
 	// Create a channel to receive the completed tool calls.

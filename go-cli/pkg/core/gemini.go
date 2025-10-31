@@ -6,8 +6,7 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/tools"
-	"go-ai-agent-v2/go-cli/pkg/types" // Added
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/iterator"
@@ -23,14 +22,13 @@ type ContentGenerator interface {
 type GeminiChat struct {
 	client           *genai.Client
 	model            *genai.GenerativeModel
-	Name             string // Added
-	generationConfig agents.GenerateContentConfig
-	startHistory     []genai.Content
-	// toolRegistry *tools.ToolRegistry // Removed, passed directly to SendMessageStream
+	Name             string
+	generationConfig types.GenerateContentConfig
+	startHistory     []*genai.Content
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
-func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []genai.Content) (*GeminiChat, error) {
+func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (*GeminiChat, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -47,19 +45,27 @@ func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentCon
 	// Apply generation config
 	model.SetTemperature(generationConfig.Temperature)
 	model.SetTopP(generationConfig.TopP)
-	// TODO: Handle ThinkingConfig and SystemInstruction
+
+	return &GeminiChat{
+		client:           client,
+		model:            model,
+		Name:             cfg.Model(),
+		generationConfig: generationConfig,
+		startHistory:     startHistory,
+	}, nil
+}
 
 // GenerateContent generates content using the Gemini API, handling tool calls.
 func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
 	ctx := context.Background()
 
 	messageParams := types.MessageParams{
-		Message:     []agents.Part{{Text: prompt}},
+		Message:     []types.Part{{Text: prompt}},
 		AbortSignal: ctx,
 	}
 
 	responseStream, err := gc.SendMessageStream(
-		gc.Name, // Using gc.Name
+		gc.Name,
 		messageParams,
 		"generate-command", // Dummy promptId
 	)
@@ -87,40 +93,19 @@ func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
 	return generatedText, nil
 }
 
-	return &GeminiChat{
-		client:           client,
-		model:            model,
-		Name:             cfg.Model(), // Initialized
-		generationConfig: generationConfig,
-		startHistory:     startHistory,
-	}, nil
-}
-
 // SendMessageStream generates content using the Gemini API and streams responses.
-func (gc *GeminiChat) SendMessageStream(modelName string, messageParams agents.MessageParams, promptId string) (<-chan agents.StreamResponse, error) {
-	respChan := make(chan agents.StreamResponse)
+func (gc *GeminiChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
+	respChan := make(chan types.StreamResponse)
 
 	cs := gc.model.StartChat()
-
-	// Convert []genai.Content to []*genai.Content for history
-	historyPtrs := make([]*genai.Content, len(gc.startHistory))
-	for i := range gc.startHistory {
-		historyPtrs[i] = &gc.startHistory[i]
-	}
-	cs.History = historyPtrs
+	cs.History = gc.startHistory
 
 	// Prepare tools for the model
 	if len(messageParams.Tools) > 0 {
-		genaiTools := make([]*genai.Tool, len(messageParams.Tools))
-		for i, tool := range messageParams.Tools {
-			genaiTools[i] = &genai.Tool{
-				FunctionDeclarations: []*genai.FunctionDeclaration{&tool},
-			}
-		}
-		gc.model.Tools = genaiTools
+		gc.model.Tools = messageParams.Tools
 	}
 
-	// Convert agents.Part to genai.Part
+	// Convert types.Part to genai.Part
 	genaiParts := make([]genai.Part, len(messageParams.Message))
 	for i, part := range messageParams.Message {
 		if part.Text != "" {
@@ -136,8 +121,6 @@ func (gc *GeminiChat) SendMessageStream(modelName string, messageParams agents.M
 				Data:     []byte(part.InlineData.Data),
 			}
 		} else if part.FileData != nil {
-			// Handle FileData if necessary, currently not directly supported by genai.Part
-			// For now, we'll skip or convert to text if possible.
 			genaiParts[i] = genai.Text(fmt.Sprintf("File data: %s (%s)", part.FileData.FileURL, part.FileData.MimeType))
 		}
 	}
@@ -152,10 +135,10 @@ func (gc *GeminiChat) SendMessageStream(modelName string, messageParams agents.M
 				return
 			}
 			if err != nil {
-				respChan <- agents.StreamResponse{Type: agents.StreamEventTypeError, Error: err}
+				respChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: err}
 				return
 			}
-			respChan <- agents.StreamResponse{Type: agents.StreamEventTypeChunk, Value: resp}
+			respChan <- types.StreamResponse{Type: types.StreamEventTypeChunk, Value: resp}
 		}
 	}()
 

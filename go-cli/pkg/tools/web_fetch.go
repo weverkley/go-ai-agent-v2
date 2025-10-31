@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents" // Added import
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -55,19 +55,18 @@ func extractUrls(text string) []string {
 }
 
 // Execute performs a web fetch operation.
-func (t *WebFetchTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *WebFetchTool) Execute(args map[string]any) (types.ToolResult, error) {
 	prompt, ok := args["prompt"].(string)
 	if !ok || prompt == "" {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'prompt' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'prompt' argument")
 	}
 
 	urls := extractUrls(prompt)
 	if len(urls) == 0 {
-		return agents.ToolResult{
+		return types.ToolResult{
 			LLMContent:    "No URLs found in the prompt.",
 			ReturnDisplay: "No URLs found in the prompt.",
-		},
-	nil
+		}, nil
 	}
 
 	var results strings.Builder
@@ -99,9 +98,9 @@ func (t *WebFetchTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	}
 
 	resultMessage := results.String()
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    resultMessage,
 		ReturnDisplay: resultMessage,
-	},
-	nil
+	}, nil
 }
+

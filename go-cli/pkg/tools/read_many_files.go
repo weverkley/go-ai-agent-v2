@@ -1,14 +1,13 @@
 package tools
 
 import (
-	"bufio"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/gobwas/glob"
 	"github.com/google/generative-ai-go/genai"
@@ -75,10 +74,10 @@ type SkippedFile struct {
 }
 
 // Execute performs a read-many-files operation.
-func (t *ReadManyFilesTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *ReadManyFilesTool) Execute(args map[string]any) (types.ToolResult, error) {
 	patterns, ok := args["paths"].([]any)
 	if !ok || len(patterns) == 0 {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'paths' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'paths' argument")
 	}
 	pathStrings := make([]string, len(patterns))
 	for i, v := range patterns {
@@ -124,7 +123,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (agents.ToolResult, err
 	for _, p := range excludePatterns {
 		g, err := glob.Compile(p)
 		if err != nil {
-			return agents.ToolResult{}, fmt.Errorf("failed to compile exclude pattern %s: %w", p, err)
+			return types.ToolResult{}, fmt.Errorf("failed to compile exclude pattern %s: %w", p, err)
 		}
 		compiledExcludeGlobs = append(compiledExcludeGlobs, g)
 	}
@@ -132,7 +131,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (agents.ToolResult, err
 	for _, searchPattern := range searchPatterns {
 		absSearchPath, err := filepath.Abs(".")
 		if err != nil {
-			return agents.ToolResult{}, fmt.Errorf("failed to get absolute path: %w", err)
+			return types.ToolResult{}, fmt.Errorf("failed to get absolute path: %w", err)
 		}
 
 		err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
@@ -176,7 +175,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (agents.ToolResult, err
 		})
 
 		if err != nil {
-			return agents.ToolResult{}, fmt.Errorf("error walking path for pattern %s: %w", searchPattern, err)
+			return types.ToolResult{}, fmt.Errorf("error walking path for pattern %s: %w", searchPattern, err)
 		}
 	}
 
@@ -220,7 +219,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (agents.ToolResult, err
 		displayMessage.WriteString("No files were read and concatenated based on the criteria.\n")
 	}
 
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    contentBuilder.String() + "\n--- End of content ---\n\n" + displayMessage.String(),
 		ReturnDisplay: displayMessage.String(),
 	}, nil

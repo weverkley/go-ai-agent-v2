@@ -3,8 +3,7 @@ package config
 import (
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/types" // Import the new types package
-	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // WorkspaceContext defines an interface for accessing workspace-related information.
@@ -44,11 +43,6 @@ type OutputSettings struct {
 	Format string `json:"format,omitempty"`
 }
 
-// ToolRegistryProvider defines an interface for providing the tool registry.
-type ToolRegistryProvider interface {
-	GetToolRegistry() *tools.ToolRegistry
-}
-
 // ConfigParameters represents the parameters for creating a new Config.
 type ConfigParameters struct {
 	SessionID      string
@@ -61,7 +55,7 @@ type ConfigParameters struct {
 	Telemetry      *TelemetrySettings
 	Output         *OutputSettings
 	CodebaseInvestigator *CodebaseInvestigatorSettings
-	ToolRegistryProvider ToolRegistryProvider // Changed
+	ToolRegistryProvider types.ToolRegistryProvider // Changed
 }
 
 // Config represents the application configuration.
@@ -76,7 +70,7 @@ type Config struct {
 	telemetry      *TelemetrySettings
 	output         *OutputSettings
 	codebaseInvestigatorSettings *CodebaseInvestigatorSettings
-	toolRegistryProvider ToolRegistryProvider // Changed
+	toolRegistryProvider types.ToolRegistryProvider // Changed
 }
 
 // NewConfig creates a new Config instance.
@@ -107,7 +101,7 @@ func (c *Config) GetDebugMode() bool {
 }
 
 // GetToolRegistry returns the global tool registry.
-func (c *Config) GetToolRegistry() *tools.ToolRegistry {
+func (c *Config) GetToolRegistry() *types.ToolRegistry {
 	if c.toolRegistryProvider == nil {
 		return nil // Or handle error appropriately
 	}
@@ -138,14 +132,19 @@ func (d *dummyWorkspaceContext) GetDirectories() []string {
 // This is a placeholder and should be replaced with a proper implementation.
 func (c *Config) GetFileService() FileService {
 	// For now, return a dummy implementation.
-	return &dummyFileService{}
+	return &DummyFileService{}
 }
 
-// dummyFileService is a placeholder implementation of FileService.
-type dummyFileService struct{}
+// DummyFileService is a placeholder implementation of FileService.
+type DummyFileService struct{}
 
-func (d *dummyFileService) ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool {
+func (d *DummyFileService) ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool {
 	// For now, always return false.
 	return false
+}
+
+
+func (c *Config) Model() string {
+	return c.model
 }
 

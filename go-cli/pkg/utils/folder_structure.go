@@ -1,4 +1,4 @@
-package agents
+package utils
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/services" // Assuming FileSystemService is here
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 const (
@@ -23,7 +23,7 @@ var (
 		".git":         true,
 		"dist":         true,
 	}
-	DEFAULT_FILE_FILTERING_OPTIONS = FileFilteringOptions{
+	DEFAULT_FILE_FILTERING_OPTIONS = types.FileFilteringOptions{
 		RespectGitIgnore:  boolPtr(true),
 		RespectGeminiIgnore: boolPtr(true),
 	}
@@ -35,13 +35,13 @@ func boolPtr(b bool) *bool {
 }
 
 // getFolderStructure generates a string representation of a directory's structure.
-func getFolderStructure(directory string, options *FolderStructureOptions, fileService *services.FileSystemService) (string, error) {
+func getFolderStructure(directory string, options *types.FolderStructureOptions, fileService config.FileService) (string, error) {
 	resolvedPath, err := filepath.Abs(directory)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve path: %w", err)
 	}
 
-	mergedOptions := FolderStructureOptions{
+	mergedOptions := types.FolderStructureOptions{
 		MaxItems:           intPtr(MAX_ITEMS),
 		IgnoredFolders:     &[]string{}, // Will be merged with DEFAULT_IGNORED_FOLDERS
 		FileIncludePattern: nil,
@@ -105,17 +105,17 @@ func intPtr(i int) *int {
 }
 
 // readFullStructure reads the directory structure using BFS, respecting maxItems.
-func readFullStructure(rootPath string, options *FolderStructureOptions, fileService *services.FileSystemService) (*FullFolderInfo, error) {
+func readFullStructure(rootPath string, options *types.FolderStructureOptions, fileService config.FileService) (*types.FullFolderInfo, error) {
 	rootName := filepath.Base(rootPath)
-	rootNode := &FullFolderInfo{
+	rootNode := &types.FullFolderInfo{
 		Name:       rootName,
 		Path:       rootPath,
 		Files:      []string{},
-		SubFolders: []FullFolderInfo{},
+		SubFolders: []types.FullFolderInfo{},
 	}
 
 	queue := []struct {
-		folderInfo  *FullFolderInfo
+		folderInfo  *types.FullFolderInfo
 		currentPath string
 	}{
 		{folderInfo: rootNode, currentPath: rootPath},
@@ -155,7 +155,7 @@ func readFullStructure(rootPath string, options *FolderStructureOptions, fileSer
 		})
 
 		filesInCurrentDir := []string{}
-		subFoldersInCurrentDir := []FullFolderInfo{}
+		subFoldersInCurrentDir := []types.FullFolderInfo{}
 
 		// Process files first
 		for _, entry := range entries {
@@ -165,7 +165,7 @@ func readFullStructure(rootPath string, options *FolderStructureOptions, fileSer
 					break
 				}
 				fileName := entry.Name()
-				filePath := filepath.Join(currentPath, fileName)
+				
 
 				// TODO: Implement shouldIgnoreFile using fileService
 				// For now, a dummy check
@@ -209,12 +209,12 @@ func readFullStructure(rootPath string, options *FolderStructureOptions, fileSer
 				// }
 
 				if isIgnored {
-					ignoredSubFolder := FullFolderInfo{
+					ignoredSubFolder := types.FullFolderInfo{
 						Name:        subFolderName,
 						Path:        subFolderPath,
 						IsIgnored:   true,
 						Files:       []string{},
-						SubFolders:  []FullFolderInfo{},
+						SubFolders:  []types.FullFolderInfo{},
 						TotalChildren: 0,
 						TotalFiles:  0,
 					}
@@ -224,18 +224,18 @@ func readFullStructure(rootPath string, options *FolderStructureOptions, fileSer
 					continue
 				}
 
-				subFolderNode := &FullFolderInfo{
+				subFolderNode := &types.FullFolderInfo{
 					Name:       subFolderName,
 					Path:       subFolderPath,
 					Files:      []string{},
-					SubFolders: []FullFolderInfo{},
+					SubFolders: []types.FullFolderInfo{},
 				}
 				subFoldersInCurrentDir = append(subFoldersInCurrentDir, *subFolderNode)
 				currentItemCount++
 				folderInfo.TotalChildren++
 
 				queue = append(queue, struct {
-					folderInfo  *FullFolderInfo
+					folderInfo  *types.FullFolderInfo
 					currentPath string
 				}{folderInfo: subFolderNode, currentPath: subFolderPath})
 			}
@@ -248,7 +248,7 @@ func readFullStructure(rootPath string, options *FolderStructureOptions, fileSer
 
 // formatStructure formats the FullFolderInfo into a string.
 func formatStructure(
-	node *FullFolderInfo,
+	node *types.FullFolderInfo,
 	currentIndent string,
 	isLastChildOfParent bool,
 	isProcessingRootNode bool,
@@ -307,7 +307,7 @@ func formatStructure(
 }
 
 // isTruncated checks if any part of the folder structure was truncated or ignored.
-func isTruncated(node *FullFolderInfo) bool {
+func isTruncated(node *types.FullFolderInfo) bool {
 	if node.HasMoreFiles || node.HasMoreSubfolders || node.IsIgnored {
 		return true
 	}
@@ -320,11 +320,11 @@ func isTruncated(node *FullFolderInfo) bool {
 }
 
 // containsString checks if a string is present in a slice of strings.
-func containsString(slice *[]string, str string) bool {
+func containsString(slice []string, str string) bool {
 	if slice == nil {
 		return false
 	}
-	for _, s := range *slice {
+	for _, s := range slice {
 		if s == str {
 			return true
 		}

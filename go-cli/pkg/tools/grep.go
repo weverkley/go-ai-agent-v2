@@ -8,7 +8,7 @@ import (
 	"regexp"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -64,11 +64,11 @@ type GrepMatch struct {
 }
 
 // Execute performs a grep search.
-func (t *GrepTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *GrepTool) Execute(args map[string]any) (types.ToolResult, error) {
 	// Extract arguments
 	pattern, ok := args["pattern"].(string)
 	if !ok {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")
 	}
 
 	searchPath := "." // Default to current directory
@@ -84,13 +84,13 @@ func (t *GrepTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	// Compile the regex pattern
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("invalid regex pattern: %w", err)
+		return types.ToolResult{}, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
 	// Resolve the search path
 	absSearchPath, err := filepath.Abs(searchPath)
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
+		return types.ToolResult{}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
 	}
 
 	var allMatches []GrepMatch
@@ -149,11 +149,11 @@ func (t *GrepTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	})
 
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
+		return types.ToolResult{}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
 	}
 
 	if len(allMatches) == 0 {
-		return agents.ToolResult{
+		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("No matches found for pattern \"%s\" in path \"%s\"", pattern, searchPath),
 			ReturnDisplay: fmt.Sprintf("No matches found for pattern \"%s\" in path \"%s\"", pattern, searchPath),
 		}, nil
@@ -170,7 +170,7 @@ func (t *GrepTool) Execute(args map[string]any) (agents.ToolResult, error) {
 		llmContent.WriteString("---\n\n")
 	}
 
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    llmContent.String(),
 		ReturnDisplay: llmContent.String(),
 	}, nil

@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -56,10 +56,10 @@ func (t *ReadFileTool) Definition() *genai.Tool {
 }
 
 // Execute performs a read-file operation.
-func (t *ReadFileTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *ReadFileTool) Execute(args map[string]any) (types.ToolResult, error) {
 	absolutePath, ok := args["absolute_path"].(string)
 	if !ok || absolutePath == "" {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'absolute_path' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'absolute_path' argument")
 	}
 
 	var offset int
@@ -76,21 +76,21 @@ func (t *ReadFileTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	info, err := os.Stat(absolutePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return agents.ToolResult{}, fmt.Errorf("file not found: %s", absolutePath)
+			return types.ToolResult{}, fmt.Errorf("file not found: %s", absolutePath)
 		}
-		return agents.ToolResult{}, fmt.Errorf("failed to get file info for %s: %w", absolutePath, err)
+		return types.ToolResult{}, fmt.Errorf("failed to get file info for %s: %w", absolutePath, err)
 	}
 
 	// Check if it's a directory
 	if info.IsDir() {
-		return agents.ToolResult{}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
+		return types.ToolResult{}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
 	}
 
 	// For now, assume all are text files.
 	// TODO: Implement image/pdf handling.
 	ext := strings.ToLower(filepath.Ext(absolutePath))
 	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".pdf" {
-		return agents.ToolResult{
+		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath),
 			ReturnDisplay: fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath),
 		}, nil
@@ -98,7 +98,7 @@ func (t *ReadFileTool) Execute(args map[string]any) (agents.ToolResult, error) {
 
 	file, err := os.Open(absolutePath)
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to open file %s: %w", absolutePath, err)
+		return types.ToolResult{}, fmt.Errorf("failed to open file %s: %w", absolutePath, err)
 	}
 	defer file.Close()
 
@@ -108,7 +108,7 @@ func (t *ReadFileTool) Execute(args map[string]any) (agents.ToolResult, error) {
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return agents.ToolResult{}, fmt.Errorf("error reading file %s: %w", absolutePath, err)
+		return types.ToolResult{}, fmt.Errorf("error reading file %s: %w", absolutePath, err)
 	}
 
 	originalLineCount := len(lines)
@@ -124,7 +124,7 @@ func (t *ReadFileTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	}
 
 	if linesShownStart >= originalLineCount {
-		return agents.ToolResult{
+		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("Offset %d is beyond the end of the file (total lines: %d)", offset, originalLineCount),
 			ReturnDisplay: fmt.Sprintf("Offset %d is beyond the end of the file (total lines: %d)", offset, originalLineCount),
 		}, nil
@@ -154,7 +154,7 @@ func (t *ReadFileTool) Execute(args map[string]any) (agents.ToolResult, error) {
 	}
 	llmContent.WriteString(contentBuilder.String())
 
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    llmContent.String(),
 		ReturnDisplay: llmContent.String(), // For now, same as LLMContent
 	}, nil

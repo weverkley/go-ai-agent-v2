@@ -2,30 +2,29 @@ package agents
 
 import (
 	"fmt"
+
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // convertInputConfigToJsonSchema converts an internal InputConfig definition into a standard JSON Schema
 // object suitable for a tool's FunctionDeclaration.
-func convertInputConfigToJsonSchema(inputConfig InputConfig) (JsonSchemaObject, error) {
-	properties := make(map[string]JsonSchemaProperty)
+func convertInputConfigToJsonSchema(inputConfig InputConfig) (types.JsonSchemaObject, error) {
+	properties := make(map[string]types.JsonSchemaProperty)
 	required := []string{}
 
 	for name, definition := range inputConfig.Inputs {
-		schemaProperty := JsonSchemaProperty{
+		schemaProperty := types.JsonSchemaProperty{
 			Description: definition.Description,
 		}
 
 		switch definition.Type {
 		case "string", "number", "integer", "boolean":
 			schemaProperty.Type = definition.Type
-		case "string[]":
-			schemaProperty.Type = "array"
-			schemaProperty.Items = &struct{ Type string }{Type: "string"}
+			schemaProperty.Items = &types.JsonSchemaPropertyItem{Type: "string"}
 		case "number[]":
-			schemaProperty.Type = "array"
-			schemaProperty.Items = &struct{ Type string }{Type: "number"}
+			schemaProperty.Items = &types.JsonSchemaPropertyItem{Type: "number"}
 		default:
-			return JsonSchemaObject{}, fmt.Errorf("unsupported input type '%s' for parameter '%s'. Supported types: string, number, integer, boolean, string[], number[]", definition.Type, name)
+			return types.JsonSchemaObject{}, fmt.Errorf("unsupported input type '%s' for parameter '%s'. Supported types: string, number, integer, boolean, string[], number[]", definition.Type, name)
 		}
 
 		properties[name] = schemaProperty
@@ -40,7 +39,7 @@ func convertInputConfigToJsonSchema(inputConfig InputConfig) (JsonSchemaObject, 
 		requiredPtr = required
 	}
 
-	return JsonSchemaObject{
+	return types.JsonSchemaObject{
 		Type:       "object",
 		Properties: properties,
 		Required:   requiredPtr,

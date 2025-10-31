@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -123,36 +123,36 @@ func computeNewContent(currentContent, fact string) string {
 }
 
 // Execute saves a fact to long-term memory.
-func (t *MemoryTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *MemoryTool) Execute(args map[string]any) (types.ToolResult, error) {
 	fact, ok := args["fact"].(string)
 	if !ok || fact == "" {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'fact' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'fact' argument")
 	}
 
 	memoryFilePath, err := getGlobalMemoryFilePath()
 	if err != nil {
-		return agents.ToolResult{}, err
+		return types.ToolResult{}, err
 	}
 
 	err = os.MkdirAll(filepath.Dir(memoryFilePath), 0755)
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to create memory directory: %w", err)
+		return types.ToolResult{}, fmt.Errorf("failed to create memory directory: %w", err)
 	}
 
 	currentContent, err := readMemoryFileContent()
 	if err != nil {
-		return agents.ToolResult{}, err
+		return types.ToolResult{}, err
 	}
 
 	newContent := computeNewContent(currentContent, fact)
 
 	err = ioutil.WriteFile(memoryFilePath, []byte(newContent), 0644)
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to write memory file: %w", err)
+		return types.ToolResult{}, fmt.Errorf("failed to write memory file: %w", err)
 	}
 
 	successMessage := fmt.Sprintf("Okay, I've remembered that: \"%s\"", fact)
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    successMessage,
 		ReturnDisplay: successMessage,
 	}, nil

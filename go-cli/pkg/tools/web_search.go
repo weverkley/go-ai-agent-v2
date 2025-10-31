@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/customsearch/v1"
@@ -49,35 +49,35 @@ func (t *WebSearchTool) Definition() *genai.Tool {
 }
 
 // Execute performs a web search operation.
-func (t *WebSearchTool) Execute(args map[string]any) (agents.ToolResult, error) {
+func (t *WebSearchTool) Execute(args map[string]any) (types.ToolResult, error) {
 	query, ok := args["query"].(string)
 	if !ok || query == "" {
-		return agents.ToolResult{}, fmt.Errorf("invalid or missing 'query' argument")
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'query' argument")
 	}
 
 	apiKey := os.Getenv("GOOGLE_API_KEY")
 	cx := os.Getenv("GOOGLE_CUSTOM_SEARCH_CX")
 
 	if apiKey == "" || cx == "" {
-		return agents.ToolResult{}, fmt.Errorf("GOOGLE_API_KEY and GOOGLE_CUSTOM_SEARCH_CX environment variables must be set for web search")
+		return types.ToolResult{}, fmt.Errorf("GOOGLE_API_KEY and GOOGLE_CUSTOM_SEARCH_CX environment variables must be set for web search")
 	}
 
 	ctx := context.Background()
 	svc, err := customsearch.NewService(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to create customsearch service: %w", err)
+		return types.ToolResult{}, fmt.Errorf("failed to create customsearch service: %w", err)
 	}
 
 	resp, err := svc.Cse.List().Q(query).Cx(cx).Do()
 	if err != nil {
-		return agents.ToolResult{}, fmt.Errorf("failed to perform custom search: %w", err)
+		return types.ToolResult{}, fmt.Errorf("failed to perform custom search: %w", err)
 	}
 
 	var llmContent strings.Builder
 	llmContent.WriteString(fmt.Sprintf("Web search results for \"%s\":\n\n", query))
 
 	if len(resp.Items) == 0 {
-		return agents.ToolResult{
+		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("No search results found for query: \"%s\"", query),
 			ReturnDisplay: fmt.Sprintf("No search results found for query: \"%s\"", query),
 		}, nil
@@ -89,7 +89,7 @@ func (t *WebSearchTool) Execute(args map[string]any) (agents.ToolResult, error) 
 	}
 
 	resultMessage := llmContent.String()
-	return agents.ToolResult{
+	return types.ToolResult{
 		LLMContent:    resultMessage,
 		ReturnDisplay: resultMessage,
 	}, nil

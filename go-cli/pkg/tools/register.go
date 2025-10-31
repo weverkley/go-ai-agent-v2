@@ -3,13 +3,13 @@ package tools
 import (
 	"fmt"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(cfg *config.Config) *ToolRegistry {
-	registry := NewToolRegistry()
+func RegisterAllTools(cfg types.Config) *types.ToolRegistry {
+	registry := types.NewToolRegistry()
 
 	registry.Register(NewGrepTool())
 	registry.Register(NewGlobTool())
