@@ -459,7 +459,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 					Name:     types.TASK_COMPLETE_TOOL_NAME,
 					Response: map[string]interface{}{"status": "Task marked complete."},
 				}}) // Removed Id: callId
-				
+
 				ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
 					"name":   functionCall.Name,
 					"output": "Task marked complete.",
@@ -558,8 +558,8 @@ func (ae *AgentExecutor) emitActivity(activityType string, data map[string]inter
 }
 
 // CreateAgentExecutor creates and validates a new AgentExecutor instance.
-func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Config, parentToolRegistry *tools.ToolRegistry, parentPromptId string, onActivity ActivityCallback) (*AgentExecutor, error) {
-	agentToolRegistry := tools.NewToolRegistry()
+func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity ActivityCallback) (*AgentExecutor, error) {
+	agentToolRegistry := types.NewToolRegistry()
 
 	if definition.ToolConfig != nil {
 		for _, toolName := range definition.ToolConfig.Tools {
@@ -595,16 +595,16 @@ func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Conf
 }
 
 // validateTools validates that all tools in a registry are safe for non-interactive use.
-func validateTools(toolRegistry *tools.ToolRegistry, agentName string) error {
+func validateTools(toolRegistry *types.ToolRegistry, agentName string) error {
 	allowlist := map[string]bool{
-		tools.LS_TOOL_NAME:              true,
-		tools.READ_FILE_TOOL_NAME:       true,
-		tools.GREP_TOOL_NAME:            true,
-		tools.GLOB_TOOL_NAME:            true,
-		tools.READ_MANY_FILES_TOOL_NAME: true,
-		tools.MEMORY_TOOL_NAME:          true,
-		tools.WEB_SEARCH_TOOL_NAME:      true,
-		tools.WEB_FETCH_TOOL_NAME:       true,
+		types.LS_TOOL_NAME:              true,
+		types.READ_FILE_TOOL_NAME:       true,
+		types.GREP_TOOL_NAME:            true,
+		types.GLOB_TOOL_NAME:            true,
+		types.READ_MANY_FILES_TOOL_NAME: true,
+		types.MEMORY_TOOL_NAME:          true,
+		types.WEB_SEARCH_TOOL_NAME:      true,
+		types.WEB_FETCH_TOOL_NAME:       true,
 	}
 
 	for _, tool := range toolRegistry.GetAllRegisteredTools() {
@@ -619,4 +619,3 @@ func validateTools(toolRegistry *tools.ToolRegistry, agentName string) error {
 func stringPtr(s string) *string {
 	return &s
 }
-

@@ -7,3 +7,5 @@ i want to replicate the same GUI for the cli which the javascript version alread
 The javascript files reside in the folder docs/gemini-cli-main/packages folder The documentation about each the javascript verion feature redise in the folder docs/gemini-cli-main/docs.
 
 Before continuing, i want you to read my current progress and the files i have implemented already on the folder go-cli, start reading the folders and then proceed to read files.
+
+As an important task i have seen so many constants inside of types.go, move them to a dedicated constants file.
