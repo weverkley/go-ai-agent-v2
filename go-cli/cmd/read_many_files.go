@@ -27,7 +27,7 @@ func init() {
 	readManyFilesCmd.Flags().BoolVar(&readManyFilesUseDefaultExcludes, "use-default-excludes", true, "Optional: Whether to apply default exclusion patterns.")
 	readManyFilesCmd.Flags().BoolVar(&readManyFilesRespectGitIgnore, "respect-git-ignore", true, "Optional: Whether to respect .gitignore patterns.")
 	readManyFilesCmd.Flags().BoolVar(&readManyFilesRespectGeminiIgnore, "respect-gemini-ignore", true, "Optional: Whether to respect .geminiignore patterns.")
-	readManyFilesCmd.MarkFlagRequired("paths")
+	_ = readManyFilesCmd.MarkFlagRequired("paths")
 }
 
 func stringSliceToAnySlice(s []string) []any {

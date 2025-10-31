@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -184,7 +183,7 @@ func (t *ReadManyFilesTool) Execute(args map[string]any) (types.ToolResult, erro
 		if _, exists := uniqueFiles[file]; !exists {
 			uniqueFiles[file] = true
 
-			content, err := ioutil.ReadFile(file)
+			content, err := os.ReadFile(file)
 			if err != nil {
 				skippedFilesList = append(skippedFilesList, SkippedFile{Path: file, Reason: fmt.Sprintf("failed to read: %v", err)})
 				continue

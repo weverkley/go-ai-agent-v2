@@ -19,7 +19,7 @@ func init() {
 	grepCmd.Flags().StringVarP(&grepPattern, "pattern", "p", "", "The regular expression (regex) pattern to search for.")
 	grepCmd.Flags().StringVar(&grepPath, "path", ".", "Optional: The absolute path to the directory to search within.")
 	grepCmd.Flags().StringVar(&grepInclude, "include", "", "Optional: A glob pattern to filter which files are searched.")
-	grepCmd.MarkFlagRequired("pattern")
+	_ = grepCmd.MarkFlagRequired("pattern")
 }
 
 var grepCmd = &cobra.Command{

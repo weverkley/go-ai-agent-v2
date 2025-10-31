@@ -16,7 +16,7 @@ var (
 func init() {
 	rootCmd.AddCommand(todosCmd)
 	todosCmd.Flags().StringArrayVarP(&todosList, "list", "l", []string{}, "The full list of todos, each in 'description:status' format.")
-	todosCmd.MarkFlagRequired("list")
+	_ = todosCmd.MarkFlagRequired("list")
 }
 
 var todosCmd = &cobra.Command{

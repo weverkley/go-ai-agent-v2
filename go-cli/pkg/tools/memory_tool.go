@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -67,7 +66,7 @@ func readMemoryFileContent() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data, err := ioutil.ReadFile(memoryFilePath)
+	data, err := os.ReadFile(memoryFilePath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return "", nil // File doesn't exist, return empty content
@@ -146,7 +145,7 @@ func (t *MemoryTool) Execute(args map[string]any) (types.ToolResult, error) {
 
 	newContent := computeNewContent(currentContent, fact)
 
-	err = ioutil.WriteFile(memoryFilePath, []byte(newContent), 0644)
+	err = os.WriteFile(memoryFilePath, []byte(newContent), 0644)
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to write memory file: %w", err)
 	}

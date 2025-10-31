@@ -69,7 +69,7 @@ func init() {
 	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallConsent, "consent", false, "Acknowledge security risks and skip confirmation prompt.")
 	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallForce, "force", false, "Force overwrite of existing extension.")
 
-	extensionsInstallCmd.MarkFlagRequired("source")
+	_ = extensionsInstallCmd.MarkFlagRequired("source")
 
 
 
@@ -77,7 +77,7 @@ func init() {
 
 	extensionsUninstallCmd.Flags().StringVar(&extensionsUninstallName, "name", "", "The name of the extension to uninstall.")
 
-	extensionsUninstallCmd.MarkFlagRequired("name")
+	_ = extensionsUninstallCmd.MarkFlagRequired("name")
 
 
 
@@ -87,7 +87,7 @@ func init() {
 
 	extensionsNewCmd.Flags().StringVar(&extensionsNewTemplate, "template", "", "The boilerplate template to use.")
 
-	extensionsNewCmd.MarkFlagRequired("path")
+	_ = extensionsNewCmd.MarkFlagRequired("path")
 
 
 
@@ -97,7 +97,7 @@ func init() {
 
 	extensionsEnableCmd.Flags().StringVar(&extensionsEnableScope, "scope", "", "The scope to enable the extension in.")
 
-	extensionsEnableCmd.MarkFlagRequired("name")
+	_ = extensionsEnableCmd.MarkFlagRequired("name")
 
 
 
@@ -107,7 +107,7 @@ func init() {
 
 	extensionsDisableCmd.Flags().StringVar(&extensionsDisableScope, "scope", "", "The scope to disable the extension in.")
 
-	extensionsDisableCmd.MarkFlagRequired("name")
+	_ = extensionsDisableCmd.MarkFlagRequired("name")
 
 
 
@@ -125,7 +125,7 @@ func init() {
 
 	extensionsLinkCmd.Flags().StringVar(&extensionsLinkPath, "path", "", "The path to the local extension to link.")
 
-	extensionsLinkCmd.MarkFlagRequired("path")
+	_ = extensionsLinkCmd.MarkFlagRequired("path")
 
 }
 

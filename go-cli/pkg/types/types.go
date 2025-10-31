@@ -7,38 +7,11 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-const (
-	GLOB_TOOL_NAME            = "glob"
-	WRITE_TODOS_TOOL_NAME     = "write_todos"
-	WRITE_FILE_TOOL_NAME      = "write_file"
-	WEB_SEARCH_TOOL_NAME      = "google_web_search"
-	WEB_FETCH_TOOL_NAME       = "web_fetch"
-	EDIT_TOOL_NAME            = "replace"
-	SHELL_TOOL_NAME           = "run_shell_command"
-	GREP_TOOL_NAME            = "search_file_content"
-	READ_MANY_FILES_TOOL_NAME = "read_many_files"
-	READ_FILE_TOOL_NAME       = "read_file"
-	LS_TOOL_NAME              = "list_directory"
-	MEMORY_TOOL_NAME          = "save_memory"
-)
-
 // ApprovalMode defines the approval mode for tool calls.
 type ApprovalMode string
 
-const (
-	ApprovalModeDefault  ApprovalMode = "default"
-	ApprovalModeAutoEdit ApprovalMode = "autoEdit"
-	ApprovalModeYOLO     ApprovalMode = "yolo"
-)
-
 // MCPServerStatus represents the connection status of an MCP server.
 type MCPServerStatus string
-
-const (
-	CONNECTED    MCPServerStatus = "CONNECTED"
-	CONNECTING   MCPServerStatus = "CONNECTING"
-	DISCONNECTED MCPServerStatus = "DISCONNECTED"
-)
 
 // MCPOAuthConfig represents the OAuth configuration for an MCP server.
 type MCPOAuthConfig struct {
@@ -98,12 +71,6 @@ type MessageParams struct {
 
 // StreamEventType defines the type of event in the stream.
 type StreamEventType string
-
-const (
-	StreamEventTypeChunk StreamEventType = "CHUNK"
-	StreamEventTypeError StreamEventType = "ERROR"
-	StreamEventTypeDone  StreamEventType = "DONE"
-)
 
 // StreamResponse represents a response from the stream.
 type StreamResponse struct {
@@ -188,13 +155,6 @@ type StreamStats struct {
 // ToolErrorType defines types of tool errors.
 type ToolErrorType string
 
-const (
-	ToolErrorTypeToolNotRegistered  ToolErrorType = "TOOL_NOT_REGISTERED"
-	ToolErrorTypeInvalidToolParams  ToolErrorType = "INVALID_TOOL_PARAMS"
-	ToolErrorTypeUnhandledException ToolErrorType = "UNHANDLED_EXCEPTION"
-	ToolErrorTypeExecutionFailed    ToolErrorType = "EXECUTION_FAILED"
-)
-
 // FunctionCall represents a function call requested by the model.
 type FunctionCall struct {
 	ID   string                 `json:"id,omitempty"`
@@ -234,13 +194,6 @@ type ToolResultDisplay struct {
 
 // ToolConfirmationOutcome defines the outcome of a tool confirmation.
 type ToolConfirmationOutcome string
-
-const (
-	ToolConfirmationOutcomeProceedAlways    ToolConfirmationOutcome = "PROCEED_ALWAYS"
-	ToolConfirmationOutcomeProceedOnce      ToolConfirmationOutcome = "PROCEED_ONCE"
-	ToolConfirmationOutcomeCancel           ToolConfirmationOutcome = "CANCEL"
-	ToolConfirmationOutcomeModifyWithEditor ToolConfirmationOutcome = "MODIFY_WITH_EDITOR"
-)
 
 // ToolCallConfirmationDetails represents details for tool call confirmation.
 type ToolCallConfirmationDetails struct {
@@ -290,9 +243,13 @@ type JsonSchemaPropertyItem struct {
 	Type string `json:"type"` // "string", "number"
 }
 
-// ToolRegistryProvider defines an interface for providing the tool registry.
-type ToolRegistryProvider interface {
-	GetToolRegistry() *ToolRegistry
+// ToolRegistryProvider provides a ToolRegistry.
+type ToolRegistryProvider struct {
+	ToolRegistry *ToolRegistry
+}
+
+func (p *ToolRegistryProvider) GetToolRegistry() *ToolRegistry {
+	return p.ToolRegistry
 }
 
 // Tool is the interface that all tools must implement.
@@ -311,11 +268,6 @@ type ToolInvocation interface {
 
 // Kind represents the type of tool.
 type Kind string
-
-const (
-	KindThink Kind = "THINK"
-	// Add other kinds as needed
-)
 
 // BaseDeclarativeTool provides a base implementation for declarative tools.
 type BaseDeclarativeTool struct {
@@ -545,11 +497,3 @@ func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []ge
 	}
 	return declarations
 }
-
-const (
-	AgentTerminateModeError    AgentTerminateMode = "ERROR"
-	AgentTerminateModeGoal     AgentTerminateMode = "GOAL"
-	AgentTerminateModeMaxTurns AgentTerminateMode = "MAX_TURNS"
-	AgentTerminateModeTimeout  AgentTerminateMode = "TIMEOUT"
-	AgentTerminateModeAborted  AgentTerminateMode = "ABORTED"
-)

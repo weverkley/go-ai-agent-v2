@@ -6,6 +6,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/spf13/cobra"
 )
@@ -16,7 +17,7 @@ var rootCmd = &cobra.Command{
 	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			cmd.Help()
+			_ = cmd.Help()
 			os.Exit(0)
 		}
 	},
@@ -42,7 +43,7 @@ func init() {
 		DebugMode: false,
 		Model:     config.DEFAULT_GEMINI_MODEL,
 		// Add other parameters as needed
-		ToolRegistryProvider: toolRegistry, // Pass the toolRegistry directly
+		ToolRegistryProvider: &types.ToolRegistryProvider{ToolRegistry: toolRegistry}, // Pass the toolRegistry directly
 	}
 
 	// Create the final Config instance

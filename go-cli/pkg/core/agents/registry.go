@@ -23,7 +23,7 @@ func (ar *AgentRegistry) Initialize() {
 	ar.loadBuiltInAgents()
 
 	if ar.config.GetDebugMode() {
-		// debugLogger.log(fmt.Sprintf("[AgentRegistry] Initialized with %d agents.", len(ar.agents))) // TODO: Implement debugLogger
+		// TODO: Implement debugLogger
 	}
 }
 
@@ -59,12 +59,12 @@ func (ar *AgentRegistry) loadBuiltInAgents() {
 func (ar *AgentRegistry) registerAgent(definition AgentDefinition) {
 	// Basic validation
 	if definition.Name == "" || definition.Description == "" {
-		// debugLogger.warn(fmt.Sprintf("[AgentRegistry] Skipping invalid agent definition. Missing name or description.")) // TODO: Implement debugLogger
+		// TODO: Implement debugLogger
 		return
 	}
 
 	if _, exists := ar.agents[definition.Name]; exists && ar.config.GetDebugMode() {
-		// debugLogger.log(fmt.Sprintf("[AgentRegistry] Overriding agent '%s'", definition.Name)) // TODO: Implement debugLogger
+		// Overriding agent
 	}
 
 	ar.agents[definition.Name] = definition

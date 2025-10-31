@@ -103,56 +103,20 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`cmd/list-models.go`**: Added `genai` import and provided correct arguments to `core.NewGeminiChat`.
 
 - **Import Cycles**: Partially resolved by moving `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool`, and `ToolRegistry` to `pkg/types/types.go`.
-
+- **`pkg/core/agents/non_interactive_tool_executor.go`**: Fixed `undefined: ToolCallRequestInfo`.
+- **`pkg/core/agents/schema_utils.go`**: Fixed `undefined` errors for `JsonSchemaObject` and `JsonSchemaProperty`.
+- **`pkg/core/agents/registry.go`**: Removed unused `fmt` import.
+- **`pkg/tools/glob.go`, `pkg/tools/grep.go`**: Removed unused `pkg/core/tool` import.
+- **`pkg/tools/read_many_files.go`**: Removed unused `bufio` import.
+- **`pkg/types/types.go`**: Moved constants to `pkg/types/constants.go`.
+- **`pkg/config/config.go`**: Changed `ToolRegistryProvider` to a struct.
 
 
 ### Remaining Issues:
 
-
-
-- **Import Cycles**: Still present in `pkg/core/agents/executor.go`, `pkg/tools/glob.go`, `pkg/mcp/manager.go`, `cmd/glob.go`. These need further analysis and refactoring.
-
-- **`pkg/core/agents/non_interactive_tool_executor.go`**:
-
-  - **Error:** `15:18: undefined: ToolCallRequestInfo (typecheck)`
-
-  - **Reason:** Missing import for `ToolCallRequestInfo`.
-
-  - **Action:** Add `import "go-ai-agent-v2/go-cli/pkg/types"` and update `ToolCallRequestInfo` to `types.ToolCallRequestInfo`.
-
-- **`pkg/core/agents/schema_utils.go`**:
-
-  - **Errors:** Multiple `undefined` errors for `JsonSchemaObject` and `JsonSchemaProperty`.
-
-  - **Reason:** Missing import for schema types.
-
-  - **Action:** Add `import "go-ai-agent-v2/go-cli/pkg/types"` and update references to `types.JsonSchemaObject` and `types.JsonSchemaProperty`. Check for unused `pkg/types` import afterwards.
-
-- **`pkg/core/agents/registry.go`**:
-
-  - **Error:** `4:2: "fmt" imported and not used (typecheck)`
-
-  - **Reason:** Unused import.
-
-  - **Action:** Remove `fmt` import.
-
-- **`pkg/tools/glob.go`, `pkg/tools/grep.go`**:
-
-  - **Error:** `pkg/tools/glob.go:12:2: "go-ai-agent-v2/go-cli/pkg/core/tool" imported and not used (typecheck)`
-
-  - **Error:** `pkg/tools/grep.go:11:2: "go-ai-agent-v2/go-cli/pkg/core/tool" imported and not used (typecheck)`
-
-  - **Reason:** Unused import.
-
-  - **Action:** Remove `pkg/core/tool` import from both files.
-
-- **`pkg/tools/read_many_files.go`**:
-
-  - **Error:** `4:2: "bufio" imported and not used (typecheck)`
-
-  - **Reason:** Unused import.
-
-  - **Action:** Remove `bufio` import.
+- **`errcheck` errors**: Multiple `errcheck` errors in the `cmd` package.
+- **`SA9003: empty branch` errors**: Empty branches in `pkg/utils/folder_structure.go` and `pkg/core/agents/registry.go`.
+- **`unused` function error**: Unused function `stringPtr` in `pkg/core/agents/executor.go`.
 
 
 
@@ -272,16 +236,6 @@ The migration will proceed iteratively, focusing on one command or core function
 
 **Next Immediate Steps:**
 
-
-
-1.  **Address Remaining Import Cycles**: Analyze the import graph and refactor to break the remaining cycles.
-
-2.  **Fix `pkg/core/agents/non_interactive_tool_executor.go`**: Add `import "go-ai-agent-v2/go-cli/pkg/types"` and update `ToolCallRequestInfo` to `types.ToolCallRequestInfo`.
-
-3.  **Fix `pkg/core/agents/schema_utils.go`**: Add `import "go-ai-agent-v2/go-cli/pkg/types"` and update references to `types.JsonSchemaObject` and `types.JsonSchemaProperty`.
-
-4.  **Fix `pkg/core/agents/registry.go`**: Remove `fmt` import.
-
-5.  **Fix `pkg/tools/glob.go`, `pkg/tools/grep.go`**: Remove `pkg/core/tool` import.
-
-6.  **Fix `pkg/tools/read_many_files.go`**: Remove `bufio` import.
+1.  Fix the remaining `SA9003: empty branch` errors.
+2.  Fix the remaining `unused` function errors.
+3.  Fix the `errcheck` errors by handling the errors from `MarkFlagRequired` and `cmd.Help()`.

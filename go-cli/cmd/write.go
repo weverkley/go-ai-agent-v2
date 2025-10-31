@@ -15,8 +15,8 @@ func init() {
 	rootCmd.AddCommand(writeCmd)
 	writeCmd.Flags().StringVarP(&writeFilePath, "file", "f", "", "The path to the file to write")
 	writeCmd.Flags().StringVarP(&writeContent, "content", "c", "", "The content to write to the file")
-	writeCmd.MarkFlagRequired("file")
-	writeCmd.MarkFlagRequired("content")
+	_ = writeCmd.MarkFlagRequired("file")
+	_ = writeCmd.MarkFlagRequired("content")
 }
 
 var writeCmd = &cobra.Command{

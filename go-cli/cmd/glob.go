@@ -23,7 +23,7 @@ func init() {
 	globCmd.Flags().BoolVar(&globCaseSensitive, "case-sensitive", false, "Whether the search should be case-sensitive.")
 	globCmd.Flags().BoolVar(&globRespectGitIgnore, "respect-git-ignore", true, "Whether to respect .gitignore patterns.")
 	globCmd.Flags().BoolVar(&globRespectGeminiIgnore, "respect-gemini-ignore", true, "Whether to respect .geminiignore patterns.")
-	globCmd.MarkFlagRequired("pattern")
+	_ = globCmd.MarkFlagRequired("pattern")
 }
 
 var globCmd = &cobra.Command{

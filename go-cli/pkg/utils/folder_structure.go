@@ -34,8 +34,38 @@ func boolPtr(b bool) *bool {
 	return &b
 }
 
-// getFolderStructure generates a string representation of a directory's structure.
-func getFolderStructure(directory string, options *types.FolderStructureOptions, fileService config.FileService) (string, error) {
+// GetDirectoryContextString generates a string describing the current workspace directories and their structures.
+func GetDirectoryContextString(config *config.Config) (string, error) {
+	workspaceContext := config.GetWorkspaceContext()
+	workspaceDirectories := workspaceContext.GetDirectories()
+
+	var folderStructures []string
+	for _, dir := range workspaceDirectories {
+		structure, err := _getFolderStructure(dir, &types.FolderStructureOptions{}, config.GetFileService())
+		if err != nil {
+			return "", err
+		}
+		folderStructures = append(folderStructures, structure)
+	}
+
+	folderStructure := strings.Join(folderStructures, "\n")
+
+	var workingDirPreamble string
+	if len(workspaceDirectories) == 1 {
+		workingDirPreamble = fmt.Sprintf("I'm currently working in the directory: %s", workspaceDirectories[0])
+	} else {
+		var dirList []string
+		for _, dir := range workspaceDirectories {
+			dirList = append(dirList, fmt.Sprintf("  - %s", dir))
+		}
+		workingDirPreamble = fmt.Sprintf("I'm currently working in the following directories:\n%s", strings.Join(dirList, "\n"))
+	}
+
+	return fmt.Sprintf("%s\nHere is the folder structure of the current working directories:\n\n%s", workingDirPreamble, folderStructure), nil
+}
+
+// _getFolderStructure generates a string representation of a directory's structure.
+func _getFolderStructure(directory string, options *types.FolderStructureOptions, fileService config.FileService) (string, error) {
 	resolvedPath, err := filepath.Abs(directory)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve path: %w", err)

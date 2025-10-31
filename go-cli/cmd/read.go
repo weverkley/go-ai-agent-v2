@@ -13,7 +13,7 @@ var readFilePath string
 func init() {
 	rootCmd.AddCommand(readCmd)
 	readCmd.Flags().StringVarP(&readFilePath, "file", "f", "", "The path to the file to read")
-	readCmd.MarkFlagRequired("file")
+	_ = readCmd.MarkFlagRequired("file")
 }
 
 var readCmd = &cobra.Command{

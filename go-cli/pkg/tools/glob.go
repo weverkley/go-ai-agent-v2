@@ -249,3 +249,4 @@ func (t *GlobTool) Execute(args map[string]any) (types.ToolResult, error) {
 		ReturnDisplay: resultMessage,
 	}, nil
 }
+

@@ -11,7 +11,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/utils"
-	folder_structure "go-ai-agent-v2/go-cli/pkg/utils/folder_structure"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -220,7 +219,7 @@ func (ae *AgentExecutor) buildSystemPrompt(inputs AgentInputs) (string, error) {
 
 	finalPrompt := utils.TemplateString(promptConfig.SystemPrompt, inputs)
 
-	dirContext, err := folder_structure.GetDirectoryContextString(ae.RuntimeContext)
+	dirContext, err := utils.GetDirectoryContextString(ae.RuntimeContext)
 	if err != nil {
 		return "", fmt.Errorf("failed to get directory context string: %w", err)
 	}
@@ -244,11 +243,7 @@ func (ae *AgentExecutor) prepareToolsList() ([]*genai.FunctionDeclaration, error
 	outputConfig := ae.Definition.OutputConfig
 
 	if toolConfig != nil {
-		toolNamesToLoad := []string{}
-		for _, toolRef := range toolConfig.Tools {
-			// For now, we only handle tool names (strings).
-			toolNamesToLoad = append(toolNamesToLoad, toolRef)
-		}
+		toolNamesToLoad := toolConfig.Tools
 		// Add schemas from tools that were registered by name.
 		declarations := ae.ToolRegistry.GetFunctionDeclarationsFiltered(toolNamesToLoad)
 		for i := range declarations {

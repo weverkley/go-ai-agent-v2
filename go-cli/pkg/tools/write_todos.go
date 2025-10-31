@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -129,7 +128,7 @@ func (t *WriteTodosTool) Execute(args map[string]any) (types.ToolResult, error) 
 		}
 	}
 
-	err = ioutil.WriteFile(todosFilePath, []byte(todoListBuilder.String()), 0644)
+	err = os.WriteFile(todosFilePath, []byte(todoListBuilder.String()), 0644)
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to write todos file: %w", err)
 	}

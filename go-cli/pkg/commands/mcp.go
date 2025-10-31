@@ -108,7 +108,7 @@ func (c *McpCommand) ListMcpItems() error {
 		return nil
 	}
 
-	fmt.Println("Configured MCP servers:\n")
+	fmt.Println("Configured MCP servers:")
 
 	for _, serverName := range serverNames {
 		server := mcpServers[serverName]

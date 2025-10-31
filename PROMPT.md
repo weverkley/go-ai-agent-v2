@@ -8,4 +8,6 @@ The javascript files reside in the folder docs/gemini-cli-main/packages folder T
 
 Before continuing, i want you to read my current progress and the files i have implemented already on the folder go-cli, start reading the folders and then proceed to read files.
 
-As an important task i have seen so many constants inside of types.go, move them to a dedicated constants file.
+When finishing migrating a full function from javascript into go, you must run the linter and then build the application.
+
+When the build passes and the linter has no error, you must test the implemented feature.

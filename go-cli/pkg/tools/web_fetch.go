@@ -2,7 +2,7 @@ package tools
 
 import (
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"regexp"
 	"strings"
@@ -85,7 +85,7 @@ func (t *WebFetchTool) Execute(args map[string]any) (types.ToolResult, error) {
 			continue
 		}
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		if err != nil {
 			results.WriteString(fmt.Sprintf("Error reading body from %s: %v\n", url, err))
 			continue

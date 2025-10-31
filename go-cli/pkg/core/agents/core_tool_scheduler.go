@@ -23,26 +23,11 @@ type CoreToolSchedulerOptions struct {
 type CoreToolScheduler struct {
 	config *config.Config
 
-	toolCalls                  []ToolCall
-	outputUpdateHandler        func(toolCallID string, outputChunk string)
+	outputUpdateHandler    func(toolCallID string, outputChunk string)
 	onAllToolCallsComplete     func(completedToolCalls []CompletedToolCall)
 	onToolCallsUpdate          func(toolCalls []ToolCall)
 	getPreferredEditor         func() types.EditorType
 	onEditorClose              func()
-	isFinalizingToolCalls      bool
-	isScheduling               bool
-	isCancelling               bool
-	requestQueue               []*schedulerRequest
-	toolCallQueue              []ToolCall
-	completedToolCallsForBatch []CompletedToolCall
-}
-
-// schedulerRequest represents a request in the scheduler's queue.
-type schedulerRequest struct {
-	Request types.ToolCallRequestInfo
-	Context context.Context
-	Resolve func()
-	Reject  func(error)
 }
 
 // NewCoreToolScheduler creates a new CoreToolScheduler instance.

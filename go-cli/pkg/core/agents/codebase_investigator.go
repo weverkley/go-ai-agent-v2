@@ -3,7 +3,7 @@ package agents
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"os"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
@@ -11,7 +11,7 @@ import (
 )
 
 func loadPromptsFromFile(filePath string) (map[string]string, error) {
-	content, err := ioutil.ReadFile(filePath)
+	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}

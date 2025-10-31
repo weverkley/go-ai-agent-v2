@@ -2,7 +2,6 @@ package tools
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -71,10 +70,7 @@ func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'instruction' argument")
 	}
 
-	oldString, ok := args["old_string"].(string)
-	if !ok {
-		// old_string can be empty for new file creation
-	}
+	oldString, _ := args["old_string"].(string)
 
 	newString, ok := args["new_string"].(string)
 	if !ok {
@@ -82,11 +78,11 @@ func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 	}
 
 	// Read the file content
-	contentBytes, err := ioutil.ReadFile(filePath)
+	contentBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		// If file doesn't exist and old_string is empty, it's a new file creation
 		if os.IsNotExist(err) && oldString == "" {
-			err = ioutil.WriteFile(filePath, []byte(newString), 0644)
+			err = os.WriteFile(filePath, []byte(newString), 0644)
 			if err != nil {
 				return types.ToolResult{}, fmt.Errorf("failed to create new file %s: %w", filePath, err)
 			}
@@ -113,7 +109,7 @@ func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 	}
 
 	// Write the new content back to the file
-	err = ioutil.WriteFile(filePath, []byte(newContent), 0644)
+	err = os.WriteFile(filePath, []byte(newContent), 0644)
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}

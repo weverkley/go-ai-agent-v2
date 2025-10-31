@@ -15,7 +15,7 @@ func init() {
 	rootCmd.AddCommand(execCmd)
 	execCmd.Flags().StringVarP(&execCommand, "command", "c", "", "The shell command to execute")
 	execCmd.Flags().StringVarP(&execWorkingDir, "path", "p", ".", "The working directory for the command")
-	execCmd.MarkFlagRequired("command")
+	_ = execCmd.MarkFlagRequired("command")
 }
 
 var execCmd = &cobra.Command{

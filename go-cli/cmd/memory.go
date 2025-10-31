@@ -15,7 +15,7 @@ var (
 func init() {
 	rootCmd.AddCommand(memoryCmd)
 	memoryCmd.Flags().StringVarP(&memoryFact, "fact", "f", "", "The specific fact or piece of information to remember.")
-	memoryCmd.MarkFlagRequired("fact")
+	_ = memoryCmd.MarkFlagRequired("fact")
 }
 
 var memoryCmd = &cobra.Command{

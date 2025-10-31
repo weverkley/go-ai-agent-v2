@@ -3,17 +3,17 @@ package mcp
 import (
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // McpClientManager manages the lifecycle of multiple MCP clients.
 type McpClientManager struct {
 	clients map[string]*McpClient
-	toolRegistry *tools.ToolRegistry // Placeholder for now
+	toolRegistry *types.ToolRegistry // Placeholder for now
 }
 
 // NewMcpClientManager creates a new instance of McpClientManager.
-func NewMcpClientManager(toolRegistry *tools.ToolRegistry) *McpClientManager {
+func NewMcpClientManager(toolRegistry *types.ToolRegistry) *McpClientManager {
 	return &McpClientManager{
 		clients: make(map[string]*McpClient),
 		toolRegistry: toolRegistry,

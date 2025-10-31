@@ -55,7 +55,7 @@ type ConfigParameters struct {
 	Telemetry      *TelemetrySettings
 	Output         *OutputSettings
 	CodebaseInvestigator *CodebaseInvestigatorSettings
-	ToolRegistryProvider types.ToolRegistryProvider // Changed
+	ToolRegistryProvider *types.ToolRegistryProvider // Changed
 }
 
 // Config represents the application configuration.
@@ -70,7 +70,7 @@ type Config struct {
 	telemetry      *TelemetrySettings
 	output         *OutputSettings
 	codebaseInvestigatorSettings *CodebaseInvestigatorSettings
-	toolRegistryProvider types.ToolRegistryProvider // Changed
+	toolRegistryProvider *types.ToolRegistryProvider // Changed
 }
 
 // NewConfig creates a new Config instance.

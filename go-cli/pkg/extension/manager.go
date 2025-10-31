@@ -6,7 +6,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -119,7 +118,7 @@ func (em *ExtensionManager) LoadExtensions() ([]Extension, error) {
 
 			if exists {
 				// Read and parse gemini-extension.json
-				configBytes, err := ioutil.ReadFile(extensionConfigFile)
+				configBytes, err := os.ReadFile(extensionConfigFile)
 				if err != nil {
 					fmt.Printf("Warning: Failed to read extension config file %s: %v\n", extensionConfigFile, err)
 					continue
@@ -160,9 +159,7 @@ func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMe
 	if metadata.Type == "git" {
 		// Extract repository name from git URL
 		repoName := filepath.Base(metadata.Source)
-		if strings.HasSuffix(repoName, ".git") {
-			repoName = strings.TrimSuffix(repoName, ".git")
-		}
+		repoName = strings.TrimSuffix(repoName, ".git")
 		extensionName = repoName
 	} else {
 		extensionName = filepath.Base(metadata.Source)

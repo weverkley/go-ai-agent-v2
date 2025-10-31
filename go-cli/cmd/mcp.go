@@ -44,7 +44,7 @@ func init() {
 
 	mcpCmd.AddCommand(mcpRemoveCmd)
 	mcpRemoveCmd.Flags().StringVar(&mcpRemoveName, "name", "", "The name of the MCP server to remove.")
-	mcpRemoveCmd.MarkFlagRequired("name")
+	_ = mcpRemoveCmd.MarkFlagRequired("name")
 }
 
 var mcpCmd = &cobra.Command{

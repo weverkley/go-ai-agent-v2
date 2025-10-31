@@ -21,10 +21,10 @@ func init() {
 	smartEditCmd.Flags().StringVarP(&smartEditInstruction, "instruction", "i", "", "A clear, semantic instruction for the code change.")
 	smartEditCmd.Flags().StringVarP(&smartEditOldString, "old-string", "o", "", "The exact literal text to replace.")
 	smartEditCmd.Flags().StringVarP(&smartEditNewString, "new-string", "n", "", "The exact literal text to replace old_string with.")
-	smartEditCmd.MarkFlagRequired("file-path")
-	smartEditCmd.MarkFlagRequired("instruction")
-	smartEditCmd.MarkFlagRequired("old-string")
-	smartEditCmd.MarkFlagRequired("new-string")
+	_ = smartEditCmd.MarkFlagRequired("file-path")
+	_ = smartEditCmd.MarkFlagRequired("instruction")
+	_ = smartEditCmd.MarkFlagRequired("old-string")
+	_ = smartEditCmd.MarkFlagRequired("new-string")
 }
 
 var smartEditCmd = &cobra.Command{
