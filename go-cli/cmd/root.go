@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -36,6 +37,16 @@ func init() {
 	// Create a dummy config for initial tool registry creation
 	dummyConfig := config.NewConfig(&config.ConfigParameters{})
 	toolRegistry := tools.RegisterAllTools(dummyConfig)
+
+	// Register subagents as tools
+	subagentTool, err := agents.NewSubagentToolWrapper(agents.CodebaseInvestigatorAgent, dummyConfig, nil) // messageBus is nil for now
+	if err != nil {
+		fmt.Printf("Error creating CodebaseInvestigatorAgent tool: %v\n", err)
+	} else {
+		if err := toolRegistry.Register(subagentTool); err != nil {
+			fmt.Printf("Error registering CodebaseInvestigatorAgent tool: %v\n", err)
+		}
+	}
 
 	// Initialize ConfigParameters
 	params := &config.ConfigParameters{

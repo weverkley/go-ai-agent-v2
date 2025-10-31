@@ -201,7 +201,7 @@ func readFullStructure(rootPath string, options *types.FolderStructureOptions, f
 				// For now, a dummy check
 				isIgnored := false
 				if fileService != nil {
-					// isIgnored = fileService.shouldIgnoreFile(filePath, *options.FileFilteringOptions)
+					// Not implemented yet
 				}
 
 				if isIgnored {
@@ -234,9 +234,9 @@ func readFullStructure(rootPath string, options *types.FolderStructureOptions, f
 					isIgnored = true
 				}
 				// TODO: Implement shouldIgnoreFile using fileService
-				// if fileService != nil {
-				// 	isIgnored = isIgnored || fileService.shouldIgnoreFile(subFolderPath, *options.FileFilteringOptions)
-				// }
+				if fileService != nil {
+					// Not implemented yet
+				}
 
 				if isIgnored {
 					ignoredSubFolder := types.FullFolderInfo{

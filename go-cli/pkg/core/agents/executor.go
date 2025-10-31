@@ -42,7 +42,8 @@ func (ae *AgentExecutor) Run(inputs AgentInputs, ctx context.Context) (OutputObj
 		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
 		return OutputObject{}, err
 	}
-	toolsList, err := ae.prepareToolsList()
+
+toolsList, err := ae.prepareToolsList()
 	if err != nil {
 		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
 		return OutputObject{}, err
@@ -403,9 +404,9 @@ func (ae *AgentExecutor) processFunctionCalls(
 			if taskCompleted {
 				errorMsg := "Task already marked complete in this turn. Ignoring duplicate call."
 				syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-					Name:     types.TASK_COMPLETE_TOOL_NAME,
-					Response: map[string]interface{}{"error": errorMsg},
-				}}) // Removed Id: callId
+						Name:     types.TASK_COMPLETE_TOOL_NAME,
+						Response: map[string]interface{}{"error": errorMsg},
+					}})
 				ae.emitActivity("ERROR", map[string]interface{}{
 					"context": "protocol_violation",
 					"name":    functionCall.Name,
@@ -428,9 +429,9 @@ func (ae *AgentExecutor) processFunctionCalls(
 						submittedOutput = validatedOutput
 					}
 					syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-						Name:     types.TASK_COMPLETE_TOOL_NAME,
-						Response: map[string]interface{}{"result": "Output submitted and task completed."},
-					}}) // Removed Id: callId
+							Name:     types.TASK_COMPLETE_TOOL_NAME,
+							Response: map[string]interface{}{"result": "Output submitted and task completed."},
+						}})
 					ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
 						"name":   functionCall.Name,
 						"output": "Output submitted and task completed.",
@@ -439,9 +440,9 @@ func (ae *AgentExecutor) processFunctionCalls(
 					taskCompleted = false // Revoke completion
 					errorMsg := fmt.Sprintf("Missing required argument '%s' for completion.", outputName)
 					syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-						Name:     types.TASK_COMPLETE_TOOL_NAME,
-						Response: map[string]interface{}{"error": errorMsg},
-					}}) // Removed Id: callId
+							Name:     types.TASK_COMPLETE_TOOL_NAME,
+							Response: map[string]interface{}{"error": errorMsg},
+						}})
 					ae.emitActivity("ERROR", map[string]interface{}{
 						"context": "tool_call",
 						"name":    functionCall.Name,
@@ -451,9 +452,9 @@ func (ae *AgentExecutor) processFunctionCalls(
 			} else {
 				submittedOutput = "Task completed successfully."
 				syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-					Name:     types.TASK_COMPLETE_TOOL_NAME,
-					Response: map[string]interface{}{"status": "Task marked complete."},
-				}}) // Removed Id: callId
+						Name:     types.TASK_COMPLETE_TOOL_NAME,
+						Response: map[string]interface{}{"status": "Task marked complete."},
+					}})
 
 				ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
 					"name":   functionCall.Name,
@@ -466,9 +467,9 @@ func (ae *AgentExecutor) processFunctionCalls(
 		if !allowedToolNames[functionCall.Name] {
 			errorMsg := fmt.Sprintf("Unauthorized tool call: '%s' is not available to this agent.", functionCall.Name)
 			syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-				Name:     functionCall.Name,
-				Response: map[string]interface{}{"error": errorMsg},
-			}}) // Removed Id: callId
+					Name:     functionCall.Name,
+					Response: map[string]interface{}{"error": errorMsg},
+				}})
 			ae.emitActivity("ERROR", map[string]interface{}{
 				"context": "tool_call_unauthorized",
 				"name":    functionCall.Name,
@@ -608,9 +609,4 @@ func validateTools(toolRegistry *types.ToolRegistry, agentName string) error {
 		}
 	}
 	return nil
-}
-
-// stringPtr returns a pointer to a string.
-func stringPtr(s string) *string {
-	return &s
 }
