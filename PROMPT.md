@@ -2,6 +2,8 @@ read my @go-cli/PLAN.md and continue my execution plan, after implementing each 
 the command, also when creating or updating a new go file, read the source javasctipt file to address 
 the logic, and make sure the same logic is applied, it must have the same responses and behaviour.
 
+When implementing a feature and its not fully yet implemented, or depends on another feature that is not done yet, you must create a placeholder for the missing feature, highlight it as a TODO and give it a comment to dont block my linter like "//nolint:staticcheck" and when the missing feature is done, you must replace the placeholder with the missing feature.
+
 i want to replicate the same GUI for the cli which the javascript version already have, for terminal gui tasks i want to use https://github.com/charmbracelet/bubbletea as the main cli gui.
 
 The javascript files reside in the folder docs/gemini-cli-main/packages folder The documentation about each the javascript verion feature redise in the folder docs/gemini-cli-main/docs.

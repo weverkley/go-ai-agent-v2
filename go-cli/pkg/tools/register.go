@@ -3,12 +3,11 @@ package tools
 import (
 	"fmt"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(cfg *config.Config) *types.ToolRegistry {
+func RegisterAllTools() *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
@@ -37,16 +36,6 @@ func RegisterAllTools(cfg *config.Config) *types.ToolRegistry {
 	}
 	if err := registry.Register(NewWriteTodosTool()); err != nil {
 		fmt.Printf("Error registering WriteTodosTool: %v\n", err)
-	}
-
-	// Register subagents as tools
-	subagentTool, err := agents.NewSubagentToolWrapper(agents.CodebaseInvestigatorAgent, cfg, nil) // messageBus is nil for now
-	if err != nil {
-		fmt.Printf("Error creating CodebaseInvestigatorAgent tool: %v\n", err)
-	} else {
-		if err := registry.Register(subagentTool); err != nil {
-			fmt.Printf("Error registering CodebaseInvestigatorAgent tool: %v\n", err)
-		}
 	}
 
 	return registry

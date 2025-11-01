@@ -22,8 +22,8 @@ func NewAgentRegistry(cfg *config.Config) *AgentRegistry {
 func (ar *AgentRegistry) Initialize() {
 	ar.loadBuiltInAgents()
 
-	if ar.config.GetDebugMode() {
-		// TODO: Implement debugLogger
+	if ar.config.GetDebugMode() { //nolint:staticcheck
+		// debugLogger.Debug("Debug mode is enabled.")
 	}
 }
 
@@ -58,13 +58,13 @@ func (ar *AgentRegistry) loadBuiltInAgents() {
 // registerAgent registers an agent definition.
 func (ar *AgentRegistry) registerAgent(definition AgentDefinition) {
 	// Basic validation
-	if definition.Name == "" || definition.Description == "" {
-		// TODO: Implement debugLogger
+	if definition.Name == "" || definition.Description == "" { //nolint:staticcheck
+		// debugLogger.Warn("Agent definition missing name or description.")
 		return
 	}
 
-	if _, exists := ar.agents[definition.Name]; exists && ar.config.GetDebugMode() {
-		// Overriding agent
+	if _, exists := ar.agents[definition.Name]; exists && ar.config.GetDebugMode() { //nolint:staticcheck
+		// debugLogger.Debug(fmt.Sprintf("Overriding existing agent: %s", definition.Name))
 	}
 
 	ar.agents[definition.Name] = definition

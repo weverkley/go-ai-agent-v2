@@ -126,7 +126,8 @@ func _getFolderStructure(directory string, options *types.FolderStructureOptions
 		summary += fmt.Sprintf(" Folders or files indicated with %s contain more items not shown, were ignored, or the display limit (%d items) was reached.", TRUNCATION_INDICATOR, *mergedOptions.MaxItems)
 	}
 
-	return fmt.Sprintf("%s\n\n%s%c\n%s", summary, resolvedPath, filepath.Separator, strings.Join(structureLines, "\n")), nil
+	return fmt.Sprintf("%s\n\n%s%c\n%s", summary, resolvedPath, filepath.Separator, strings.Join(structureLines, "\n")),
+		nil
 }
 
 // intPtr returns a pointer to an int.
@@ -172,8 +173,9 @@ func readFullStructure(rootPath string, options *types.FolderStructureOptions, f
 		if err != nil {
 			if os.IsPermission(err) || os.IsNotExist(err) {
 				// debugLogger.Warn(fmt.Sprintf("Warning: Could not read directory %s: %v", currentPath, err))
+				// If root directory itself not found
 				if currentPath == rootPath && os.IsNotExist(err) {
-					return nil, nil // Root directory itself not found
+					return nil, nil 
 				}
 				continue
 			}
@@ -200,7 +202,7 @@ func readFullStructure(rootPath string, options *types.FolderStructureOptions, f
 				// TODO: Implement shouldIgnoreFile using fileService
 				// For now, a dummy check
 				isIgnored := false
-				if fileService != nil {
+				if fileService != nil { //nolint:staticcheck
 					// Not implemented yet
 				}
 
@@ -234,7 +236,7 @@ func readFullStructure(rootPath string, options *types.FolderStructureOptions, f
 					isIgnored = true
 				}
 				// TODO: Implement shouldIgnoreFile using fileService
-				if fileService != nil {
+				if fileService != nil { //nolint:staticcheck
 					// Not implemented yet
 				}
 
