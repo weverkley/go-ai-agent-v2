@@ -25,31 +25,31 @@ func init() {
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate content using a prompt",
-	Long:  `Generate content using a specified prompt. If no prompt is provided, an interactive UI will be launched.`, 
+	Long:  `Generate content using a specified prompt. If no prompt is provided, an interactive UI will be launched.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Load the configuration within the command's Run function
+		workspaceDir, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current working directory: %v\n", err)
+			os.Exit(1)
+		}
+		loadedSettings := config.LoadSettings(workspaceDir)
+
+		params := &config.ConfigParameters{
+			Model: loadedSettings.Model,
+		}
+		appConfig := config.NewConfig(params)
+
+		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		if err != nil {
+			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			os.Exit(1)
+		}
+
 		// If a prompt is provided as an argument, run in non-interactive mode
 		if len(args) > 0 || promptName != "default" {
 			promptManager := prompts.NewPromptManager()
 			promptManager.AddPrompt(prompts.DiscoveredMCPPrompt{Name: "default", Description: "Translate the following Go code to Javascript:", ServerName: "cli"})
-
-			// Load the configuration within the command's Run function
-			workspaceDir, err := os.Getwd()
-			if err != nil {
-				fmt.Printf("Error getting current working directory: %v\n", err)
-				os.Exit(1)
-			}
-			loadedSettings := config.LoadSettings(workspaceDir)
-
-			params := &config.ConfigParameters{
-				Model: loadedSettings.Model,
-			}
-			appConfig := config.NewConfig(params)
-
-			geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
-			if err != nil {
-				fmt.Printf("Error initializing GeminiChat: %v\n", err)
-				os.Exit(1)
-			}
 
 			prompt, err := promptManager.GetPrompt(promptName)
 			if err != nil {
@@ -74,7 +74,7 @@ var generateCmd = &cobra.Command{
 			fmt.Println(content)
 		} else {
 			// Launch interactive UI
-			p := tea.NewProgram(ui.NewGenerateModel())
+			p := tea.NewProgram(ui.NewGenerateModel(geminiClient)) // Pass geminiClient here
 			if _, err := p.Run(); err != nil {
 				fmt.Printf("Error running interactive generate: %v\n", err)
 				os.Exit(1)

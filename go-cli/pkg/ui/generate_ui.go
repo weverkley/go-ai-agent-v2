@@ -2,159 +2,148 @@ package ui
 
 import (
 	"fmt"
-	"os"
 	"strings"
-	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/types"
 
+	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/google/generative-ai-go/genai"
-	lipgloss "github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss"
 )
 
-// GenerateModel is the Bubble Tea model for the interactive generate command.
+// GenerateModel is the Bubble Tea model for the interactive generate UI.
 type GenerateModel struct {
-	input        string
-	output       string
-	error        error
-	quitting     bool
-	generating   bool
-	width        int
-	height       int
-	inputFocused bool
+	textInput   textinput.Model
+	err         error
+	gemini      *core.GeminiChat
+	history     []string
+	awaitingGemini bool
+	styles      *GenerateStyles
 }
 
-// NewGenerateModel creates a new GenerateModel.
-func NewGenerateModel() GenerateModel {
-	return GenerateModel{
-		input:        "",
-		output:       "",
-		error:        nil,
-		quitting:     false,
-		generating:   false,
-		inputFocused: true,
-	}
+// GenerateStyles contains lipgloss styles for the UI.
+type GenerateStyles struct {
+	focusedPromptStyle lipgloss.Style
+	blurredPromptStyle lipgloss.Style
+	geminiResponseStyle lipgloss.Style
+	userPromptStyle    lipgloss.Style
+	errorStyle         lipgloss.Style
+}
+
+// NewGenerateModel creates a new GenerateModel with initialized text input.
+func NewGenerateModel(gemini *core.GeminiChat) *GenerateModel {
+
+ti := textinput.New()
+
+ti.Placeholder = "Ask Gemini..."
+ti.Focus()
+ti.CharLimit = 256
+ti.Width = 80
+ti.Prompt = "> "
+
+return &GenerateModel{
+	textInput:   ti,
+	gemini:      gemini,
+	history:     []string{},
+	awaitingGemini: false,
+	styles: &GenerateStyles{
+		focusedPromptStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("205")),
+		blurredPromptStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		geminiResponseStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Bold(true),
+		userPromptStyle:    lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Italic(true),
+		errorStyle:         lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Bold(true),
+	},
+}
 }
 
 // Init initializes the model.
 func (m GenerateModel) Init() tea.Cmd {
-	return tea.EnterAltScreen
+	return textinput.Blink
 }
 
 // Update handles messages and updates the model.
 func (m GenerateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "esc":
-			m.quitting = true
+		switch msg.Type {
+		case tea.KeyEnter:
+			if m.awaitingGemini {
+				return m, nil // Ignore input while awaiting response
+			}
+			query := m.textInput.Value()
+			if strings.TrimSpace(query) == "" {
+				return m, nil // Ignore empty queries
+			}
+
+			m.history = append(m.history, m.styles.userPromptStyle.Render("You: ")+query)
+			m.textInput.Reset()
+			m.awaitingGemini = true
+			return m, m.generateContentCmd(query)
+		case tea.KeyCtrlC, tea.KeyEsc:
 			return m, tea.Quit
-		case "enter":
-			if m.inputFocused && !m.generating {
-				m.generating = true
-				// In a real implementation, this would trigger the AI generation.
-				// For now, simulate a delay and set a dummy output.
-				return m, tea.Batch(tea.Tick(2*time.Second, func(t time.Time) tea.Msg { return generateDoneMsg{} }), generateContentCmd(m.input))
-			}
-		case "backspace":
-			if m.inputFocused && len(m.input) > 0 {
-				m.input = m.input[:len(m.input)-1]
-			}
-		default:
-			if m.inputFocused && !m.generating {
-				m.input += msg.String()
-			}
 		}
-	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-	case generateDoneMsg:
-		m.generating = false
-		// This is where the actual AI output would be set.
-		// For now, it's handled by generateContentCmd
-	case generateContentResultMsg:
-		m.output = string(msg)
-		m.generating = false
+	case geminiResponseMsg:
+		m.history = append(m.history, m.styles.geminiResponseStyle.Render("Gemini: ")+string(msg))
+		m.awaitingGemini = false
 		return m, nil
-	case error:
-		m.error = msg
-		m.generating = false
+	case errMsg:
+		m.err = msg
+		m.awaitingGemini = false
 		return m, nil
 	}
-	return m, nil
+
+	m.textInput, cmd = m.textInput.Update(msg)
+	return m, cmd
 }
 
 // View renders the UI.
 func (m GenerateModel) View() string {
-	if m.quitting {
-		return ""
+	s := strings.Builder{}
+
+	// History
+	for _, item := range m.history {
+		s.WriteString(item)
+		s.WriteString("\n")
 	}
 
-	sb := strings.Builder{}
-	sb.WriteString("\n")
+	// Prompt
+	s.WriteString("\n")
+	if m.textInput.Focused() {
+		s.WriteString(m.styles.focusedPromptStyle.Render(m.textInput.Prompt))
+	} else {
+		s.WriteString(m.styles.blurredPromptStyle.Render(m.textInput.Prompt))
+	}
+	s.WriteString(m.textInput.View())
+	s.WriteString("\n")
 
-	// Input area
-	sb.WriteString(lipgloss.NewStyle().Bold(true).Render("Enter your prompt:"))
-	sb.WriteString("\n")
-	sb.WriteString(lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("63")).
-		Padding(0, 1).
-		Width(m.width - 4).
-		Render(m.input))
-	sb.WriteString("\n\n")
-
-	// Output area
-	if m.generating {
-		sb.WriteString(lipgloss.NewStyle().Faint(true).Render("Generating..."))
-	} else if m.error != nil {
-		sb.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf("Error: %v", m.error)))
-	} else if m.output != "" {
-		sb.WriteString(lipgloss.NewStyle().Bold(true).Render("AI Response:"))
-		sb.WriteString("\n")
-		sb.WriteString(lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("205")).
-			Padding(0, 1).
-			Width(m.width - 4).
-			Height(m.height - 10).
-			Render(m.output))
+	// Status/Error
+	if m.awaitingGemini {
+		s.WriteString("Gemini is thinking...")
+	} else if m.err != nil {
+		s.WriteString(m.styles.errorStyle.Render(fmt.Sprintf("Error: %v", m.err)))
 	}
 
-	return sb.String()
+	return s.String()
 }
 
-type generateDoneMsg struct{}
-
-type generateContentResultMsg string
-
-func generateContentCmd(prompt string) tea.Cmd {
+// generateContentCmd is a command that sends the query to Gemini.
+func (m GenerateModel) generateContentCmd(query string) tea.Cmd {
 	return func() tea.Msg {
-		// Load the configuration within the command's Run function
-		workspaceDir, err := os.Getwd()
+		// Use the geminiClient from the model
+		content, err := m.gemini.GenerateContent(query)
 		if err != nil {
-			return err
+			return errMsg{err}
 		}
-		loadedSettings := config.LoadSettings(workspaceDir)
-
-		params := &config.ConfigParameters{
-			Model: loadedSettings.Model,
-		}
-		appConfig := config.NewConfig(params)
-
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			return err
-		}
-
-		content, err := geminiClient.GenerateContent(prompt)
-		if err != nil {
-			return err
-		}
-
-		return generateContentResultMsg(content)
+		return geminiResponseMsg(content)
 	}
 }
+
+// geminiResponseMsg is a message type for Gemini's response.
+type geminiResponseMsg string
+
+// errMsg is a message type for errors.
+type errMsg struct{ err error }
+
+func (e errMsg) Error() string { return e.err.Error() }
