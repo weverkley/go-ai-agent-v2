@@ -64,7 +64,7 @@ type Config struct {
 	embeddingModel string
 	targetDir      string
 	debugMode      bool
-	model          string
+	Model          string
 	mcpServers     map[string]types.MCPServerConfig
 	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
 	telemetry      *TelemetrySettings
@@ -73,21 +73,25 @@ type Config struct {
 	toolRegistryProvider *types.ToolRegistryProvider // Changed
 }
 
-// NewConfig creates a new Config instance.
 func NewConfig(params *ConfigParameters) *Config {
 	return &Config{
 		sessionID:      params.SessionID,
 		embeddingModel: params.EmbeddingModel,
 		targetDir:      params.TargetDir,
 		debugMode:      params.DebugMode,
-		model:          params.Model,
+		Model:          params.Model,
 		mcpServers:     params.McpServers,
 		approvalMode:   params.ApprovalMode,
 		telemetry:      params.Telemetry,
 		output:         params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
-		toolRegistryProvider: params.ToolRegistryProvider, // Changed
+		toolRegistryProvider: params.ToolRegistryProvider,
 	}
+}
+
+// GetModel returns the configured model name.
+func (c *Config) GetModel() string {
+	return c.Model
 }
 
 // GetCodebaseInvestigatorSettings returns the Codebase Investigator settings.
@@ -143,8 +147,4 @@ func (d *DummyFileService) ShouldIgnoreFile(filePath string, options types.FileF
 	return false
 }
 
-
-func (c *Config) Model() string {
-	return c.model
-}
 

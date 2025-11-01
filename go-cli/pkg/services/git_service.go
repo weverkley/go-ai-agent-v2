@@ -41,3 +41,76 @@ func (s *GitService) GetCurrentBranch(dir string) (string, error) {
 
 	return "", fmt.Errorf("could not determine current branch/tag/commit")
 }
+
+// GetRemoteURL returns the URL of the "origin" remote for the given Git repository.
+func (s *GitService) GetRemoteURL(dir string) (string, error) {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return "", fmt.Errorf("failed to open git repository at %s: %w", dir, err)
+	}
+
+	remote, err := repo.Remote("origin")
+	if err != nil {
+		return "", fmt.Errorf("failed to get remote 'origin': %w", err)
+	}
+
+	if len(remote.Config().URLs) == 0 {
+		return "", fmt.Errorf("no URLs found for remote 'origin'")
+	}
+
+	return remote.Config().URLs[0], nil
+}
+
+// CheckoutBranch checks out the specified branch in the given repository.
+func (s *GitService) CheckoutBranch(dir string, branchName string) error {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree for %s: %w", dir, err)
+	}
+
+	err = w.Checkout(&git.CheckoutOptions{
+		Branch: plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branchName)),
+	})
+	if err != nil {
+		return fmt.Errorf("failed to checkout branch %s: %w", branchName, err)
+	}
+	return nil
+}
+
+// Pull pulls the latest changes from the remote for the current branch.
+func (s *GitService) Pull(dir string) error {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree for %s: %w", dir, err)
+	}
+
+	err = w.Pull(&git.PullOptions{})
+	if err != nil && err != git.NoErrAlreadyUpToDate {
+		return fmt.Errorf("failed to pull latest changes: %w", err)
+	}
+	return nil
+}
+
+// DeleteBranch deletes the specified branch locally.
+func (s *GitService) DeleteBranch(dir string, branchName string) error {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
+	}
+
+	err = repo.Storer.RemoveReference(plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", branchName)))
+	if err != nil {
+		return fmt.Errorf("failed to delete branch %s: %w", branchName, err)
+	}
+	return nil
+}

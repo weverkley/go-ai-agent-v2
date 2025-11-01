@@ -13,3 +13,5 @@ Before continuing, i want you to read my current progress and the files i have i
 When finishing migrating a full function from javascript into go, you must run the linter and then build the application.
 
 When the build passes and the linter has no error, you must test the implemented feature.
+
+At first before you start crafting, you need to understand the JavaScript's intent and translate it idiomatically into Go, leveraging the existing Go project structure. To do this, you will need to get a comprehensive understanding of my entire Go project by recursively listing the go-cli directory and then reading relevant files to grasp current implementations.

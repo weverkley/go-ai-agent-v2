@@ -4,10 +4,13 @@ import (
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/prompts"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/ui"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 )
@@ -22,40 +25,60 @@ func init() {
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate content using a prompt",
-	Long:  `Generate content using a specified prompt.`,
+	Long:  `Generate content using a specified prompt. If no prompt is provided, an interactive UI will be launched.`, 
 	Run: func(cmd *cobra.Command, args []string) {
-		promptManager := prompts.NewPromptManager()
-		promptManager.AddPrompt(prompts.DiscoveredMCPPrompt{Name: "default", Description: "Translate the following Go code to Javascript:", ServerName: "cli"})
+		// If a prompt is provided as an argument, run in non-interactive mode
+		if len(args) > 0 || promptName != "default" {
+			promptManager := prompts.NewPromptManager()
+			promptManager.AddPrompt(prompts.DiscoveredMCPPrompt{Name: "default", Description: "Translate the following Go code to Javascript:", ServerName: "cli"})
 
-		// Initialize GeminiChat using the global config
-		// For now, using default generation config and empty history.
-		// This will be properly set up when agent execution is integrated.
-		geminiClient, err := core.NewGeminiChat(cfg, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
-			os.Exit(1)
-		}
+			// Load the configuration within the command's Run function
+			workspaceDir, err := os.Getwd()
+			if err != nil {
+				fmt.Printf("Error getting current working directory: %v\n", err)
+				os.Exit(1)
+			}
+			loadedSettings := config.LoadSettings(workspaceDir)
 
-		prompt, err := promptManager.GetPrompt(promptName)
-		if err != nil {
-			fmt.Printf("Error: %v\n", err)
-			os.Exit(1)
-		}
+			params := &config.ConfigParameters{
+				Model: loadedSettings.Model,
+			}
+			appConfig := config.NewConfig(params)
 
-		// If there are command-line arguments, use them as the prompt
-		var finalPrompt string
-		if len(args) > 0 {
-			finalPrompt = args[0]
+			geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+			if err != nil {
+				fmt.Printf("Error initializing GeminiChat: %v\n", err)
+				os.Exit(1)
+			}
+
+			prompt, err := promptManager.GetPrompt(promptName)
+			if err != nil {
+				fmt.Printf("Error: %v\n", err)
+				os.Exit(1)
+			}
+
+			// If there are command-line arguments, use them as the prompt
+			var finalPrompt string
+			if len(args) > 0 {
+				finalPrompt = args[0]
+			} else {
+				finalPrompt = prompt.Description
+			}
+
+			content, err := geminiClient.GenerateContent(finalPrompt)
+			if err != nil {
+				fmt.Printf("Error generating content: %v\n", err)
+				os.Exit(1)
+			}
+
+			fmt.Println(content)
 		} else {
-			finalPrompt = prompt.Description
+			// Launch interactive UI
+			p := tea.NewProgram(ui.NewGenerateModel())
+			if _, err := p.Run(); err != nil {
+				fmt.Printf("Error running interactive generate: %v\n", err)
+				os.Exit(1)
+			}
 		}
-
-		content, err := geminiClient.GenerateContent(finalPrompt)
-		if err != nil {
-			fmt.Printf("Error generating content: %v\n", err)
-			os.Exit(1)
-		}
-
-		fmt.Println(content)
 	},
 }
