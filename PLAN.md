@@ -233,3 +233,9 @@ The migration will proceed iteratively, focusing on one command or core function
 8.  **Test**: Write and run Go unit/integration tests, and perform manual testing.
 
 9.  **Refine**: Address any issues or improvements.
+
+
+## 7. Git Instructions based on conventional commit convention
+1. **Initialize a new repository**: if not already done, initialize a new repository in the go-cli directory
+2. **Commit messages**: use short, clear and concise commit messages to document your changes
+3. **Commit your changes**: use `git add .` to stage all changes, and then `git commit -m "Your commit message"` to commit your changes
