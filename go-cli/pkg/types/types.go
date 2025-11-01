@@ -504,3 +504,14 @@ type FullFolderInfo struct {
 	HasMoreFiles      bool // Indicates if files were truncated for this specific folder
 	HasMoreSubfolders bool // Indicates if subfolders were truncated for this specific folder
 }
+
+// TelemetrySettings represents the telemetry settings.
+type TelemetrySettings struct {
+	Enabled      bool   `json:"enabled,omitempty"`
+	Target       string `json:"target,omitempty"`
+	OtlpEndpoint string `json:"otlpEndpoint,omitempty"`
+	OtlpProtocol string `json:"otlpProtocol,omitempty"`
+	LogPrompts   bool   `json:"logPrompts,omitempty"`
+	Outfile      string `json:"outfile,omitempty"`
+	UseCollector bool   `json:"useCollector,omitempty"`
+}

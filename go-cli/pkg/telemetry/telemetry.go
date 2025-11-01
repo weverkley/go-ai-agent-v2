@@ -6,7 +6,6 @@ import (
 	"os"
 	"sync"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -101,7 +100,7 @@ func (l *fileTelemetryLogger) writeLog(data []byte) {
 }
 
 // NewTelemetryLogger creates a TelemetryLogger based on the provided telemetry settings.
-func NewTelemetryLogger(settings *config.TelemetrySettings) TelemetryLogger {
+func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
 	if settings == nil || !settings.Enabled {
 		return &noopTelemetryLogger{}
 	}

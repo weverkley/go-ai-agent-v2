@@ -134,17 +134,6 @@ type FileService interface {
 	ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool
 }
 
-// TelemetrySettings represents the telemetry settings.
-type TelemetrySettings struct {
-	Enabled      bool   `json:"enabled,omitempty"`
-	Target       string `json:"target,omitempty"`
-	OtlpEndpoint string `json:"otlpEndpoint,omitempty"`
-	OtlpProtocol string `json:"otlpProtocol,omitempty"`
-	LogPrompts   bool   `json:"logPrompts,omitempty"`
-	Outfile      string `json:"outfile,omitempty"`
-	UseCollector bool   `json:"useCollector,omitempty"`
-}
-
 // CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
 type CodebaseInvestigatorSettings struct {
 	Enabled        bool    `json:"enabled,omitempty"`
@@ -168,7 +157,7 @@ type ConfigParameters struct {
 	Model          string
 	McpServers     map[string]types.MCPServerConfig
 	ApprovalMode   types.ApprovalMode // Use ApprovalMode from types package
-	Telemetry      *TelemetrySettings
+	Telemetry      *types.TelemetrySettings
 	Output         *OutputSettings
 	CodebaseInvestigator *CodebaseInvestigatorSettings
 	ToolRegistry *types.ToolRegistry // Changed
@@ -185,7 +174,7 @@ type Config struct {
 	Model          string
 	mcpServers     map[string]types.MCPServerConfig
 	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
-	telemetry      *TelemetrySettings
+	telemetry      *types.TelemetrySettings
 	output         *OutputSettings
 	codebaseInvestigatorSettings *CodebaseInvestigatorSettings
 	toolRegistry *types.ToolRegistry // Changed
