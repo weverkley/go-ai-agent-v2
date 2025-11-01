@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -190,10 +191,11 @@ type Config struct {
 	toolRegistry *types.ToolRegistry // Changed
 	toolDiscoveryCommand string
 	toolCallCommand      string
+	telemetryLogger telemetry.TelemetryLogger
 }
 
 func NewConfig(params *ConfigParameters) *Config {
-	return &Config{
+	cfg := &Config{
 		sessionID:      params.SessionID,
 		embeddingModel: params.EmbeddingModel,
 		targetDir:      params.TargetDir,
@@ -208,6 +210,8 @@ func NewConfig(params *ConfigParameters) *Config {
 		toolDiscoveryCommand: params.ToolDiscoveryCommand,
 		toolCallCommand:      params.ToolCallCommand,
 	}
+	cfg.telemetryLogger = telemetry.NewTelemetryLogger(params.Telemetry) // Initialize here
+	return cfg
 }
 
 // GetToolDiscoveryCommand returns the tool discovery command.
@@ -237,6 +241,11 @@ func (c *Config) GetDebugMode() bool {
 // GetToolRegistry returns the global tool registry.
 func (c *Config) GetToolRegistry() *types.ToolRegistry {
 	return c.toolRegistry
+}
+
+// GetTelemetryLogger returns the initialized telemetry logger.
+func (c *Config) GetTelemetryLogger() telemetry.TelemetryLogger {
+	return c.telemetryLogger
 }
 
 // GetWorkspaceContext returns the workspace context.

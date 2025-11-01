@@ -18,7 +18,7 @@ The foundational structure for the Go CLI has been established, and several core
   - Command-line argument parsing is implemented using the `cobra` library.
   - `--version` flag implemented.
   - Top-level commands implemented:
-    - `generate`: **Functional** (with tool-calling capabilities). Now includes an **Interactive UI** using `charmbracelet/bubbletea` if no prompt is provided. Generates content using `pkg/core/gemini.go` (real Gemini API integration).
+    - `generate`: **Functional** (with tool-calling capabilities). Now includes an **Interactive UI** using `charmbracelet/bubbletea` if no prompt is provided. Generates content using `pkg/core/gemini.go` (real Gemini API integration). **Interactive UI is fully functional and tested.**
     - `read`: **Functional**, reads file content using `pkg/services/file_system_service.go`.
     - `write`: **Functional**, writes content to a file using `pkg/services/file_system_service.go`.
     - `exec`: **Functional**, executes shell commands (uses `pkg/services/shell_service.go`).
@@ -33,7 +33,7 @@ The foundational structure for the Go CLI has been established, and several core
       - `disable`: **Functional`.
     - `mcp`: Command group with subcommands:
       - `list`: **Functional**, lists configured MCP servers, merging from settings and extensions, and simulates connection status.
-      - `add`: **Functional**.
+      - `add`: **Functional**. 
       - `remove`: **Functional**.
     - **New Commands Implemented (from JavaScript .toml files)**:
       - `code-guide`: **Functional**, answers questions about the codebase using AI.
@@ -78,6 +78,7 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`cmd/root.go`**: Updated call to `tools.RegisterAllTools()` (now `types.NewToolRegistry()`) and removed unused `dummyConfig`.
 - **`SA9003: empty branch` errors**: Added `//nolint:staticcheck` to empty `if` blocks in `pkg/utils/folder_structure.go` and `pkg/core/agents/registry.go`.
 - **Duplicate definitions in `pkg/config`**: Consolidated `SettingScope`, `Settings`, and `LoadSettings` into `pkg/config/config.go` and deleted `pkg/config/settings.go`.
+- **`cmd/generate.go` and `pkg/ui/generate_ui.go` type mismatch**: Corrected `ui.NewGenerateModel` to accept `*core.GeminiChat` and updated `cmd/generate.go` to pass the `geminiClient` correctly. Removed unused imports from `pkg/ui/generate_ui.go`.
 
 ### Remaining Issues:
 
@@ -94,7 +95,7 @@ Translate the logic from the JavaScript files below. Each command needs argument
 - `install.ts`: **Functional**. Implemented with `force` flag support. Core logic in `pkg/extension/manager.go` handles git clone/pull and local copy/overwrite. Argument parsing in `main.go` is ready.
 - `list.ts`: **Functional**.
 - `new.ts`: **Functional`.
-- `enable.ts`: **Functional**.
+- `enable.ts`: **Functional**. 
 - `disable.ts`: **Functional`.
 - `uninstall`: **Functional** (with linked extension support).
 - `update.ts`: **Functional**.

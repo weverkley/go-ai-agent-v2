@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/spf13/cobra"
@@ -40,12 +41,19 @@ func init() {
 		// Set default values or load from settings file
 		DebugMode: false,
 		Model:     config.DEFAULT_GEMINI_MODEL,
+		Telemetry: &config.TelemetrySettings{ // Initialize TelemetrySettings
+			Enabled: false, // Default to disabled
+			Outfile: "",    // Default to no outfile
+		},
 		// Add other parameters as needed
 		ToolRegistry: toolRegistry, // Pass the toolRegistry directly
 	}
 
 	// Create the final Config instance
 	cfg = config.NewConfig(params)
+
+	// Initialize the global telemetry logger
+	telemetry.globalLogger = telemetry.NewTelemetryLogger(params.Telemetry)
 
 	rootCmd.AddCommand(generateCmd)
 	rootCmd.AddCommand(readCmd)

@@ -1,20 +1,18 @@
 package telemetry
 
 import (
-	"fmt"
-
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
+var globalLogger TelemetryLogger = &noopTelemetryLogger{}
+
 // LogAgentStart logs the start of an agent's execution.
-func LogAgentStart(cfg *config.Config, event types.AgentStartEvent) {
-	// TODO: Implement actual telemetry logging
-	fmt.Printf("Telemetry: Agent %s started (placeholder). AgentID: %s\n", event.AgentName, event.AgentID)
+func LogAgentStart(event types.AgentStartEvent) {
+	globalLogger.LogAgentStart(event)
 }
 
 // LogAgentFinish logs the finish of an agent's execution.
-func LogAgentFinish(cfg *config.Config, event types.AgentFinishEvent) {
-	// TODO: Implement actual telemetry logging
-	fmt.Printf("Telemetry: Agent %s finished (placeholder). AgentID: %s, Duration: %dms, Turns: %d, Reason: %s\n", event.AgentName, event.AgentID, event.DurationMs, event.TurnCounter, event.TerminateReason)
+func LogAgentFinish(event types.AgentFinishEvent) {
+	globalLogger.LogAgentFinish(event)
 }
