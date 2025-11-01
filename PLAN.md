@@ -12,7 +12,7 @@ The UI for this CLI will be implemented using `charmbracelet/bubbletea` for an i
 
 
 
-The foundational structure for the Go CLI has been established, and several core services and commands have been implemented. Many original JavaScript files have been translated with tool-calling capabilities. Currently, I am addressing numerous type-checking and unused import errors identified by `golangci-lint` to stabilize the codebase.
+The foundational structure for the Go CLI has been established, and several core services and commands have been implemented. Many original JavaScript files have been translated with tool-calling capabilities. All identified type-checking and unused import errors have been addressed.
 
 
 
@@ -26,7 +26,7 @@ The foundational structure for the Go CLI has been established, and several core
 
   - Top-level commands implemented:
 
-    - `generate`: **Functional** (with tool-calling capabilities), generates content using `pkg/core/gemini.go` (real Gemini API integration).
+    - `generate`: **Functional** (with tool-calling capabilities). Now includes an **Interactive UI** using `charmbracelet/bubbletea` if no prompt is provided. Generates content using `pkg/core/gemini.go` (real Gemini API integration).
 
     - `read`: **Functional**, reads file content using `pkg/services/file_system_service.go`.
 
@@ -48,13 +48,22 @@ The foundational structure for the Go CLI has been established, and several core
 
       - `new`: **Functional**.
 
-      - `enable`: **Placeholder**.
+      - `enable`: **Functional**.
 
-      - `disable`: **Placeholder`.
+      - `disable`: **Functional`.
 
     - `mcp`: Command group with subcommands:
 
       - `list`: **Functional**, lists configured MCP servers, merging from settings and extensions, and simulates connection status.
+      - `add`: **Functional**.
+      - `remove`: **Functional**.
+
+    - **New Commands Implemented (from JavaScript .toml files)**:
+      - `code-guide`: **Functional**, answers questions about the codebase using AI.
+      - `find-docs`: **Functional**, finds relevant documentation and outputs GitHub URLs using AI.
+      - `cleanup-back-to-main`: **Functional**, automates Git branch cleanup.
+      - `pr-review`: **Functional**, conducts comprehensive AI-driven pull request reviews.
+      - `grep-code`: **Functional**, summarizes code findings for a given pattern using grep and AI.
 
     - `list-models`: **Functional**, lists available Gemini models using `pkg/core/gemini.go`.
 
@@ -64,15 +73,17 @@ The foundational structure for the Go CLI has been established, and several core
 
   - `pkg/services/shell_service.go`: **Functional**, provides `ExecuteCommand` for shell operations.
 
-  - `pkg/services/file_system_service.go`: **Functional**, provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, `WriteFile`, and `ReadFile`.
+  - `pkg/services/file_system_service.go`: **Functional**, provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, `WriteFile`, `ReadFile`, `CreateDirectory`, `CopyDirectory`.
 
-  - `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories.
+  - `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories. Now includes `GetRemoteURL`, `CheckoutBranch`, `Pull`, and `DeleteBranch` methods.
 
-  - `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, but `EnableExtension` and `DisableExtension` are placeholders.
+  - `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, `EnableExtension` and `DisableExtension` are implemented.
 
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
 
   - `pkg/config/settings.go`: **Functional** (extended functionality). Loads default settings, can read/write settings.json, and includes fields for DebugMode, UserMemory, ApprovalMode, ShowMemoryUsage, TelemetryEnabled, Model, and Proxy.
+
+  - `pkg/config/config.go`: **Updated**. `Config` struct now has an exported `Model` field, and `NewConfig` and `GetModel()` methods are adjusted accordingly.
 
   - `pkg/mcp/types.go`: **Moved to `pkg/types/types.go`**.
 
@@ -109,8 +120,9 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`pkg/tools/glob.go`, `pkg/tools/grep.go`**: Removed unused `pkg/core/tool` import.
 - **`pkg/tools/read_many_files.go`**: Removed unused `bufio` import.
 - **`pkg/types/types.go`**: Moved constants to `pkg/types/constants.go`.
-- **`pkg/config/config.go`**: Changed `ToolRegistryProvider` to a struct.
+- **`pkg/config/config.go`**: Changed `ToolRegistryProvider` to a struct, and exported `Model` field.
 - **`pkg/core/agents/executor.go`**: Removed unused `stringPtr` function.
+
 - **`pkg/tools/register.go`**: Removed subagent registration logic to resolve import cycle.
 - **`cmd/root.go`**: Updated call to `tools.RegisterAllTools()` and removed unused `dummyConfig`.
 - **`SA9003: empty branch` errors**: Added `//nolint:staticcheck` to empty `if` blocks in `pkg/utils/folder_structure.go` and `pkg/core/agents/registry.go`.
@@ -144,9 +156,9 @@ Translate the logic from the JavaScript files below. Each command needs argument
 
 - `new.ts`: **Functional`.
 
-- `enable.ts`: **Placeholder**.
+- `enable.ts`: **Functional**.
 
-- `disable.ts`: **Placeholder`.
+- `disable.ts`: **Functional`.
 
 - `uninstall`: **Functional** (with linked extension support).
 
@@ -236,6 +248,29 @@ The migration will proceed iteratively, focusing on one command or core function
 
 
 ## 7. Git Instructions based on conventional commit convention
+1. **Initialize a new repository**: if not already done, initialize a new repository in the go-cli directory
+2. **Commit messages**: use short, clear and concise commit messages to document your changes
+3. **Commit your changes**: use `git add .` to stage all changes, and then `git commit -m "Your commit message"` to commit your changes
+
+
+## 8. Next Steps
+
+1.  **Enhance Interactive UI**:
+    *   Expand the interactive UI to other commands where user interaction would be beneficial (e.g., `code-guide`, `find-docs`).
+    *   Improve the UI/UX of the interactive components (e.g., better loading indicators, error displays, input validation).
+2.  **Tool Integration for AI Commands**:
+    *   For commands like `find-docs` and `pr-review`, integrate actual tool-calling capabilities. This would allow the AI to dynamically use `GitService`, `FileSystemService`, and `ShellExecutionService` to gather information or perform actions, rather than relying solely on pre-constructed prompts.
+    *   This would involve implementing the `tools` package in Go to register and execute these services as AI tools.
+3.  **Error Handling and User Feedback**:
+    *   Improve error handling across all commands, providing more user-friendly messages.
+    *   Implement a consistent way to provide feedback to the user, especially for long-running operations.
+4.  **Testing**:
+    *   Implement comprehensive unit and integration tests for all newly added commands and UI components.
+    *   Address the environmental issue encountered during `extensions` testing (permission denied when creating `.gemini/extensions` directory). This might involve adjusting default paths or providing clearer instructions for setting up the environment.
+5.  **Remaining JavaScript CLI Commands**:
+    *   Review any remaining JavaScript CLI commands or features that have not yet been migrated to Go. (Based on current analysis, all explicit commands have been addressed, but a deeper dive might reveal more subtle features).
+
+## 9. Git Instructions based on conventional commit convention
 1. **Initialize a new repository**: if not already done, initialize a new repository in the go-cli directory
 2. **Commit messages**: use short, clear and concise commit messages to document your changes
 3. **Commit your changes**: use `git add .` to stage all changes, and then `git commit -m "Your commit message"` to commit your changes
