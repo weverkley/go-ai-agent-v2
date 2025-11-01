@@ -6,6 +6,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/commands"
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"github.com/spf13/cobra"
 )
 
@@ -23,9 +24,24 @@ var (
 	mcpAddIncludeTools []string
 	mcpAddExcludeTools []string
 	mcpRemoveName string
+
+	rootConfig *config.Config // Declare rootConfig
 )
 
 func init() {
+	// Initialize rootConfig
+	workspaceDir, _ := os.Getwd()
+	settings := config.LoadSettings(workspaceDir)
+	rootConfig = config.NewConfig(&config.ConfigParameters{
+		Model: settings.Model,
+		DebugMode: settings.DebugMode,
+		ApprovalMode: settings.ApprovalMode,
+		McpServers: settings.McpServers,
+		ToolDiscoveryCommand: settings.ToolDiscoveryCommand,
+		ToolCallCommand: settings.ToolCallCommand,
+		ToolRegistry: types.NewToolRegistry(), // Use types.NewToolRegistry()
+	})
+
 	rootCmd.AddCommand(mcpCmd)
 
 	mcpCmd.AddCommand(mcpListCmd)
@@ -57,8 +73,8 @@ var mcpListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List configured MCP servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		mcp := commands.NewMcpCommand()
-		err := mcp.ListMcpItems()
+		mcp := commands.NewMcpCommand(rootConfig.GetToolRegistry())
+		err := mcp.ListMcpServers()
 		if err != nil {
 			fmt.Printf("Error listing MCP items: %v\n", err)
 			os.Exit(1)
@@ -76,8 +92,8 @@ var mcpAddCmd = &cobra.Command{
 		if len(args) > 2 {
 			mcpAddArgs = args[2:]
 		}
-		mcp := commands.NewMcpCommand()
-		err := mcp.AddMcpItem(
+		mcp := commands.NewMcpCommand(rootConfig.GetToolRegistry())
+		err := mcp.AddMcpServer(
 			mcpAddName,
 			mcpAddCommandOrUrl,
 			mcpAddArgs,
@@ -102,7 +118,7 @@ var mcpRemoveCmd = &cobra.Command{
 	Use:   "remove",
 	Short: "Remove an MCP server",
 	Run: func(cmd *cobra.Command, args []string) {
-		mcp := commands.NewMcpCommand()
+		mcp := commands.NewMcpCommand(rootConfig.GetToolRegistry())
 		err := mcp.RemoveMcpItem(mcpRemoveName)
 		if err != nil {
 			fmt.Printf("Error removing MCP item: %v\n", err)

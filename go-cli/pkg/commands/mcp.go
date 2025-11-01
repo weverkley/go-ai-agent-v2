@@ -8,158 +8,55 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"strings"
-	"time"
 )
 
-const (
-	COLOR_GREEN = "\u001b[32m"
-	COLOR_YELLOW = "\u001b[33m"
-	COLOR_RED = "\u001b[31m"
-	RESET_COLOR = "\u001b[0m"
-)
-
-// McpCommand represents the MCP command group.
+// McpCommand provides functionalities for managing MCP servers.
 type McpCommand struct {
-	// Dependencies can be added here
+	workspaceDir string
+	settings     *config.Settings
+	mcpManager   *mcp.McpClientManager
+	extManager   *extension.ExtensionManager
+	toolRegistry *types.ToolRegistry
 }
 
 // NewMcpCommand creates a new instance of McpCommand.
-func NewMcpCommand() *McpCommand {
-	return &McpCommand{}
-}
-
-// getMcpServersFromConfig loads and merges MCP server configurations.
-func (c *McpCommand) getMcpServersFromConfig(workspaceDir string) (map[string]types.MCPServerConfig, error) {
+func NewMcpCommand(toolRegistry *types.ToolRegistry) *McpCommand {
+	workspaceDir, _ := os.Getwd()
 	settings := config.LoadSettings(workspaceDir)
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	extensions, err := extensionManager.LoadExtensions()
-	if err != nil {
-		return nil, fmt.Errorf("failed to load extensions: %w", err)
+	extManager := extension.NewExtensionManager(workspaceDir)
+	return &McpCommand{
+		workspaceDir: workspaceDir,
+		settings:     settings,
+		mcpManager:   mcp.NewMcpClientManager(toolRegistry),
+		extManager:   extManager,
+		toolRegistry: toolRegistry,
 	}
-
-	mcpServers := make(map[string]types.MCPServerConfig)
-
-	// Merge MCP servers from settings
-	for k, v := range settings.McpServers {
-		mcpServers[k] = v
-	}
-
-	// Merge MCP servers from extensions
-	for _, ext := range extensions {
-		for k, v := range ext.McpServers {
-			if _, exists := mcpServers[k]; !exists {
-				// Only add if not already defined in settings
-				mcpServers[k] = v
-			}
-		}
-	}
-	return mcpServers, nil
 }
 
-// testMCPConnection simulates testing an MCP connection.
-func (c *McpCommand) testMCPConnection(serverName string, config types.MCPServerConfig) (types.MCPServerStatus, error) {
-	client := mcp.NewMcpClient("mcp-test-client", "0.0.1")
-
-	// Simulate transport creation (for now, just a placeholder)
-	// In a real implementation, createTransport would be called here.
-
-	err := client.Connect(config, 5*time.Second) // 5s timeout
-	if err != nil {
-		client.Close()
-		return types.DISCONNECTED, nil // Return nil error as status indicates disconnection
-	}
-
-	err = client.Ping()
-	if err != nil {
-		client.Close()
-		return types.DISCONNECTED, nil // Return nil error as status indicates disconnection
-	}
-
-	client.Close()
-	return types.CONNECTED, nil
-}
-
-// getServerStatus gets the status of an MCP server.
-func (c *McpCommand) getServerStatus(serverName string, serverConfig types.MCPServerConfig) (types.MCPServerStatus, error) {
-	return c.testMCPConnection(serverName, serverConfig)
-}
-
-// ListMcpItems lists configured MCP items.
-func (c *McpCommand) ListMcpItems() error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	mcpServers, err := c.getMcpServersFromConfig(workspaceDir)
-	if err != nil {
-		return fmt.Errorf("failed to get MCP servers from config: %w", err)
-	}
-
-	serverNames := make([]string, 0, len(mcpServers))
-	for name := range mcpServers {
-		serverNames = append(serverNames, name)
-	}
-	// Sort server names for consistent output
-	// sort.Strings(serverNames)
-
-	if len(serverNames) == 0 {
+// ListMcpServers lists all configured MCP servers.
+func (c *McpCommand) ListMcpServers() error {
+	servers := c.mcpManager.ListServers()
+	if len(servers) == 0 {
 		fmt.Println("No MCP servers configured.")
 		return nil
 	}
 
-	fmt.Println("Configured MCP servers:")
-
-	for _, serverName := range serverNames {
-		server := mcpServers[serverName]
-
-		status, err := c.getServerStatus(serverName, server)
-		if err != nil {
-			fmt.Printf("Error getting status for %s: %v\n", serverName, err)
-			continue
+	fmt.Println("Configured MCP Servers:")
+	for _, server := range servers {
+		fmt.Printf("  - Name: %s\n", server.Name)
+		fmt.Printf("    Status: %s\n", server.Status)
+		fmt.Printf("    URL: %s\n", server.Url)
+		if server.Description != "" {
+			fmt.Printf("    Description: %s\n", server.Description)
 		}
-
-		var statusIndicator string
-		var statusText string
-		switch status {
-		case types.CONNECTED:
-			statusIndicator = COLOR_GREEN + "✓" + RESET_COLOR
-			statusText = "Connected"
-		case types.CONNECTING:
-			statusIndicator = COLOR_YELLOW + "…" + RESET_COLOR
-			statusText = "Connecting"
-		case types.DISCONNECTED:
-			statusIndicator = COLOR_RED + "✗" + RESET_COLOR
-			statusText = "Disconnected"
-		default:
-			statusIndicator = "?"
-			statusText = "Unknown"
-		}
-
-		serverInfo := serverName
-		// if server.Extension != nil && server.Extension.Name != "" {
-		// 	serverInfo += fmt.Sprintf(" (from %s)", server.Extension.Name)
-		// }
-		serverInfo += ": "
-
-		if server.HttpUrl != "" {
-			serverInfo += fmt.Sprintf("%s (http)", server.HttpUrl)
-		} else if server.Url != "" {
-			serverInfo += fmt.Sprintf("%s (sse)", server.Url)
-		} else if server.Command != "" {
-			serverInfo += fmt.Sprintf("%s %s (stdio)", server.Command, strings.Join(server.Args, " "))
-		}
-
-		fmt.Printf("%s %s - %s\n", statusIndicator, serverInfo, statusText)
+		fmt.Println()
 	}
-
 	return nil
 }
 
-// AddMcpItem adds a new MCP item.
-func (c *McpCommand) AddMcpItem(
-	name string,
-	commandOrUrl string,
+// AddMcpServer adds or updates an MCP server configuration.
+func (c *McpCommand) AddMcpServer(
+	name, commandOrUrl string,
 	args []string,
 	scope config.SettingScope,
 	transport string,
@@ -171,65 +68,55 @@ func (c *McpCommand) AddMcpItem(
 	includeTools []string,
 	excludeTools []string,
 ) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
+	// Load settings again to ensure we have the latest
+	settings := config.LoadSettings(c.workspaceDir)
 
-	settings := config.LoadSettings(workspaceDir)
-	if settings.McpServers == nil {
-		settings.McpServers = make(map[string]types.MCPServerConfig)
-	}
-
-	if _, exists := settings.McpServers[name]; exists {
-		// If it exists, we are updating it.
-		fmt.Printf("MCP server \"%s\" already exists, updating.\n", name)
-	}
-
-	// Parse env variables
-	envMap := make(map[string]string)
-	for _, e := range env {
-		parts := strings.SplitN(e, "=", 2)
-		if len(parts) == 2 {
-			envMap[parts[0]] = parts[1]
-		}
-	}
-
-	// Parse headers
-	headersMap := make(map[string]string)
-	for _, h := range header {
-		parts := strings.SplitN(h, ":", 2)
-		if len(parts) == 2 {
-			headersMap[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
-		}
-	}
-
-	newServer := types.MCPServerConfig{
-		Timeout:      timeout,
-		Trust:        trust,
+	// Create or update the server config
+	serverConfig := types.MCPServerConfig{
 		Description:  description,
+		Trust:        trust,
+		Args:         args,
+		Env:          make(map[string]string),
+		Headers:      make(map[string]string),
+		Timeout:      timeout,
 		IncludeTools: includeTools,
 		ExcludeTools: excludeTools,
 	}
 
+	// Parse env variables
+	for _, e := range env {
+		parts := strings.SplitN(e, "=", 2)
+		if len(parts) == 2 {
+			serverConfig.Env[parts[0]] = parts[1]
+		}
+	}
+
+	// Parse headers
+	for _, h := range header {
+		parts := strings.SplitN(h, ":", 2)
+		if len(parts) == 2 {
+			serverConfig.Headers[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+	}
+
 	switch transport {
-	case "sse":
-		newServer.Url = commandOrUrl
-		newServer.Headers = headersMap
-	case "http":
-		newServer.HttpUrl = commandOrUrl
-		newServer.Headers = headersMap
 	case "stdio":
-		newServer.Command = commandOrUrl
-		newServer.Args = args
-		newServer.Env = envMap
+		serverConfig.Command = commandOrUrl
+	case "http":
+		serverConfig.HttpUrl = commandOrUrl
+	case "tcp":
+		serverConfig.Tcp = commandOrUrl
 	default:
 		return fmt.Errorf("unsupported transport type: %s", transport)
 	}
 
-	settings.McpServers[name] = newServer
+	if settings.McpServers == nil {
+		settings.McpServers = make(map[string]types.MCPServerConfig)
+	}
+	settings.McpServers[name] = serverConfig
 
-	if err := config.SaveSettings(workspaceDir, settings); err != nil {
+	// Save updated settings
+	if err := config.SaveSettings(c.workspaceDir, settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
@@ -239,12 +126,8 @@ func (c *McpCommand) AddMcpItem(
 
 // RemoveMcpItem removes an MCP item.
 func (c *McpCommand) RemoveMcpItem(name string) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	settings := config.LoadSettings(workspaceDir)
+	// Load settings again to ensure we have the latest
+	settings := config.LoadSettings(c.workspaceDir)
 
 	if _, exists := settings.McpServers[name]; !exists {
 		return fmt.Errorf("MCP server \"%s\" not found", name)
@@ -252,7 +135,8 @@ func (c *McpCommand) RemoveMcpItem(name string) error {
 
 	delete(settings.McpServers, name)
 
-	if err := config.SaveSettings(workspaceDir, settings); err != nil {
+	// Save updated settings
+	if err := config.SaveSettings(c.workspaceDir, settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 

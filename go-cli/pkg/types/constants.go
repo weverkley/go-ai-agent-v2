@@ -23,12 +23,6 @@ const (
 )
 
 const (
-	CONNECTED    MCPServerStatus = "CONNECTED"
-	CONNECTING   MCPServerStatus = "CONNECTING"
-	DISCONNECTED MCPServerStatus = "DISCONNECTED"
-)
-
-const (
 	StreamEventTypeChunk StreamEventType = "CHUNK"
 	StreamEventTypeError StreamEventType = "ERROR"
 	StreamEventTypeDone  StreamEventType = "DONE"
@@ -46,10 +40,6 @@ const (
 	ToolConfirmationOutcomeProceedOnce      ToolConfirmationOutcome = "PROCEED_ONCE"
 	ToolConfirmationOutcomeCancel           ToolConfirmationOutcome = "CANCEL"
 	ToolConfirmationOutcomeModifyWithEditor ToolConfirmationOutcome = "MODIFY_WITH_EDITOR"
-)
-
-const (
-	KindThink Kind = "THINK"
 )
 
 const (

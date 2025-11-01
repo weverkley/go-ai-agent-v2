@@ -46,3 +46,16 @@ func (m *McpClientManager) Stop() error {
 
 	return nil
 }
+
+// ListServers returns a list of configured MCP servers with their status.
+func (m *McpClientManager) ListServers() []types.MCPServerStatus {
+	// For now, return a dummy list.
+	return []types.MCPServerStatus{
+		{
+			Name:   "dummy-server",
+			Status: types.MCPServerStatusDisconnected,
+			Url:    "http://localhost:8080",
+			Description: "A dummy MCP server for testing.",
+		},
+	}
+}

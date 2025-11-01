@@ -5,7 +5,6 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/spf13/cobra"
@@ -34,7 +33,7 @@ func Execute() {
 
 func init() {
 	// Create a dummy config for initial tool registry creation
-	toolRegistry := tools.RegisterAllTools()
+	toolRegistry := types.NewToolRegistry()
 
 	// Initialize ConfigParameters
 	params := &config.ConfigParameters{
@@ -42,7 +41,7 @@ func init() {
 		DebugMode: false,
 		Model:     config.DEFAULT_GEMINI_MODEL,
 		// Add other parameters as needed
-		ToolRegistryProvider: &types.ToolRegistryProvider{ToolRegistry: toolRegistry}, // Pass the toolRegistry directly
+		ToolRegistry: toolRegistry, // Pass the toolRegistry directly
 	}
 
 	// Create the final Config instance

@@ -32,7 +32,7 @@ func NewSubagentToolWrapper(
 		definition.Name,
 		definition.DisplayName,
 		definition.Description,
-		types.KindThink, // Assuming subagents are "THINK" kind
+		types.KindOther, // Assuming subagents are "OTHER" kind
 		parameterSchema,
 		true,        // isOutputMarkdown
 		true,        // canUpdateOutput

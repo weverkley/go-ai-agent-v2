@@ -11,7 +11,19 @@ import (
 type ApprovalMode string
 
 // MCPServerStatus represents the connection status of an MCP server.
-type MCPServerStatus string
+type MCPServerStatus struct {
+	Name        string
+	Status      string
+	Url         string
+	Description string
+}
+
+const (
+	MCPServerStatusConnected    string = "CONNECTED"
+	MCPServerStatusDisconnected string = "DISCONNECTED"
+	MCPServerStatusConnecting   string = "CONNECTING"
+	MCPServerStatusError        string = "ERROR"
+)
 
 // MCPOAuthConfig represents the OAuth configuration for an MCP server.
 type MCPOAuthConfig struct {
@@ -243,15 +255,6 @@ type JsonSchemaPropertyItem struct {
 	Type string `json:"type"` // "string", "number"
 }
 
-// ToolRegistryProvider provides a ToolRegistry.
-type ToolRegistryProvider struct {
-	ToolRegistry *ToolRegistry
-}
-
-func (p *ToolRegistryProvider) GetToolRegistry() *ToolRegistry {
-	return p.ToolRegistry
-}
-
 // Tool is the interface that all tools must implement.
 type Tool interface {
 	Name() string
@@ -269,78 +272,20 @@ type ToolInvocation interface {
 // Kind represents the type of tool.
 type Kind string
 
+const (
+	KindOther Kind = "OTHER"
+)
+
 // BaseDeclarativeTool provides a base implementation for declarative tools.
 type BaseDeclarativeTool struct {
 	name             string
 	displayName      string
 	description      string
 	kind             Kind
-	parameterSchema  JsonSchemaObject // Changed
+	parameterSchema  JsonSchemaObject
 	isOutputMarkdown bool
 	canUpdateOutput  bool
-	MessageBus       interface{} // Placeholder for MessageBus
-}
-
-// ToolRegistry holds all the registered tools.
-type ToolRegistry struct {
-	tools map[string]Tool
-}
-
-// Config is an interface that represents the application configuration.
-type Config interface {
-	GetCodebaseInvestigatorSettings() *CodebaseInvestigatorSettings
-	GetDebugMode() bool
-	GetToolRegistry() *ToolRegistry
-	Model() string
-}
-
-// CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
-type CodebaseInvestigatorSettings struct {
-	Enabled        bool   `json:"enabled,omitempty"`
-	Model          string `json:"model,omitempty"`
-	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
-	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
-	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
-}
-
-// AgentTerminateMode defines the reasons an agent might terminate.
-type AgentTerminateMode string
-
-// AgentStartEvent is a placeholder for telemetry event.
-type AgentStartEvent struct {
-	AgentID   string
-	AgentName string
-}
-
-// AgentFinishEvent is a placeholder for telemetry event.
-type AgentFinishEvent struct {
-	AgentID         string
-	AgentName       string
-	DurationMs      int64
-	TurnCounter     int
-	TerminateReason AgentTerminateMode
-}
-
-// FolderStructureOptions for customizing folder structure retrieval.
-type FolderStructureOptions struct {
-	MaxItems           *int      // Maximum number of files and folders combined to display. Defaults to 200.
-	IgnoredFolders     *[]string // Set of folder names to ignore completely. Case-sensitive.
-	FileIncludePattern *string   // Optional regex to filter included files by name.
-	// FileService        FileDiscoveryService // For filtering files.
-	FileFilteringOptions *FileFilteringOptions // File filtering ignore options.
-}
-
-// FullFolderInfo represents the full, unfiltered information about a folder and its contents.
-type FullFolderInfo struct {
-	Name              string
-	Path              string
-	Files             []string
-	SubFolders        []FullFolderInfo
-	TotalChildren     int
-	TotalFiles        int
-	IsIgnored         bool // Flag to easily identify ignored folders later
-	HasMoreFiles      bool // Indicates if files were truncated for this specific folder
-	HasMoreSubfolders bool // Indicates if subfolders were truncated for this specific folder
+	MessageBus       interface{}
 }
 
 // NewBaseDeclarativeTool creates a new BaseDeclarativeTool.
@@ -433,6 +378,11 @@ func (bdt *BaseDeclarativeTool) Execute(args map[string]any) (ToolResult, error)
 	return ToolResult{}, fmt.Errorf("Execute method not implemented for BaseDeclarativeTool")
 }
 
+// ToolRegistry holds all the registered tools.
+type ToolRegistry struct {
+	tools map[string]Tool
+}
+
 // NewToolRegistry creates a new instance of ToolRegistry.
 func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
@@ -496,4 +446,61 @@ func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []ge
 		}
 	}
 	return declarations
+}
+
+// Config is an interface that represents the application configuration.
+type Config interface {
+	GetCodebaseInvestigatorSettings() *CodebaseInvestigatorSettings
+	GetDebugMode() bool
+	GetToolRegistry() *ToolRegistry
+	Model() string
+}
+
+// CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
+type CodebaseInvestigatorSettings struct {
+	Enabled        bool   `json:"enabled,omitempty"`
+	Model          string `json:"model,omitempty"`
+	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
+	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
+	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
+}
+
+// AgentTerminateMode defines the reasons an agent might terminate.
+type AgentTerminateMode string
+
+// AgentStartEvent is a placeholder for telemetry event.
+type AgentStartEvent struct {
+	AgentID   string
+	AgentName string
+}
+
+// AgentFinishEvent is a placeholder for telemetry event.
+type AgentFinishEvent struct {
+	AgentID         string
+	AgentName       string
+	DurationMs      int64
+	TurnCounter     int
+	TerminateReason AgentTerminateMode
+}
+
+// FolderStructureOptions for customizing folder structure retrieval.
+type FolderStructureOptions struct {
+	MaxItems           *int      // Maximum number of files and folders combined to display. Defaults to 200.
+	IgnoredFolders     *[]string // Set of folder names to ignore completely. Case-sensitive.
+	FileIncludePattern *string   // Optional regex to filter included files by name.
+	// FileService        FileDiscoveryService // For filtering files.
+	FileFilteringOptions *FileFilteringOptions // File filtering ignore options.
+}
+
+// FullFolderInfo represents the full, unfiltered information about a folder and its contents.
+type FullFolderInfo struct {
+	Name              string
+	Path              string
+	Files             []string
+	SubFolders        []FullFolderInfo
+	TotalChildren     int
+	TotalFiles        int
+	IsIgnored         bool // Flag to easily identify ignored folders later
+	HasMoreFiles      bool // Indicates if files were truncated for this specific folder
+	HasMoreSubfolders bool // Indicates if subfolders were truncated for this specific folder
 }

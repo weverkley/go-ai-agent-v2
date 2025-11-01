@@ -3,7 +3,7 @@ package extension
 import (
 	"encoding/json"
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/config"
+	configPkg "go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
@@ -34,7 +34,7 @@ type ExtensionConfig struct {
 // ExtensionManager manages the loading and interaction with extensions.
 type ExtensionManager struct {
 	workspaceDir string
-	settings     *config.Settings
+	settings     *configPkg.Settings
 	fsService    *services.FileSystemService // Add FileSystemService dependency
 	gitService   *services.GitService        // Add GitService dependency
 	// Add other dependencies like consent handlers
@@ -42,7 +42,7 @@ type ExtensionManager struct {
 
 // NewExtensionManager creates a new instance of ExtensionManager.
 func NewExtensionManager(workspaceDir string) *ExtensionManager {
-	settings := config.LoadSettings(workspaceDir)
+	settings := configPkg.LoadSettings(workspaceDir)
 	return &ExtensionManager{
 		workspaceDir: workspaceDir,
 		settings:     settings,
@@ -370,7 +370,7 @@ func (em *ExtensionManager) UninstallExtension(name string, _ bool) error {
 	return nil
 }
 // EnableExtension enables an extension.
-func (em *ExtensionManager) EnableExtension(name string, scope config.SettingScope) error {
+func (em *ExtensionManager) EnableExtension(name string, scope configPkg.SettingScope) error {
 	// 1. Check if the extension exists
 	installedExtensions, err := em.LoadExtensions()
 	if err != nil {
@@ -402,10 +402,7 @@ func (em *ExtensionManager) EnableExtension(name string, scope config.SettingSco
 	}
 
 	// Append if not already enabled
-	em.settings.EnabledExtensions[scope] = append(currentEnabled, name)
-
-	// 4. Save updated settings
-	if err := config.SaveSettings(em.workspaceDir, em.settings); err != nil {
+	if err := configPkg.SaveSettings(em.workspaceDir, em.settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
@@ -413,7 +410,7 @@ func (em *ExtensionManager) EnableExtension(name string, scope config.SettingSco
 }
 
 // DisableExtension disables an extension.
-func (em *ExtensionManager) DisableExtension(name string, scope config.SettingScope) error {
+func (em *ExtensionManager) DisableExtension(name string, scope configPkg.SettingScope) error {
 	// 1. Check if the extension exists
 	installedExtensions, err := em.LoadExtensions()
 	if err != nil {
@@ -453,7 +450,7 @@ func (em *ExtensionManager) DisableExtension(name string, scope config.SettingSc
 	em.settings.EnabledExtensions[scope] = newEnabled
 
 	// 4. Save updated settings
-	if err := config.SaveSettings(em.workspaceDir, em.settings); err != nil {
+	if err := configPkg.SaveSettings(em.workspaceDir, em.settings); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
