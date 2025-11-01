@@ -216,7 +216,7 @@ The migration will proceed iteratively, focusing on one command or core function
 
 
 
-1.  **Linter First**: Run `golangci-lint` to identify all issues.
+1.  **Linter First**: You must run `golangci-lint` from the go-cli directory to identify all issues.
 
 2.  **Systematic Fixing**: Address issues one by one, prioritizing type-checking and unused import errors.
 
