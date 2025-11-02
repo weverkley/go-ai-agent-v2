@@ -9,17 +9,50 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/ui"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
+	"github.com/charmbracelet/bubbletea"
 )
 
 var grepCodeCmd = &cobra.Command{
 	Use:   "grep-code [pattern]",
 	Short: "Summarize findings for a given code pattern.",
 	Long: `This command uses grep to search for a code pattern and then uses AI to summarize the findings.`, 
-	Args: cobra.MinimumNArgs(1), // Requires at least one argument for the pattern
+	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
 	Run: func(cmd *cobra.Command, args []string) {
+		// Load the configuration within the command's Run function
+		workspaceDir, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current working directory: %v\n", err)
+			os.Exit(1)
+		}
+		loadedSettings := config.LoadSettings(workspaceDir)
+
+		params := &config.ConfigParameters{
+			Model: loadedSettings.Model,
+			ToolRegistry: cfg.GetToolRegistry(), // Use the global tool registry
+		}
+
+		appConfig := config.NewConfig(params)
+
+		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		if err != nil {
+			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			os.Exit(1)
+		}
+
+		// If no question is provided, launch interactive UI
+		if len(args) == 0 {
+			p := tea.NewProgram(ui.NewGrepCodeModel(geminiClient))
+			if _, err := p.Run(); err != nil {
+				fmt.Printf("Error running interactive grep-code: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
 		pattern := strings.Join(args, " ")
 
 		// Execute grep command
@@ -45,32 +78,21 @@ Search Results:
 		
 		finalPrompt := fmt.Sprintf(promptTemplate, pattern, grepOutput)
 
-		// Load the configuration within the command's Run function
-		workspaceDir, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error getting current working directory: %v\n", err)
-			os.Exit(1)
-		}
-		loadedSettings := config.LoadSettings(workspaceDir)
-
-		params := &config.ConfigParameters{
-			Model: loadedSettings.Model,
-		}
-		appConfig := config.NewConfig(params)
-
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
-			os.Exit(1)
-		}
-
-		content, err := geminiClient.GenerateContent(finalPrompt)
+		resp, err := geminiClient.GenerateContent(core.NewUserContent(finalPrompt))
 		if err != nil {
 			fmt.Printf("Error generating content: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Println(content)
+		var textResponse string
+		if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+			for _, part := range resp.Candidates[0].Content.Parts {
+				if txt, ok := part.(genai.Text); ok {
+					textResponse += string(txt)
+				}
+			}
+		}
+		fmt.Println(textResponse)
 	},
 }
 

@@ -9,9 +9,25 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/google/generative-ai-go/genai"
 )
+
+// ErrMsg is a message type for errors.
+type ErrMsg struct{ Err error }
+
+func (e ErrMsg) Error() string { return e.Err.Error() }
+
+// ClearErrorMsg is a message type to clear the error. 
+type ClearErrorMsg struct{}
+
+// ClearErrorCmd clears the error message after a delay. 
+func ClearErrorCmd() tea.Cmd {
+	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
+		return ClearErrorMsg{}
+	})
+}
 
 // GenerateModel is the Bubble Tea model for the interactive generate UI.
 type GenerateModel struct {
@@ -92,7 +108,12 @@ func (m GenerateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			query := m.textInput.Value()
 			if strings.TrimSpace(query) == "" {
-				return m, nil // Ignore empty queries
+				m.currentError = m.styles.errorStyle.Render("Error: Query cannot be empty.")
+				if m.errorTimer != nil {
+					m.errorTimer.Stop()
+				}
+				m.errorTimer = time.NewTimer(5 * time.Second)
+				return m, ClearErrorCmd()
 			}
 
 			m.history = append(m.history, m.styles.userPromptStyle.Render("You: ")+query)
@@ -103,19 +124,28 @@ func (m GenerateModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case geminiResponseMsg:
-		m.history = append(m.history, m.styles.geminiResponseStyle.Render("Gemini: ")+string(msg))
+		// Extract text from the response
+		var textResponse string
+		if msg.Value != nil && len(msg.Value.Candidates) > 0 && msg.Value.Candidates[0].Content != nil {
+			for _, part := range msg.Value.Candidates[0].Content.Parts {
+				if txt, ok := part.(genai.Text); ok {
+					textResponse += string(txt)
+				}
+			}
+		}
+		m.history = append(m.history, m.styles.geminiResponseStyle.Render("Gemini: ")+textResponse)
 		m.awaitingGemini = false
 		return m, nil
-	case errMsg:
-		m.err = msg.err // Store the actual error object
-		m.currentError = m.styles.errorStyle.Render(fmt.Sprintf("Error: %v", msg.err))
+	case ErrMsg:
+		m.err = msg.Err // Store the actual error object
+		m.currentError = m.styles.errorStyle.Render(fmt.Sprintf("Error: %v", msg.Err))
 		m.awaitingGemini = false
 		if m.errorTimer != nil {
 			m.errorTimer.Stop()
 		}
 		m.errorTimer = time.NewTimer(5 * time.Second) // Start a timer to clear the error
-		return m, clearErrorCmd()
-	case clearErrorMsg:
+		return m, ClearErrorCmd()
+	case ClearErrorMsg:
 		m.currentError = "" // Clear the error message
 		m.err = nil         // Clear the error object
 		if m.errorTimer != nil {
@@ -165,28 +195,15 @@ func (m GenerateModel) View() string {
 func (m GenerateModel) generateContentCmd(query string) tea.Cmd {
 	return func() tea.Msg {
 		// Use the geminiClient from the model
-		content, err := m.gemini.GenerateContent(query)
+		content, err := m.gemini.GenerateContent(core.NewUserContent(query))
 		if err != nil {
-			return errMsg{err}
+			return ErrMsg{Err: err}
 		}
-		return geminiResponseMsg(content)
+		return geminiResponseMsg{Value: content}
 	}
 }
 
 // geminiResponseMsg is a message type for Gemini's response.
-type geminiResponseMsg string
-
-// errMsg is a message type for errors.
-type errMsg struct{ err error }
-
-func (e errMsg) Error() string { return e.err.Error() }
-
-// clearErrorMsg is a message type to clear the error. 
-type clearErrorMsg struct{}
-
-// clearErrorCmd clears the error message after a delay. 
-func clearErrorCmd() tea.Cmd {
-	return tea.Tick(5*time.Second, func(t time.Time) tea.Msg {
-		return clearErrorMsg{}
-	})
+type geminiResponseMsg struct {
+	Value *genai.GenerateContentResponse
 }

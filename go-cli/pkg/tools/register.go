@@ -37,6 +37,24 @@ func RegisterAllTools() *types.ToolRegistry {
 	if err := registry.Register(NewWriteTodosTool()); err != nil {
 		fmt.Printf("Error registering WriteTodosTool: %v\n", err)
 	}
+	if err := registry.Register(NewListDirectoryTool()); err != nil {
+		fmt.Printf("Error registering ListDirectoryTool: %v\n", err)
+	}
+	if err := registry.Register(NewGetCurrentBranchTool()); err != nil {
+		fmt.Printf("Error registering GetCurrentBranchTool: %v\n", err)
+	}
+	if err := registry.Register(NewGetRemoteURLTool()); err != nil {
+		fmt.Printf("Error registering GetRemoteURLTool: %v\n", err)
+	}
+	if err := registry.Register(NewCheckoutBranchTool()); err != nil {
+		fmt.Printf("Error registering CheckoutBranchTool: %v\n", err)
+	}
+	if err := registry.Register(NewPullTool()); err != nil {
+		fmt.Printf("Error registering PullTool: %v\n", err)
+	}
+	if err := registry.Register(NewExecuteCommandTool()); err != nil {
+		fmt.Printf("Error registering ExecuteCommandTool: %v\n", err)
+	}
 
 	return registry
 }

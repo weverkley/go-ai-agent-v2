@@ -18,7 +18,7 @@ The foundational structure for the Go CLI has been established, and several core
   - Command-line argument parsing is implemented using the `cobra` library.
   - `--version` flag implemented.
   - Top-level commands implemented:
-    - `generate`: **Functional** (with tool-calling capabilities). Now includes an **Interactive UI** using `charmbracelet/bubbletea` if no prompt is provided. Generates content using `pkg/core/gemini.go` (real Gemini API integration). **Interactive UI is fully functional and tested.**
+    - `generate`: **Functional** (with tool-calling capabilities). Now includes an **Interactive UI** using `charmbracelet/bubbletea` if no prompt is provided. Generates content using `pkg/core/gemini.go` (real Gemini API integration). **Interactive UI is fully functional and tested, including dynamic loading spinner and self-clearing error messages.**
     - `read`: **Functional**, reads file content using `pkg/services/file_system_service.go`.
     - `write`: **Functional**, writes content to a file using `pkg/services/file_system_service.go`.
     - `exec`: **Functional**, executes shell commands (uses `pkg/services/shell_service.go`).
@@ -52,7 +52,7 @@ The foundational structure for the Go CLI has been established, and several core
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
   - `pkg/config/config.go`: **Consolidated and Functional**. Now contains `SettingScope`, `Settings`, `LoadSettings`, `Config` struct, and related methods. `Config` struct now has an exported `Model` field, and `NewConfig` and `GetModel()` methods are adjusted accordingly.
   - `pkg/mcp/client.go`: **Functional** (renamed `Client` to `McpClient`). Simulates MCP connection.
-  - `pkg/types/types.go`: **Centralized Types**. Updated to include `MCPServerConfig`, `MCPServerStatus`, `MCPOAuthConfig`, `AuthProviderType`, `ToolCallRequestInfo`, `JsonSchemaObject`, `JsonSchemaProperty`, `AgentTerminateMode`, `FunctionCall`, `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool` (and its methods), and `ToolRegistry` (and its methods) to resolve import cycles and consolidate common types.
+  - `pkg/types/types.go`: **Centralized Types**. Updated to include `MCPServerConfig`, `MCPServerStatus`, `MCPOAuthConfig`, `AuthProviderType`, `ToolCallRequestInfo`, `JsonSchemaObject`, `JsonSchemaProperty`, `AgentTerminateMode`, `FunctionCall`, `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool` (and its methods), `ToolRegistry` (and its methods), and `TelemetrySettings` to resolve import cycles and consolidate common types.
   - `pkg/types/constants.go`: **Cleaned Up**. Removed duplicate `MCPServerStatus` and `Kind` constants.
 
 ## 2. Linter-Identified Issues (Prioritized for Next Steps)
@@ -65,7 +65,7 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`pkg/core/agents/subagent_tool_wrapper.go`**: Corrected access to `MessageBus` and updated references to `types.BaseDeclarativeTool`, `types.NewBaseDeclarativeTool`, `types.KindThink` (replaced with `types.KindOther`), and `types.ToolInvocation`.
 - **`cmd/generate.go`**: Converted `[]genai.Content{}` to `[]*genai.Content{}`.
 - **`cmd/list-models.go`**: Added `genai` import and provided correct arguments to `core.NewGeminiChat`.
-- **Import Cycles**: Fully resolved by moving `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool`, and `ToolRegistry` to `pkg/types/types.go`, and removing `pkg/tools/tool_registry.go`.
+- **Import Cycles**: Fully resolved by moving `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool`, `ToolRegistry`, and `TelemetrySettings` to `pkg/types/types.go`, and removing `pkg/tools/tool_registry.go`.
 - **`pkg/core/agents/non_interactive_tool_executor.go`**: Fixed `undefined: ToolCallRequestInfo`.
 - **`pkg/core/agents/schema_utils.go`**: Fixed `undefined` errors for `JsonSchemaObject` and `JsonSchemaProperty`.
 - **`pkg/core/agents/registry.go`**: Removed unused `fmt` import.
@@ -79,6 +79,7 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`SA9003: empty branch` errors**: Added `//nolint:staticcheck` to empty `if` blocks in `pkg/utils/folder_structure.go` and `pkg/core/agents/registry.go`.
 - **Duplicate definitions in `pkg/config`**: Consolidated `SettingScope`, `Settings`, and `LoadSettings` into `pkg/config/config.go` and deleted `pkg/config/settings.go`.
 - **`cmd/generate.go` and `pkg/ui/generate_ui.go` type mismatch**: Corrected `ui.NewGenerateModel` to accept `*core.GeminiChat` and updated `cmd/generate.go` to pass the `geminiClient` correctly. Removed unused imports from `pkg/ui/generate_ui.go`.
+- **Telemetry Logging**: Implemented basic telemetry logging with file output and global logger initialization.
 
 ### Remaining Issues:
 
@@ -151,9 +152,13 @@ The migration will proceed iteratively, focusing on one command or core function
 1.  **Enhance Interactive UI**:
     *   Expand the interactive UI to other commands where user interaction would be beneficial (e.g., `code-guide`, `find-docs`).
     *   Improve the UI/UX of the interactive components (e.g., better loading indicators, error displays, input validation).
+    *   **`generate`**: Interactive UI complete.
+    *   **`find-docs`**: Interactive UI complete.
 2.  **Tool Integration for AI Commands**:
     *   For commands like `find-docs` and `pr-review`, integrate actual tool-calling capabilities. This would allow the AI to dynamically use `GitService`, `FileSystemService`, and `ShellExecutionService` to gather information or perform actions, rather than relying solely on pre-constructed prompts.
     *   This would involve implementing the `tools` package in Go to register and execute these services as AI tools.
+    *   **`find-docs`**: Tool integration complete.
+    *   **`pr-review`**: Tool integration complete.
 3.  **Error Handling and User Feedback**:
     *   Improve error handling across all commands, providing more user-friendly messages.
     *   Implement a consistent way to provide feedback to the user, especially for long-running operations.

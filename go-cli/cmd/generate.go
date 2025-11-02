@@ -25,7 +25,7 @@ func init() {
 var generateCmd = &cobra.Command{
 	Use:   "generate",
 	Short: "Generate content using a prompt",
-	Long:  `Generate content using a specified prompt. If no prompt is provided, an interactive UI will be launched.`,
+	Long:  `Generate content using a specified prompt. If no prompt is provided, an interactive UI will be launched.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		// Load the configuration within the command's Run function
 		workspaceDir, err := os.Getwd()
@@ -65,13 +65,21 @@ var generateCmd = &cobra.Command{
 				finalPrompt = prompt.Description
 			}
 
-			content, err := geminiClient.GenerateContent(finalPrompt)
+			resp, err := geminiClient.GenerateContent(core.NewUserContent(finalPrompt))
 			if err != nil {
 				fmt.Printf("Error generating content: %v\n", err)
 				os.Exit(1)
 			}
 
-			fmt.Println(content)
+			var textResponse string
+			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+				for _, part := range resp.Candidates[0].Content.Parts {
+					if txt, ok := part.(genai.Text); ok {
+						textResponse += string(txt)
+					}
+				}
+			}
+			fmt.Println(textResponse)
 		} else {
 			// Launch interactive UI
 			p := tea.NewProgram(ui.NewGenerateModel(geminiClient)) // Pass geminiClient here

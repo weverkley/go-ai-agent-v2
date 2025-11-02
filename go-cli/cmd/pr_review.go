@@ -8,9 +8,11 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/ui"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
+	"github.com/charmbracelet/bubbletea"
 )
 
 var prReviewCmd = &cobra.Command{
@@ -18,58 +20,8 @@ var prReviewCmd = &cobra.Command{
 	Short: "Review a specific pull request",
 	Long: `This command uses AI to conduct a comprehensive review of a pull request.
 It evaluates code quality, adherence to standards, and readiness for merging, providing detailed feedback or approval messages.`, 
-	Args: cobra.MinimumNArgs(1), // Requires at least one argument for the PR identifier
+	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
 	Run: func(cmd *cobra.Command, args []string) {
-		prIdentifier := strings.Join(args, " ")
-
-		// The prompt content from pr-review.toml
-		promptTemplate := `## Mission: Comprehensive Pull Request Review
-
-Today, our mission is to meticulously review community pull requests (PRs) for this project. We will proceed systematically, evaluating each candidate PR for its quality, adherence to standards, and readiness for merging.
-
-### Workflow:
-
-1.  **PR Preparation & Initial Assessment**:
-    * **You will check out the designated PR %s** into a temporary branch.
-    * **Execute the preflight checks (npm run preflight)**. This includes building, linting, and running all unit tests.
-    * Analyze the output of these preflight checks, noting any failures, warnings, or linting issues.
-
-2.  **In-Depth Code Review**:
-    * **Your primary role is to conduct a thorough and in-depth code review** of the changes introduced in the PR. Focus your analysis on the following criteria:
-        * **Correctness**: Does the code achieve its stated purpose without bugs or logical errors?
-        * **Maintainability**: Is the code clean, well-structured, and easy to understand and modify in the future? Consider factors like code clarity, modularity, and adherence to established design patterns.
-        * **Readability**: Is the code well-commented (where necessary) and consistently formatted according to our project's coding style guidelines?
-        * **Efficiency**: Are there any obvious performance bottlenecks or resource inefficiencies introduced by the changes?
-        * **Security**: Are there any potential security vulnerabilities or insecure coding practices?
-        * **Edge Cases and Error Handling**: Does the code appropriately handle edge cases and potential errors?
-        * **Testability**: Is the new or modified code adequately covered by tests (even if preflight checks pass)? Suggest additional test cases that would improve coverage or robustness.
-    * Based on your analysis, you will determine if the PR is **safe to merge**.
-
-3.  **Reviewing Previous Feedback**:
-    * **Access and examine the PR's history** to identify any **outstanding requests or unresolved comments from previous reviews**. Incorporate these into your current review and explicitly highlight if they have been adequately addressed in the current state of the PR.
-
-4.  **Decision and Output Generation**:
-    * **If the PR is deemed safe to merge** (after your comprehensive review and considering previous feedback):
-        * Draft a **friendly, concise, and professional approval message**.
-        * **The approval message should:**
-            * Clearly state that the PR is approved.
-            * Briefly acknowledge the quality or value of the contribution (e.g., "Great work on X feature!" or "Appreciate the fix for Y issue!").
-            * **Do NOT mention the preflight checks or unit testing**, as these are internal processes.
-            * Be suitable for public display on GitHub.
-    * **If the PR is NOT safe to merge**:
-        * Provide a **clear, constructive, and detailed summary of the issues found**.
-        * Suggest **specific actionable changes** required for the PR to become merge-ready.
-        * Ensure the feedback is professional and encourages the contributor.
-
-### Post-PR Action:
-
-* After providing your review and decision for the current PR, I will wait for you to perform any manual testing you wish to do. Please let me know when you are finished.
-* Once you have confirmed that you are done, I will switch to the main branch, clean up the local branch, and perform a pull to ensure we are synchronized with the latest upstream changes for the next review.
-
-%s`
-
-		finalPrompt := fmt.Sprintf(promptTemplate, prIdentifier, "") // Second %s is for future context like preflight output
-
 		// Load the configuration within the command's Run function
 		workspaceDir, err := os.Getwd()
 		if err != nil {
@@ -80,6 +32,7 @@ Today, our mission is to meticulously review community pull requests (PRs) for t
 
 		params := &config.ConfigParameters{
 			Model: loadedSettings.Model,
+			ToolRegistry: cfg.GetToolRegistry(), // Use the global tool registry
 		}
 		appConfig := config.NewConfig(params)
 
@@ -89,13 +42,105 @@ Today, our mission is to meticulously review community pull requests (PRs) for t
 			os.Exit(1)
 		}
 
-		content, err := geminiClient.GenerateContent(finalPrompt)
-		if err != nil {
-			fmt.Printf("Error generating content: %v\n", err)
-			os.Exit(1)
+		// If no question is provided, launch interactive UI
+		if len(args) == 0 {
+			p := tea.NewProgram(ui.NewPrReviewModel(geminiClient))
+			if _, err := p.Run(); err != nil {
+				fmt.Printf("Error running interactive pr-review: %v\n", err)
+				os.Exit(1)
+			}
+			return
 		}
 
-		fmt.Println(content)
+		prIdentifier := strings.Join(args, " ")
+
+		// Construct a simpler prompt for the AI, guiding it to use tools
+		prompt := fmt.Sprintf(`## Mission: Comprehensive Pull Request Review
+
+Your task is to conduct a comprehensive review of the pull request identified by "%s".
+
+### Workflow:
+
+1.  **PR Preparation & Initial Assessment**:
+    *   Use the 'checkout_branch' tool to check out the designated PR into a temporary branch.
+    *   Use the 'execute_command' tool to run "npm run preflight". This includes building, linting, and running all unit tests.
+    *   Analyze the output of these preflight checks, noting any failures, warnings, or linting issues.
+
+2.  **In-Depth Code Review**:
+    *   Use the 'list_directory' and 'read_file' tools to explore the codebase and review the changes introduced in the PR. Focus your analysis on:
+        *   Correctness, Maintainability, Readability, Efficiency, Security, Edge Cases and Error Handling, Testability.
+    *   Based on your analysis, determine if the PR is safe to merge.
+
+3.  **Reviewing Previous Feedback**:
+    *   If necessary, use tools to access and examine the PR's history to identify any outstanding requests or unresolved comments from previous reviews.
+
+4.  **Decision and Output Generation**:
+    *   If the PR is deemed safe to merge, draft a friendly, concise, and professional approval message.
+    *   If the PR is NOT safe to merge, provide a clear, constructive, and detailed summary of the issues found, and suggest specific actionable changes.
+
+### Post-PR Action:
+
+*   After providing your review and decision, use the 'checkout_branch' tool to switch back to the main branch.
+*   Use the 'execute_command' tool to clean up any temporary branches or files.
+*   Use the 'pull' tool to ensure the main branch is synchronized with the latest upstream changes.
+
+### PR Identifier:
+
+%s`, prIdentifier, prIdentifier)
+
+		// Initial content for the chat
+		contents := []*genai.Content{core.NewUserContent(prompt)}
+
+		// Main loop for tool calling
+		for {
+			resp, err := geminiClient.GenerateContent(contents...)
+			if err != nil {
+				fmt.Printf("Error generating content: %v\n", err)
+				os.Exit(1)
+			}
+
+			if len(resp.Candidates) == 0 {
+				fmt.Println("No candidates returned from Gemini.")
+				os.Exit(0)
+			}
+
+			candidate := resp.Candidates[0]
+			if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
+				fmt.Println("No content parts returned from Gemini.")
+				os.Exit(0)
+			}
+
+			var toolCalls []*genai.FunctionCall
+			var textResponse string
+
+			for _, part := range candidate.Content.Parts {
+				if fc, ok := part.(*genai.FunctionCall); ok && fc != nil {
+					toolCalls = append(toolCalls, fc)
+				} else if text, ok := part.(genai.Text); ok && text != "" {
+					textResponse += string(text)
+				}
+			}
+
+			if len(toolCalls) > 0 {
+				// Execute tool calls
+				var toolResponses []genai.Part
+				for _, fc := range toolCalls {
+					toolResult, err := geminiClient.ExecuteTool(fc)
+					if err != nil {
+						fmt.Printf("Error executing tool %s: %v\n", fc.Name, err)
+						os.Exit(1)
+					}
+					toolResponses = append(toolResponses, core.NewFunctionResponsePart(fc.Name, toolResult.LLMContent))
+				}
+				// Append tool calls and their responses to the conversation history
+				contents = append(contents, core.NewFunctionCallContent(toolCalls...))
+				contents = append(contents, core.NewToolContent(toolResponses...))
+			} else {
+				// If no tool calls, it's the final answer
+				fmt.Println(textResponse)
+				return
+			}
+		}
 	},
 }
 

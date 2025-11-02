@@ -8,9 +8,11 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/ui"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
+	"github.com/charmbracelet/bubbletea"
 )
 
 var codeGuideCmd = &cobra.Command{
@@ -20,8 +22,44 @@ var codeGuideCmd = &cobra.Command{
 
 This command acts as a specialized AI prompt to help new engineers understand the Gemini CLI codebase.
 It provides clear explanations grounded in the actual source code, including full file paths and design choices.`,
-	Args: cobra.MinimumNArgs(1), // Requires at least one argument for the question
+	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
 	Run: func(cmd *cobra.Command, args []string) {
+		// Load the configuration within the command's Run function
+		// This ensures that cfg is initialized correctly based on the current working directory
+		workspaceDir, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Error getting current working directory: %v\n", err)
+			os.Exit(1)
+		}
+		loadedSettings := config.LoadSettings(workspaceDir)
+
+		// Create a ConfigParameters object
+		params := &config.ConfigParameters{
+			Model: loadedSettings.Model,
+		}
+
+		// Create a config.Config object
+		appConfig := config.NewConfig(params)
+
+		// Update params with ToolRegistry from appConfig
+		params.ToolRegistry = appConfig.ToolRegistry
+
+		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		if err != nil {
+			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			os.Exit(1)
+		}
+
+		// If no question is provided, launch interactive UI
+		if len(args) == 0 {
+			p := tea.NewProgram(ui.NewCodeGuideModel(geminiClient))
+			if _, err := p.Run(); err != nil {
+				fmt.Printf("Error running interactive code-guide: %v\n", err)
+				os.Exit(1)
+			}
+			return
+		}
+
 		question := strings.Join(args, " ")
 
 		// The prompt content from code-guide.toml
@@ -63,43 +101,24 @@ Your primary task is to help a new engineer understand the Gemini CLI codebase. 
 		
 		finalPrompt := fmt.Sprintf(promptTemplate, question)
 
-		// Load the configuration within the command's Run function
-		// This ensures that cfg is initialized correctly based on the current working directory
-		workspaceDir, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error getting current working directory: %v\n", err)
-			os.Exit(1)
-		}
-		loadedSettings := config.LoadSettings(workspaceDir)
-
-		// Create a ConfigParameters object
-		params := &config.ConfigParameters{
-			Model: loadedSettings.Model,
-			// Add other fields from loadedSettings as needed, or set to defaults
-			// For now, only Model is directly used by NewGeminiChat
-		}
-
-		// Create a config.Config object
-		appConfig := config.NewConfig(params)
-
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
-			os.Exit(1)
-		}
-
-		content, err := geminiClient.GenerateContent(finalPrompt)
+		resp, err := geminiClient.GenerateContent(core.NewUserContent(finalPrompt))
 		if err != nil {
 			fmt.Printf("Error generating content: %v\n", err)
 			os.Exit(1)
 		}
 
-		fmt.Println(content)
+		var textResponse string
+		if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+			for _, part := range resp.Candidates[0].Content.Parts {
+				if txt, ok := part.(genai.Text); ok {
+					textResponse += string(txt)
+				}
+			}
+		}
+		fmt.Println(textResponse)
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(codeGuideCmd)
 }
-
-

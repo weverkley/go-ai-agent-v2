@@ -160,7 +160,7 @@ type ConfigParameters struct {
 	Telemetry      *types.TelemetrySettings
 	Output         *OutputSettings
 	CodebaseInvestigator *CodebaseInvestigatorSettings
-	ToolRegistry *types.ToolRegistry // Changed
+	ToolRegistry *types.ToolRegistry // Changed to exported
 	ToolDiscoveryCommand string
 	ToolCallCommand      string
 }
@@ -177,7 +177,7 @@ type Config struct {
 	telemetry      *types.TelemetrySettings
 	output         *OutputSettings
 	codebaseInvestigatorSettings *CodebaseInvestigatorSettings
-	toolRegistry *types.ToolRegistry // Changed
+	ToolRegistry *types.ToolRegistry // Changed to exported
 	toolDiscoveryCommand string
 	toolCallCommand      string
 	telemetryLogger telemetry.TelemetryLogger
@@ -195,7 +195,7 @@ func NewConfig(params *ConfigParameters) *Config {
 		telemetry:      params.Telemetry,
 		output:         params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
-		toolRegistry: params.ToolRegistry,
+		ToolRegistry: params.ToolRegistry,
 		toolDiscoveryCommand: params.ToolDiscoveryCommand,
 		toolCallCommand:      params.ToolCallCommand,
 	}
@@ -229,7 +229,7 @@ func (c *Config) GetDebugMode() bool {
 
 // GetToolRegistry returns the global tool registry.
 func (c *Config) GetToolRegistry() *types.ToolRegistry {
-	return c.toolRegistry
+	return c.ToolRegistry
 }
 
 // GetTelemetryLogger returns the initialized telemetry logger.

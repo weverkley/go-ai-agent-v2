@@ -12,16 +12,28 @@ import (
 	"github.com/gobwas/glob"
 )
 
-// FileSystemService provides functionality to interact with the file system.
-type FileSystemService struct{}
+// FileSystemService interface defines the methods for interacting with the file system.
+type FileSystemService interface {
+	ListDirectory(dirPath string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error)
+	PathExists(path string) (bool, error)
+	IsDirectory(path string) (bool, error)
+	ReadFile(filePath string) (string, error)
+	WriteFile(filePath string, content string) error
+	CreateDirectory(path string) error
+	CopyDirectory(src string, dst string) error
+	JoinPaths(elements ...string) string
+}
+
+// fileSystemService implements the FileSystemService interface.
+type fileSystemService struct{}
 
 // NewFileSystemService creates a new instance of FileSystemService.
-func NewFileSystemService() *FileSystemService {
-	return &FileSystemService{}
+func NewFileSystemService() FileSystemService {
+	return &fileSystemService{}
 }
 
 // getIgnorePatterns reads .gitignore and .geminiignore files and returns a list of glob patterns.
-func (s *FileSystemService) getIgnorePatterns(searchDir string, respectGitIgnore, respectGeminiIgnore bool) ([]glob.Glob, error) {
+func (s *fileSystemService) getIgnorePatterns(searchDir string, respectGitIgnore, respectGeminiIgnore bool) ([]glob.Glob, error) {
 	var ignorePatterns []glob.Glob
 
 	// Read .gitignore
@@ -52,7 +64,7 @@ func (s *FileSystemService) getIgnorePatterns(searchDir string, respectGitIgnore
 }
 
 // readIgnoreFile reads an ignore file and compiles its patterns.
-func (s *FileSystemService) readIgnoreFile(filePath string) ([]glob.Glob, error) {
+func (s *fileSystemService) readIgnoreFile(filePath string) ([]glob.Glob, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -80,7 +92,7 @@ func (s *FileSystemService) readIgnoreFile(filePath string) ([]glob.Glob, error)
 }
 
 // ListDirectory lists the contents of a directory.
-func (s *FileSystemService) ListDirectory(dirPath string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error) {
+func (s *fileSystemService) ListDirectory(dirPath string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error) {
 	entries, err := os.ReadDir(dirPath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", dirPath, err)
@@ -144,7 +156,7 @@ func (s *FileSystemService) ListDirectory(dirPath string, ignorePatterns []strin
 }
 
 // PathExists checks if a file or directory exists at the given path.
-func (s *FileSystemService) PathExists(path string) (bool, error) {
+func (s *fileSystemService) PathExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -156,7 +168,7 @@ func (s *FileSystemService) PathExists(path string) (bool, error) {
 }
 
 // IsDirectory checks if the given path is a directory.
-func (s *FileSystemService) IsDirectory(path string) (bool, error) {
+func (s *fileSystemService) IsDirectory(path string) (bool, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -168,7 +180,7 @@ func (s *FileSystemService) IsDirectory(path string) (bool, error) {
 }
 
 // ReadFile reads the content of a file at the given path.
-func (s *FileSystemService) ReadFile(filePath string) (string, error) {
+func (s *fileSystemService) ReadFile(filePath string) (string, error) {
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read file %s: %w", filePath, err)
@@ -177,7 +189,7 @@ func (s *FileSystemService) ReadFile(filePath string) (string, error) {
 }
 
 // WriteFile writes the given content to a file at the given path.
-func (s *FileSystemService) WriteFile(filePath string, content string) error {
+func (s *fileSystemService) WriteFile(filePath string, content string) error {
 	err := os.WriteFile(filePath, []byte(content), 0644) // 0644 is standard file permissions
 	if err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
@@ -186,12 +198,12 @@ func (s *FileSystemService) WriteFile(filePath string, content string) error {
 }
 
 // JoinPaths joins any number of path elements into a single path, adding a separating slash if necessary.
-func (s *FileSystemService) JoinPaths(elements ...string) string {
+func (s *fileSystemService) JoinPaths(elements ...string) string {
 	return filepath.Join(elements...)
 }
 
 // CreateDirectory creates a directory, ensuring it doesn't already exist.
-func (s *FileSystemService) CreateDirectory(path string) error {
+func (s *fileSystemService) CreateDirectory(path string) error {
 	exists, err := s.PathExists(path)
 	if err != nil {
 		return fmt.Errorf("failed to check path existence for %s: %w", path, err)
@@ -208,7 +220,7 @@ func (s *FileSystemService) CreateDirectory(path string) error {
 }
 
 // CopyDirectory recursively copies a directory from src to dst.
-func (s *FileSystemService) CopyDirectory(src string, dst string) error {
+func (s *fileSystemService) CopyDirectory(src string, dst string) error {
 	src = filepath.Clean(src)
 	dst = filepath.Clean(dst)
 
@@ -246,7 +258,7 @@ func (s *FileSystemService) CopyDirectory(src string, dst string) error {
 }
 
 // copyFile copies a file from src to dst.
-func (s *FileSystemService) copyFile(src string, dst string) error {
+func (s *fileSystemService) copyFile(src string, dst string) error {
 	in, err := os.Open(src)
 	if err != nil {
 		return err

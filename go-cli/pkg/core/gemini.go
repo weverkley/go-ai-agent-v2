@@ -25,6 +25,7 @@ type GeminiChat struct {
 	Name             string
 	generationConfig types.GenerateContentConfig
 	startHistory     []*genai.Content
+	toolRegistry     *types.ToolRegistry // Add ToolRegistry
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
@@ -46,51 +47,100 @@ func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentCon
 	model.SetTemperature(generationConfig.Temperature)
 	model.SetTopP(generationConfig.TopP)
 
+	// Set tools for the model
+	if cfg.GetToolRegistry() != nil {
+		model.Tools = cfg.GetToolRegistry().GetTools()
+	}
+
 	return &GeminiChat{
 		client:           client,
 		model:            model,
 		Name:             cfg.GetModel(),
 		generationConfig: generationConfig,
 		startHistory:     startHistory,
+		toolRegistry:     cfg.GetToolRegistry(), // Store the ToolRegistry
 	}, nil
 }
 
+// NewUserContent creates a new genai.Content with user role and text part.
+func NewUserContent(text string) *genai.Content {
+	return &genai.Content{
+		Parts: []genai.Part{genai.Text(text)},
+		Role:  "user",
+	}
+}
+
+// NewFunctionResponsePart creates a new genai.Part for a function response.
+func NewFunctionResponsePart(name string, response interface{}) genai.Part {
+	// Ensure response is of type map[string]any
+	respMap, ok := response.(map[string]any)
+	if !ok {
+		// Handle error or convert if necessary. For now, return an empty map.
+		respMap = make(map[string]any)
+		respMap["error"] = fmt.Sprintf("invalid response type: %T", response)
+	}
+	return genai.FunctionResponse{
+		Name:     name,
+		Response: respMap,
+	}
+}
+
+// NewFunctionCallContent creates a new genai.Content with model role and function call parts.
+func NewFunctionCallContent(calls ...*genai.FunctionCall) *genai.Content {
+	parts := make([]genai.Part, len(calls))
+	for i, call := range calls {
+		parts[i] = call
+	}
+	return &genai.Content{
+		Parts: parts,
+		Role:  "model",
+	}
+}
+
+// NewToolContent creates a new genai.Content with tool role and tool response parts.
+func NewToolContent(responses ...genai.Part) *genai.Content {
+	return &genai.Content{
+		Parts: responses,
+		Role:  "tool",
+	}
+}
+
 // GenerateContent generates content using the Gemini API, handling tool calls.
-func (gc *GeminiChat) GenerateContent(prompt string) (string, error) {
+func (gc *GeminiChat) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
 	ctx := context.Background()
 
-	messageParams := types.MessageParams{
-		Message:     []types.Part{{Text: prompt}},
-		AbortSignal: ctx,
+	// Convert []*genai.Content to []genai.Part
+	var parts []genai.Part
+	for _, content := range contents {
+		parts = append(parts, content.Parts...)
 	}
 
-	responseStream, err := gc.SendMessageStream(
-		gc.Name,
-		messageParams,
-		"generate-command", // Dummy promptId
-	)
+	resp, err := gc.model.GenerateContent(ctx, parts...)
 	if err != nil {
-		return "", fmt.Errorf("failed to send message stream: %w", err)
+		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
 
-	var generatedText string
-	for resp := range responseStream {
-		if resp.Type == types.StreamEventTypeChunk {
-			chunk := resp.Value
-			if chunk == nil || len(chunk.Candidates) == 0 || chunk.Candidates[0].Content == nil {
-				continue
-			}
-			for _, part := range chunk.Candidates[0].Content.Parts {
-				if txt, ok := part.(genai.Text); ok {
-					generatedText += string(txt)
-				}
-			}
-		} else if resp.Type == types.StreamEventTypeError {
-			return "", resp.Error
-		}
+	return resp, nil
+}
+
+// ExecuteTool executes a tool call.
+func (gc *GeminiChat) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
+	if gc.toolRegistry == nil {
+		return types.ToolResult{}, fmt.Errorf("tool registry not initialized")
 	}
 
-	return generatedText, nil
+	tool, err := gc.toolRegistry.GetTool(fc.Name)
+	if err != nil {
+		return types.ToolResult{}, fmt.Errorf("tool %s not found: %w", fc.Name, err)
+	}
+
+	// Convert map[string]interface{} to map[string]any
+	args := make(map[string]any)
+	for k, v := range fc.Args {
+		args[k] = v
+	}
+
+	return tool.Execute(args)
 }
 
 // SendMessageStream generates content using the Gemini API and streams responses.
@@ -101,8 +151,8 @@ func (gc *GeminiChat) SendMessageStream(modelName string, messageParams types.Me
 	cs.History = gc.startHistory
 
 	// Prepare tools for the model
-	if len(messageParams.Tools) > 0 {
-		gc.model.Tools = messageParams.Tools
+	if gc.toolRegistry != nil {
+		gc.model.Tools = gc.toolRegistry.GetTools()
 	}
 
 	// Convert types.Part to genai.Part
