@@ -29,7 +29,7 @@ type GeminiChat struct {
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
-func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (*GeminiChat, error) {
+func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")

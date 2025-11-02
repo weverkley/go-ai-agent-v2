@@ -18,7 +18,7 @@ import (
 type PrReviewModel struct {
 	textInput      textinput.Model
 	err            error
-	gemini         *core.GeminiChat
+	gemini         core.Executor
 	history        []string
 	awaitingGemini bool
 	spinner        spinner.Model // New field for the spinner
@@ -37,7 +37,7 @@ type PrReviewStyles struct {
 }
 
 // NewPrReviewModel creates a new PrReviewModel with initialized text input.
-func NewPrReviewModel(gemini *core.GeminiChat) *PrReviewModel {
+func NewPrReviewModel(gemini core.Executor) *PrReviewModel {
 
 	ti := textinput.New()
 

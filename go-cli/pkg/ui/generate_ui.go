@@ -33,7 +33,7 @@ func ClearErrorCmd() tea.Cmd {
 type GenerateModel struct {
 	textInput      textinput.Model
 	err            error
-	gemini         *core.GeminiChat
+	gemini         core.Executor
 	history        []string
 	awaitingGemini bool
 	spinner        spinner.Model // New field for the spinner
@@ -52,7 +52,7 @@ type GenerateStyles struct {
 }
 
 // NewGenerateModel creates a new GenerateModel with initialized text input.
-func NewGenerateModel(gemini *core.GeminiChat) *GenerateModel {
+func NewGenerateModel(gemini core.Executor) *GenerateModel {
 
 	ti := textinput.New()
 

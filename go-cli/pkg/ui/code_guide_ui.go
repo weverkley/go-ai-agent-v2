@@ -18,7 +18,7 @@ import (
 type CodeGuideModel struct {
 	textInput      textinput.Model
 	err            error
-	gemini         *core.GeminiChat
+	gemini         core.Executor
 	history        []string
 	awaitingGemini bool
 	spinner        spinner.Model // New field for the spinner
@@ -37,7 +37,7 @@ type CodeGuideStyles struct {
 }
 
 // NewCodeGuideModel creates a new CodeGuideModel with initialized text input.
-func NewCodeGuideModel(gemini *core.GeminiChat) *CodeGuideModel {
+func NewCodeGuideModel(gemini core.Executor) *CodeGuideModel {
 
 	ti := textinput.New()
 

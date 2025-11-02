@@ -20,6 +20,7 @@ var promptName string
 func init() {
 	rootCmd.AddCommand(generateCmd)
 	generateCmd.Flags().StringVarP(&promptName, "prompt", "p", "default", "The name of the prompt to use for content generation")
+	generateCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }
 
 var generateCmd = &cobra.Command{
@@ -40,9 +41,10 @@ var generateCmd = &cobra.Command{
 		}
 		appConfig := config.NewConfig(params)
 
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executorFactory := core.NewExecutorFactory()
+		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			fmt.Printf("Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -65,7 +67,7 @@ var generateCmd = &cobra.Command{
 				finalPrompt = prompt.Description
 			}
 
-			resp, err := geminiClient.GenerateContent(core.NewUserContent(finalPrompt))
+			resp, err := executor.GenerateContent(core.NewUserContent(finalPrompt))
 			if err != nil {
 				fmt.Printf("Error generating content: %v\n", err)
 				os.Exit(1)
@@ -82,7 +84,7 @@ var generateCmd = &cobra.Command{
 			fmt.Println(textResponse)
 		} else {
 			// Launch interactive UI
-			p := tea.NewProgram(ui.NewGenerateModel(geminiClient)) // Pass geminiClient here
+			p := tea.NewProgram(ui.NewGenerateModel(executor)) // Pass executor here
 			if _, err := p.Run(); err != nil {
 				fmt.Printf("Error running interactive generate: %v\n", err)
 				os.Exit(1)

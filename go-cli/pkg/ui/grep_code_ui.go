@@ -18,7 +18,7 @@ import (
 type GrepCodeModel struct {
 	textInput      textinput.Model
 	err            error
-	gemini         *core.GeminiChat
+	gemini         core.Executor
 	history        []string
 	awaitingGemini bool
 	spinner        spinner.Model // New field for the spinner
@@ -37,7 +37,7 @@ type GrepCodeStyles struct {
 }
 
 // NewGrepCodeModel creates a new GrepCodeModel with initialized text input.
-func NewGrepCodeModel(gemini *core.GeminiChat) *GrepCodeModel {
+func NewGrepCodeModel(gemini core.Executor) *GrepCodeModel {
 
 	ti := textinput.New()
 

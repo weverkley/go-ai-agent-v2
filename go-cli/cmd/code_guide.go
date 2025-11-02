@@ -9,11 +9,18 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
+	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 	"github.com/charmbracelet/bubbletea"
 )
+
+
+func init() {
+	rootCmd.AddCommand(codeGuideCmd)
+	codeGuideCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
+}
 
 var codeGuideCmd = &cobra.Command{
 	Use:   "code-guide [question]",
@@ -33,26 +40,28 @@ It provides clear explanations grounded in the actual source code, including ful
 		}
 		loadedSettings := config.LoadSettings(workspaceDir)
 
+		// Initialize the ToolRegistry
+		toolRegistry := tools.RegisterAllTools()
+
 		// Create a ConfigParameters object
 		params := &config.ConfigParameters{
 			Model: loadedSettings.Model,
+			ToolRegistry: toolRegistry, // Use the initialized tool registry
 		}
 
 		// Create a config.Config object
 		appConfig := config.NewConfig(params)
 
-		// Update params with ToolRegistry from appConfig
-		params.ToolRegistry = appConfig.ToolRegistry
-
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executorFactory := core.NewExecutorFactory()
+		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			fmt.Printf("Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
 		// If no question is provided, launch interactive UI
 		if len(args) == 0 {
-			p := tea.NewProgram(ui.NewCodeGuideModel(geminiClient))
+			p := tea.NewProgram(ui.NewCodeGuideModel(executor))
 			if _, err := p.Run(); err != nil {
 				fmt.Printf("Error running interactive code-guide: %v\n", err)
 				os.Exit(1)
@@ -101,7 +110,7 @@ Your primary task is to help a new engineer understand the Gemini CLI codebase. 
 		
 		finalPrompt := fmt.Sprintf(promptTemplate, question)
 
-		resp, err := geminiClient.GenerateContent(core.NewUserContent(finalPrompt))
+		resp, err := executor.GenerateContent(core.NewUserContent(finalPrompt))
 		if err != nil {
 			fmt.Printf("Error generating content: %v\n", err)
 			os.Exit(1)

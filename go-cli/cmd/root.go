@@ -15,6 +15,9 @@ var rootCmd = &cobra.Command{
 	Use:   "go-cli",
 	Short: "A Go-based CLI for Gemini",
 	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// This will run before any subcommand. We can use it to set up common configurations.
+	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
 			_ = cmd.Help()
@@ -24,6 +27,7 @@ var rootCmd = &cobra.Command{
 }
 
 var cfg *config.Config
+var executorType string
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -33,6 +37,7 @@ func Execute() {
 }
 
 func init() {
+	rootCmd.PersistentFlags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 	// Create a dummy config for initial tool registry creation
 	toolRegistry := types.NewToolRegistry()
 

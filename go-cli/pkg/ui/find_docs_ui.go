@@ -18,7 +18,7 @@ import (
 type FindDocsModel struct {
 	textInput      textinput.Model
 	err            error
-	gemini         *core.GeminiChat
+	gemini         core.Executor
 	history        []string
 	awaitingGemini bool
 	spinner        spinner.Model // New field for the spinner
@@ -37,7 +37,7 @@ type FindDocsStyles struct {
 }
 
 // NewFindDocsModel creates a new FindDocsModel with initialized text input.
-func NewFindDocsModel(gemini *core.GeminiChat) *FindDocsModel {
+func NewFindDocsModel(gemini core.Executor) *FindDocsModel {
 
 	ti := textinput.New()
 

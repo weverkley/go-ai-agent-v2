@@ -10,11 +10,18 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
+	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 	"github.com/charmbracelet/bubbletea"
 )
+
+
+func init() {
+	rootCmd.AddCommand(grepCodeCmd)
+	grepCodeCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
+}
 
 var grepCodeCmd = &cobra.Command{
 	Use:   "grep-code [pattern]",
@@ -30,22 +37,26 @@ var grepCodeCmd = &cobra.Command{
 		}
 		loadedSettings := config.LoadSettings(workspaceDir)
 
+		// Initialize the ToolRegistry
+		toolRegistry := tools.RegisterAllTools()
+
 		params := &config.ConfigParameters{
 			Model: loadedSettings.Model,
-			ToolRegistry: cfg.GetToolRegistry(), // Use the global tool registry
+			ToolRegistry: toolRegistry, // Use the initialized tool registry
 		}
 
 		appConfig := config.NewConfig(params)
 
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executorFactory := core.NewExecutorFactory()
+		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			fmt.Printf("Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
 		// If no question is provided, launch interactive UI
 		if len(args) == 0 {
-			p := tea.NewProgram(ui.NewGrepCodeModel(geminiClient))
+			p := tea.NewProgram(ui.NewGrepCodeModel(executor))
 			if _, err := p.Run(); err != nil {
 				fmt.Printf("Error running interactive grep-code: %v\n", err)
 				os.Exit(1)
@@ -78,7 +89,7 @@ Search Results:
 		
 		finalPrompt := fmt.Sprintf(promptTemplate, pattern, grepOutput)
 
-		resp, err := geminiClient.GenerateContent(core.NewUserContent(finalPrompt))
+		resp, err := executor.GenerateContent(core.NewUserContent(finalPrompt))
 		if err != nil {
 			fmt.Printf("Error generating content: %v\n", err)
 			os.Exit(1)

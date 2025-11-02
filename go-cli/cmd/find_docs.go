@@ -16,6 +16,12 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+
+func init() {
+	rootCmd.AddCommand(findDocsCmd)
+	findDocsCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
+}
+
 var findDocsCmd = &cobra.Command{
 	Use:   "find-docs [question]",
 	Short: "Find relevant documentation and output GitHub URLs.",
@@ -41,15 +47,16 @@ This command uses AI to search for documentation files related to your question 
 		}
 		appConfig := config.NewConfig(params)
 
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executorFactory := core.NewExecutorFactory()
+		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			fmt.Printf("Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
 		// If no question is provided, launch interactive UI
 		if len(args) == 0 {
-			p := tea.NewProgram(ui.NewFindDocsModel(geminiClient))
+			p := tea.NewProgram(ui.NewFindDocsModel(executor))
 			if _, err := p.Run(); err != nil {
 				fmt.Printf("Error running interactive find-docs: %v\n", err)
 				os.Exit(1)
@@ -91,7 +98,7 @@ Your task is to find documentation files relevant to the user's question within 
 
 		// Main loop for tool calling
 		for {
-			resp, err := geminiClient.GenerateContent(contents...)
+			resp, err := executor.GenerateContent(contents...)
 			if err != nil {
 				fmt.Printf("Error generating content: %v\n", err)
 				os.Exit(1)
@@ -123,7 +130,7 @@ Your task is to find documentation files relevant to the user's question within 
 				// Execute tool calls
 				var toolResponses []genai.Part
 				for _, fc := range toolCalls {
-					toolResult, err := geminiClient.ExecuteTool(fc)
+					toolResult, err := executor.ExecuteTool(fc)
 					if err != nil {
 						fmt.Printf("Error executing tool %s: %v\n", fc.Name, err)
 						os.Exit(1)
@@ -140,8 +147,4 @@ Your task is to find documentation files relevant to the user's question within 
 			}
 		}
 	},
-}
-
-func init() {
-	rootCmd.AddCommand(findDocsCmd)
 }

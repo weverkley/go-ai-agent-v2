@@ -16,6 +16,12 @@ import (
 	"github.com/charmbracelet/bubbletea"
 )
 
+
+func init() {
+	rootCmd.AddCommand(prReviewCmd)
+	prReviewCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
+}
+
 var prReviewCmd = &cobra.Command{
 	Use:   "pr-review [pr_identifier]",
 	Short: "Review a specific pull request",
@@ -40,15 +46,16 @@ It evaluates code quality, adherence to standards, and readiness for merging, pr
 		}
 		appConfig := config.NewConfig(params)
 
-		geminiClient, err := core.NewGeminiChat(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executorFactory := core.NewExecutorFactory()
+		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error initializing GeminiChat: %v\n", err)
+			fmt.Printf("Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
 		// If no question is provided, launch interactive UI
 		if len(args) == 0 {
-			p := tea.NewProgram(ui.NewPrReviewModel(geminiClient))
+			p := tea.NewProgram(ui.NewPrReviewModel(executor))
 			if _, err := p.Run(); err != nil {
 				fmt.Printf("Error running interactive pr-review: %v\n", err)
 				os.Exit(1)
@@ -97,7 +104,7 @@ Your task is to conduct a comprehensive review of the pull request identified by
 
 		// Main loop for tool calling
 		for {
-			resp, err := geminiClient.GenerateContent(contents...)
+			resp, err := executor.GenerateContent(contents...)
 			if err != nil {
 				fmt.Printf("Error generating content: %v\n", err)
 				os.Exit(1)
@@ -129,7 +136,7 @@ Your task is to conduct a comprehensive review of the pull request identified by
 				// Execute tool calls
 				var toolResponses []genai.Part
 				for _, fc := range toolCalls {
-					toolResult, err := geminiClient.ExecuteTool(fc)
+					toolResult, err := executor.ExecuteTool(fc)
 					if err != nil {
 						fmt.Printf("Error executing tool %s: %v\n", fc.Name, err)
 						os.Exit(1)
