@@ -165,13 +165,16 @@ The migration will proceed iteratively, focusing on one command or core function
     *   This would involve implementing the `tools` package in Go to register and execute these services as AI tools.
     *   **`find-docs`**: Tool integration complete.
     *   **`pr_review`**: Tool integration for `pr_review` verified through code review. The `promptTemplate` in `cmd/pr_review.go` outlines the tools to be used (`checkout_branch`, `execute_command`, `list_directory`, `read_file`, `pull`).
-5.  **Error Handling and User Feedback**:
+5.  **Implement Mock Executor and Executor Factory**:
+    *   **Mock Executor**: Create a mock implementation of the `ContentGenerator` interface (or a similar interface that the `GeminiChat` implements) that can simulate responses, including tool calls and their results, without making actual API calls. This will be crucial for comprehensive testing of the entire application flow, especially given Gemini API quota limitations.
+    *   **Executor Factory**: Design and implement a factory pattern to create and manage different AI executors (e.g., Gemini, OpenAI, Mock). This will allow the application to dynamically select which executor to use based on configuration or command-line flags, making the application generic and extensible for future AI models.
+6.  **Error Handling and User Feedback**:
     *   Improve error handling across all commands, providing more user-friendly messages.
     *   Implement a consistent way to provide feedback to the user, especially for long-running operations.
-6.  **Testing**:
+7.  **Testing**:
     *   Implement comprehensive unit and integration tests for all newly added commands and UI components.
     *   Address the environmental issue encountered during `extensions` testing (permission denied when creating `.gemini/extensions` directory). This might involve adjusting default paths or providing clearer instructions for setting up the environment.
-7.  **Remaining JavaScript CLI Commands** (if any):
+8.  **Remaining JavaScript CLI Commands** (if any):
     *   Review any remaining JavaScript CLI commands or features that have not yet been migrated to Go. (Based on current analysis, all explicit commands have been addressed, but a deeper dive might reveal more subtle features).
 
 ## 9. Git Instructions based on conventional commit convention
