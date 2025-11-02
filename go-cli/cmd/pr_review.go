@@ -9,6 +9,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
+	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
@@ -30,9 +31,12 @@ It evaluates code quality, adherence to standards, and readiness for merging, pr
 		}
 		loadedSettings := config.LoadSettings(workspaceDir)
 
+		// Initialize the ToolRegistry
+		toolRegistry := tools.RegisterAllTools()
+
 		params := &config.ConfigParameters{
 			Model: loadedSettings.Model,
-			ToolRegistry: cfg.GetToolRegistry(), // Use the global tool registry
+			ToolRegistry: toolRegistry, // Use the initialized tool registry
 		}
 		appConfig := config.NewConfig(params)
 

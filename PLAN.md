@@ -81,6 +81,8 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`cmd/generate.go` and `pkg/ui/generate_ui.go` type mismatch**: Corrected `ui.NewGenerateModel` to accept `*core.GeminiChat` and updated `cmd/generate.go` to pass the `geminiClient` correctly. Removed unused imports from `pkg/ui/generate_ui.go`.
 - **Telemetry Logging**: Implemented basic telemetry logging with file output and global logger initialization.
 - **`pkg/extension/manager.go`**: Corrected `fsService` type from `*services.FileSystemService` to `services.FileSystemService`.
+- **`cmd/find_docs.go`**: Corrected ToolRegistry initialization.
+- **`cmd/pr_review.go`**: Corrected ToolRegistry initialization and syntax error.
 
 ### Remaining Issues:
 
@@ -161,7 +163,7 @@ The migration will proceed iteratively, focusing on one command or core function
     *   For commands like `find-docs` and `pr-review`, integrate actual tool-calling capabilities. This would allow the AI to dynamically use `GitService`, `FileSystemService`, and `ShellExecutionService` to gather information or perform actions, rather than relying solely on pre-constructed prompts.
     *   This would involve implementing the `tools` package in Go to register and execute these services as AI tools.
     *   **`find-docs`**: Tool integration complete.
-    *   **`pr-review`**: Tool integration complete.
+    *   **`pr_review`**: Tool integration for `pr_review` needs to be verified after fixing the syntax. The `promptTemplate` in `cmd/pr_review.go` already outlines the tools to be used (`checkout_branch`, `execute_command`, `list_directory`, `read_file`, `pull`).
 5.  **Error Handling and User Feedback**:
     *   Improve error handling across all commands, providing more user-friendly messages.
     *   Implement a consistent way to provide feedback to the user, especially for long-running operations.
