@@ -48,7 +48,7 @@ The foundational structure for the Go CLI has been established, and several core
   - `pkg/services/shell_service.go`: **Functional**, provides `ExecuteCommand` for shell operations.
   - `pkg/services/file_system_service.go`: **Functional**, provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, `WriteFile`, `ReadFile`, `CreateDirectory`, `CopyDirectory`.
   - `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories. Now includes `GetRemoteURL`, `CheckoutBranch`, `Pull`, and `DeleteBranch` methods.
-  - `pkg/extension/manager.go`: **Partially Implemented**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, `EnableExtension` and `DisableExtension` are implemented.
+  - `pkg/extension/manager.go`: **Functional**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, `EnableExtension` and `DisableExtension` are implemented. The `fsService` type issue has been resolved.
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
   - `pkg/config/config.go`: **Consolidated and Functional**. Now contains `SettingScope`, `Settings`, `LoadSettings`, `Config` struct, and related methods. `Config` struct now has an exported `Model` field, and `NewConfig` and `GetModel()` methods are adjusted accordingly.
   - `pkg/mcp/client.go`: **Functional** (renamed `Client` to `McpClient`). Simulates MCP connection.
@@ -80,10 +80,11 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **Duplicate definitions in `pkg/config`**: Consolidated `SettingScope`, `Settings`, and `LoadSettings` into `pkg/config/config.go` and deleted `pkg/config/settings.go`.
 - **`cmd/generate.go` and `pkg/ui/generate_ui.go` type mismatch**: Corrected `ui.NewGenerateModel` to accept `*core.GeminiChat` and updated `cmd/generate.go` to pass the `geminiClient` correctly. Removed unused imports from `pkg/ui/generate_ui.go`.
 - **Telemetry Logging**: Implemented basic telemetry logging with file output and global logger initialization.
+- **`pkg/extension/manager.go`**: Corrected `fsService` type from `*services.FileSystemService` to `services.FileSystemService`.
 
 ### Remaining Issues:
 
-- None. All `golangci-lint` issues are resolved.
+- None.
 
 ## 3. Command Implementation Strategy (Overview)
 
@@ -96,7 +97,7 @@ Translate the logic from the JavaScript files below. Each command needs argument
 - `install.ts`: **Functional**. Implemented with `force` flag support. Core logic in `pkg/extension/manager.go` handles git clone/pull and local copy/overwrite. Argument parsing in `main.go` is ready.
 - `list.ts`: **Functional**.
 - `new.ts`: **Functional`.
-- `enable.ts`: **Functional**. 
+- `enable.ts`: **Functional**.
 - `disable.ts`: **Functional`.
 - `uninstall`: **Functional** (with linked extension support).
 - `update.ts`: **Functional**.

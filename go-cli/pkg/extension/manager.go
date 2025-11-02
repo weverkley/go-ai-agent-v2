@@ -35,7 +35,7 @@ type ExtensionConfig struct {
 type ExtensionManager struct {
 	workspaceDir string
 	settings     *configPkg.Settings
-	fsService    *services.FileSystemService // Add FileSystemService dependency
+	fsService    services.FileSystemService // Add FileSystemService dependency
 	gitService   *services.GitService        // Add GitService dependency
 	// Add other dependencies like consent handlers
 }
