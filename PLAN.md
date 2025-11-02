@@ -62,7 +62,7 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 ### Resolved Issues:
 
 - **`pkg/core/agents/types.go`**: Removed redundant `AgentTerminateMode` definition.
-- **`pkg/core/agents/subagent_tool_wrapper.go`**: Corrected access to `MessageBus` and updated references to `types.BaseDeclarativeTool`, `types.NewBaseDeclarativeTool`, `types.KindThink` (replaced with `types.KindOther`), and `types.ToolInvocation`.
+- **`pkg/core/agents/subagent_tool_wrapper.go`**: Corrected access to `MessageBus` and updated references to `types.BaseDeclarativeTool`, `types.NewBaseDeclarativeTool`, `types.KindThink` (replaced with `types.KindOther`), and `types.ToolInvocation`.-
 - **`cmd/generate.go`**: Converted `[]genai.Content{}` to `[]*genai.Content{}`.
 - **`cmd/list-models.go`**: Added `genai` import and provided correct arguments to `core.NewGeminiChat`.
 - **Import Cycles**: Fully resolved by moving `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool`, `ToolRegistry`, and `TelemetrySettings` to `pkg/types/types.go`, and removing `pkg/tools/tool_registry.go`.
@@ -150,23 +150,25 @@ The migration will proceed iteratively, focusing on one command or core function
 
 ## 8. Next Steps
 
-1.  **Enhance Interactive UI**:
+1.  **Review of Go Port and Tool-Calling Mechanism**: Delve into `pkg/core/gemini.go` and `pkg/core/agents` to understand how prompts are structured, how tool calls are generated, and how they are executed. This is crucial for validating the AI's ability to understand and execute tools based on structured prompts.
+2.  **End-to-End Testing for AI Commands**: Run end-to-end tests for commands that involve AI and tool-calling (e.g., `generate`, `find-docs`, `pr-review`) to observe the actual JSON output and tool execution, ensuring the Go port behaves identically to the JavaScript version.
+3.  **Enhance Interactive UI**:
     *   Expand the interactive UI to other commands where user interaction would be beneficial (e.g., `code-guide`, `find-docs`).
     *   Improve the UI/UX of the interactive components (e.g., better loading indicators, error displays, input validation).
     *   **`generate`**: Interactive UI complete.
     *   **`find-docs`**: Interactive UI complete.
-2.  **Tool Integration for AI Commands**:
+4.  **Tool Integration for AI Commands**:
     *   For commands like `find-docs` and `pr-review`, integrate actual tool-calling capabilities. This would allow the AI to dynamically use `GitService`, `FileSystemService`, and `ShellExecutionService` to gather information or perform actions, rather than relying solely on pre-constructed prompts.
     *   This would involve implementing the `tools` package in Go to register and execute these services as AI tools.
     *   **`find-docs`**: Tool integration complete.
     *   **`pr-review`**: Tool integration complete.
-3.  **Error Handling and User Feedback**:
+5.  **Error Handling and User Feedback**:
     *   Improve error handling across all commands, providing more user-friendly messages.
     *   Implement a consistent way to provide feedback to the user, especially for long-running operations.
-4.  **Testing**:
+6.  **Testing**:
     *   Implement comprehensive unit and integration tests for all newly added commands and UI components.
     *   Address the environmental issue encountered during `extensions` testing (permission denied when creating `.gemini/extensions` directory). This might involve adjusting default paths or providing clearer instructions for setting up the environment.
-5.  **Remaining JavaScript CLI Commands** (if any):
+7.  **Remaining JavaScript CLI Commands** (if any):
     *   Review any remaining JavaScript CLI commands or features that have not yet been migrated to Go. (Based on current analysis, all explicit commands have been addressed, but a deeper dive might reveal more subtle features).
 
 ## 9. Git Instructions based on conventional commit convention
