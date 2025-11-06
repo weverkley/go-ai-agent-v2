@@ -213,3 +213,16 @@ func (gc *GeminiChat) ListModels() ([]string, error) {
 	}
 	return modelNames, nil
 }
+
+// GetHistory returns the current chat history.
+func (gc *GeminiChat) GetHistory() ([]*genai.Content, error) {
+	// For now, return the initial history. A more complete implementation
+	// would track the full conversation history.
+	return gc.startHistory, nil
+}
+
+// SetHistory sets the chat history.
+func (gc *GeminiChat) SetHistory(history []*genai.Content) error {
+	gc.startHistory = history
+	return nil
+}

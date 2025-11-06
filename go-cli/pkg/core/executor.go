@@ -12,4 +12,6 @@ type Executor interface {
 	ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error)
 	SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
 	ListModels() ([]string, error)
+	GetHistory() ([]*genai.Content, error)
+	SetHistory(history []*genai.Content) error
 }

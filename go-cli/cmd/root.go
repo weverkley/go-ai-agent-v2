@@ -5,8 +5,11 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
+
+	"github.com/google/generative-ai-go/genai"
 
 	"github.com/spf13/cobra"
 )
@@ -28,6 +31,7 @@ var rootCmd = &cobra.Command{
 
 var cfg *config.Config
 var executorType string
+var executor core.Executor // Declare package-level executor
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -60,22 +64,15 @@ func init() {
 	// Initialize the global telemetry logger
 	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(params.Telemetry)
 
-	rootCmd.AddCommand(generateCmd)
-	rootCmd.AddCommand(readCmd)
-	rootCmd.AddCommand(writeCmd)
-	rootCmd.AddCommand(execCmd)
-	rootCmd.AddCommand(lsCmd)
-	rootCmd.AddCommand(gitBranchCmd)
-	rootCmd.AddCommand(extensionsCmd)
-	rootCmd.AddCommand(mcpCmd)
-	rootCmd.AddCommand(listModelsCmd)
-	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(globCmd)
-	rootCmd.AddCommand(grepCmd)
-	rootCmd.AddCommand(webFetchCmd)
-	rootCmd.AddCommand(memoryCmd)
-	rootCmd.AddCommand(webSearchCmd)
-	rootCmd.AddCommand(readManyFilesCmd)
-	rootCmd.AddCommand(readFileCmd)
-	rootCmd.AddCommand(todosCmd)
+	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		// Initialize the executor here so it's available to all subcommands
+		executorFactory := core.NewExecutorFactory()
+		var err error
+		executor, err = executorFactory.CreateExecutor(executorType, cfg, types.GenerateContentConfig{}, []*genai.Content{})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
+			os.Exit(1)
+		}
+	}
 }
+

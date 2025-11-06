@@ -17,6 +17,9 @@ type MockExecutor struct {
 	ListModelsFunc              func() ([]string, error)
 	DefaultGenerateContentResponse *genai.GenerateContentResponse // New field for configurable default response
 	DefaultExecuteToolResult    *types.ToolResult              // New field for configurable default tool execution result
+	GetHistoryFunc              func() ([]*genai.Content, error) // New field for configurable mock history
+	SetHistoryFunc              func(history []*genai.Content) error
+	mockHistory                 []*genai.Content // Field to store mock history
 }
 
 // NewMockExecutor creates a new MockExecutor instance.
@@ -86,6 +89,13 @@ func NewMockExecutor(defaultResponse *genai.GenerateContentResponse, defaultTool
 	me.ListModelsFunc = func() ([]string, error) {
 			return []string{"mock-model-1", "mock-model-2"}, nil
 		}
+	me.GetHistoryFunc = func() ([]*genai.Content, error) {
+			return me.mockHistory, nil
+		}
+	me.SetHistoryFunc = func(history []*genai.Content) error {
+			me.mockHistory = history
+			return nil
+		}
 	return me
 }
 
@@ -107,4 +117,14 @@ func (me *MockExecutor) SendMessageStream(modelName string, messageParams types.
 // ListModels implements the Executor interface.
 func (me *MockExecutor) ListModels() ([]string, error) {
 	return me.ListModelsFunc()
+}
+
+// GetHistory implements the Executor interface.
+func (me *MockExecutor) GetHistory() ([]*genai.Content, error) {
+	return me.GetHistoryFunc()
+}
+
+// SetHistory implements the Executor interface.
+func (me *MockExecutor) SetHistory(history []*genai.Content) error {
+	return me.SetHistoryFunc(history)
 }
