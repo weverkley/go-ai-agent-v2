@@ -135,7 +135,7 @@ MainLoop:
 }
 
 // createChatObject initializes a GeminiChat instance for the agent run.
-func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (*core.GeminiChat, error) {
+func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, error) {
 	promptConfig := ae.Definition.PromptConfig
 	modelConfig := ae.Definition.ModelConfig
 
@@ -296,7 +296,7 @@ func (ae *AgentExecutor) checkTermination(startTime time.Time, turnCounter int) 
 
 // callModel calls the generative model with the current context and tools.
 func (ae *AgentExecutor) callModel(
-	chat *core.GeminiChat,
+	chat core.Executor,
 	message *genai.Content,
 	tools []*genai.FunctionDeclaration,
 	ctx context.Context,

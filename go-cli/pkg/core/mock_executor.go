@@ -11,16 +11,24 @@ import (
 
 // MockExecutor is a mock implementation of the Executor interface for testing.
 type MockExecutor struct {
-	GenerateContentFunc func(contents ...*genai.Content) (*genai.GenerateContentResponse, error)
-	ExecuteToolFunc     func(fc *genai.FunctionCall) (types.ToolResult, error)
-	SendMessageStreamFunc func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
-	ListModelsFunc      func() ([]string, error)
+	GenerateContentFunc         func(contents ...*genai.Content) (*genai.GenerateContentResponse, error)
+	ExecuteToolFunc             func(fc *genai.FunctionCall) (types.ToolResult, error)
+	SendMessageStreamFunc       func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
+	ListModelsFunc              func() ([]string, error)
+	DefaultGenerateContentResponse *genai.GenerateContentResponse // New field for configurable default response
+	DefaultExecuteToolResult    *types.ToolResult              // New field for configurable default tool execution result
 }
 
 // NewMockExecutor creates a new MockExecutor instance.
-func NewMockExecutor() *MockExecutor {
-	return &MockExecutor{
-		GenerateContentFunc: func(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+func NewMockExecutor(defaultResponse *genai.GenerateContentResponse, defaultToolResult *types.ToolResult) *MockExecutor {
+	me := &MockExecutor{
+		DefaultGenerateContentResponse: defaultResponse,
+		DefaultExecuteToolResult:    defaultToolResult,
+	}
+	me.GenerateContentFunc = func(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+			if me.DefaultGenerateContentResponse != nil {
+				return me.DefaultGenerateContentResponse, nil
+			}
 			// Default mock implementation: return a dummy response
 			return &genai.GenerateContentResponse{
 				Candidates: []*genai.Candidate{
@@ -31,51 +39,54 @@ func NewMockExecutor() *MockExecutor {
 					},
 				},
 			}, nil
-		},
-		ExecuteToolFunc: func(fc *genai.FunctionCall) (types.ToolResult, error) {
-			// Default mock implementation: return a dummy tool result
+		}
+	me.ExecuteToolFunc = func(fc *genai.FunctionCall) (types.ToolResult, error) {
+			if me.DefaultExecuteToolResult != nil {
+				return *me.DefaultExecuteToolResult, nil
+			}
+			// Default mock implementation: return a generic success
 			return types.ToolResult{
 				LLMContent:    fmt.Sprintf("Mocked result for tool %s with args %v", fc.Name, fc.Args),
 				ReturnDisplay: fmt.Sprintf("Mocked result for tool %s with args %v", fc.Name, fc.Args),
 			}, nil
-		},
-		SendMessageStreamFunc: func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
-			respChan := make(chan types.StreamResponse)
-			go func() {
-				defer close(respChan)
-				// Simulate a streamed response
-				respChan <- types.StreamResponse{
-					Type: types.StreamEventTypeChunk,
-					Value: &genai.GenerateContentResponse{
-						Candidates: []*genai.Candidate{
-							{
-								Content: &genai.Content{
-									Parts: []genai.Part{genai.Text("Mocked streamed response chunk 1.")},
+		}
+			me.SendMessageStreamFunc = func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
+					respChan := make(chan types.StreamResponse)
+					go func() {
+						defer close(respChan)
+						// Simulate a streamed response
+						respChan <- types.StreamResponse{
+							Type: types.StreamEventTypeChunk,
+							Value: &genai.GenerateContentResponse{
+								Candidates: []*genai.Candidate{
+									{
+										Content: &genai.Content{
+											Parts: []genai.Part{genai.Text("Mocked streamed response chunk 1.")},
+										},
+									},
 								},
 							},
-						},
-					},
-				}
-				time.Sleep(50 * time.Millisecond)
-				respChan <- types.StreamResponse{
-					Type: types.StreamEventTypeChunk,
-					Value: &genai.GenerateContentResponse{
-						Candidates: []*genai.Candidate{
-							{
-								Content: &genai.Content{
-									Parts: []genai.Part{genai.Text("Mocked streamed response chunk 2.")},
+						}
+						time.Sleep(50 * time.Millisecond)
+						respChan <- types.StreamResponse{
+							Type: types.StreamEventTypeChunk,
+							Value: &genai.GenerateContentResponse{
+								Candidates: []*genai.Candidate{
+									{
+										Content: &genai.Content{
+											Parts: []genai.Part{genai.Text("Mocked streamed response chunk 2.")},
+										},
+									},
 								},
 							},
-						},
-					},
+						}
+					}()
+					return respChan, nil
 				}
-			}()
-			return respChan, nil
-		},
-		ListModelsFunc: func() ([]string, error) {
+	me.ListModelsFunc = func() ([]string, error) {
 			return []string{"mock-model-1", "mock-model-2"}, nil
-		},
-	}
+		}
+	return me
 }
 
 // GenerateContent implements the Executor interface.

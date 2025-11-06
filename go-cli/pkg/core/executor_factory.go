@@ -23,7 +23,7 @@ func (ef *ExecutorFactory) CreateExecutor(executorType string, cfg *config.Confi
 	case "gemini":
 		return NewGeminiChat(cfg, generationConfig, startHistory)
 	case "mock":
-		return NewMockExecutor(), nil
+		return NewMockExecutor(nil, nil), nil
 	// case "openai":
 	// 	return NewOpenAIExecutor(cfg, generationConfig, startHistory)
 	default:
