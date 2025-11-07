@@ -12,7 +12,6 @@ var writeFilePath string
 var writeContent string
 
 func init() {
-	rootCmd.AddCommand(writeCmd)
 	writeCmd.Flags().StringVarP(&writeFilePath, "file", "f", "", "The path to the file to write")
 	writeCmd.Flags().StringVarP(&writeContent, "content", "c", "", "The content to write to the file")
 	_ = writeCmd.MarkFlagRequired("file")

@@ -13,14 +13,8 @@ import (
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 )
-
-
-func init() {
-	rootCmd.AddCommand(codeGuideCmd)
-	codeGuideCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
-}
 
 var codeGuideCmd = &cobra.Command{
 	Use:   "code-guide [question]",
@@ -55,7 +49,7 @@ It provides clear explanations grounded in the actual source code, including ful
 		executorFactory := core.NewExecutorFactory()
 		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error creating executor: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -112,7 +106,7 @@ Your primary task is to help a new engineer understand the Gemini CLI codebase. 
 
 		resp, err := executor.GenerateContent(core.NewUserContent(finalPrompt))
 		if err != nil {
-			fmt.Printf("Error generating content: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error generating content: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -129,5 +123,5 @@ Your primary task is to help a new engineer understand the Gemini CLI codebase. 
 }
 
 func init() {
-	rootCmd.AddCommand(codeGuideCmd)
+	codeGuideCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }

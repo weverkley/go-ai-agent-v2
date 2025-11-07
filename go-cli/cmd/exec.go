@@ -12,7 +12,6 @@ var execCommand string
 var execWorkingDir string
 
 func init() {
-	rootCmd.AddCommand(execCmd)
 	execCmd.Flags().StringVarP(&execCommand, "command", "c", "", "The shell command to execute")
 	execCmd.Flags().StringVarP(&execWorkingDir, "path", "p", ".", "The working directory for the command")
 	_ = execCmd.MarkFlagRequired("command")

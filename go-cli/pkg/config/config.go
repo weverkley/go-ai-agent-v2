@@ -237,8 +237,37 @@ func (c *Config) GetTelemetryLogger() telemetry.TelemetryLogger {
 	return c.telemetryLogger
 }
 
+// Get returns the value of a configuration setting by key.
+func (c *Config) Get(key string) (interface{}, bool) {
+	switch key {
+	case "model":
+		return c.Model, true
+	case "debugMode":
+		return c.debugMode, true
+	case "sessionID":
+		return c.sessionID, true
+	case "embeddingModel":
+		return c.embeddingModel, true
+	case "targetDir":
+		return c.targetDir, true
+	case "approvalMode":
+		return c.approvalMode, true
+	case "toolDiscoveryCommand":
+		return c.toolDiscoveryCommand, true
+	case "toolCallCommand":
+		return c.toolCallCommand, true
+	case "telemetryEnabled":
+		if c.telemetry != nil {
+			return c.telemetry.Enabled, true
+		}
+		return false, true // Default to false if telemetry settings are nil
+	// Add more cases for other settings as needed
+	default:
+		return nil, false
+	}
+}
+
 // GetWorkspaceContext returns the workspace context.
-// This is a placeholder and should be replaced with a proper implementation.
 func (c *Config) GetWorkspaceContext() WorkspaceContext {
 	// For now, return a dummy implementation.
 	return &dummyWorkspaceContext{}

@@ -18,7 +18,6 @@ import (
 
 
 func init() {
-	rootCmd.AddCommand(findDocsCmd)
 	findDocsCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }
 

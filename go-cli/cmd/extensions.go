@@ -2,397 +2,54 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/commands"
-	"go-ai-agent-v2/go-cli/pkg/extension"
 	"github.com/spf13/cobra"
 )
 
-var (
-
-	extensionsInstallSource      string
-
-	extensionsInstallRef         string
-
-	extensionsInstallAutoUpdate  bool
-
-	extensionsInstallAllowPreRelease bool
-
-	extensionsInstallConsent     bool
-	extensionsInstallForce       bool
-
-	extensionsUninstallName    string
-
-	extensionsNewPath          string
-
-	extensionsNewTemplate      string
-
-	extensionsEnableName        string
-
-	extensionsEnableScope       string
-
-	extensionsDisableName       string
-
-	extensionsDisableScope      string
-
-	extensionsUpdateName        string
-
-	extensionsUpdateAll         bool
-
-	extensionsLinkPath          string
-
-)
-
-
+// extensionsCmd represents the extensions command group
+var extensionsCmd = &cobra.Command{
+	Use:   "extensions",
+	Short: "Manage CLI extensions",
+	Long:  `The extensions command group allows you to list, enable, and disable CLI extensions.`, //nolint:staticcheck
+	Run: func(cmd *cobra.Command, args []string) {
+		// If no subcommand is provided, print help
+		cmd.Help()
+	},
+}
 
 func init() {
-
-	rootCmd.AddCommand(extensionsCmd)
-
-
-
 	extensionsCmd.AddCommand(extensionsListCmd)
-
-
-
-	extensionsCmd.AddCommand(extensionsInstallCmd)
-
-	extensionsInstallCmd.Flags().StringVar(&extensionsInstallSource, "source", "", "The git URL or local path of the extension to install.")
-
-	extensionsInstallCmd.Flags().StringVar(&extensionsInstallRef, "ref", "", "The git ref to install from.")
-
-	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallAutoUpdate, "auto-update", false, "Enable auto-update for this extension.")
-
-	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallAllowPreRelease, "pre-release", false, "Enable pre-release versions for this extension.")
-
-	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallConsent, "consent", false, "Acknowledge security risks and skip confirmation prompt.")
-	extensionsInstallCmd.Flags().BoolVar(&extensionsInstallForce, "force", false, "Force overwrite of existing extension.")
-
-	_ = extensionsInstallCmd.MarkFlagRequired("source")
-
-
-
-	extensionsCmd.AddCommand(extensionsUninstallCmd)
-
-	extensionsUninstallCmd.Flags().StringVar(&extensionsUninstallName, "name", "", "The name of the extension to uninstall.")
-
-	_ = extensionsUninstallCmd.MarkFlagRequired("name")
-
-
-
-	extensionsCmd.AddCommand(extensionsNewCmd)
-
-	extensionsNewCmd.Flags().StringVar(&extensionsNewPath, "path", "", "The path to create the extension in.")
-
-	extensionsNewCmd.Flags().StringVar(&extensionsNewTemplate, "template", "", "The boilerplate template to use.")
-
-	_ = extensionsNewCmd.MarkFlagRequired("path")
-
-
-
 	extensionsCmd.AddCommand(extensionsEnableCmd)
-
-	extensionsEnableCmd.Flags().StringVar(&extensionsEnableName, "name", "", "The name of the extension to enable.")
-
-	extensionsEnableCmd.Flags().StringVar(&extensionsEnableScope, "scope", "", "The scope to enable the extension in.")
-
-	_ = extensionsEnableCmd.MarkFlagRequired("name")
-
-
-
 	extensionsCmd.AddCommand(extensionsDisableCmd)
-
-	extensionsDisableCmd.Flags().StringVar(&extensionsDisableName, "name", "", "The name of the extension to disable.")
-
-	extensionsDisableCmd.Flags().StringVar(&extensionsDisableScope, "scope", "", "The scope to disable the extension in.")
-
-	_ = extensionsDisableCmd.MarkFlagRequired("name")
-
-
-
-	extensionsCmd.AddCommand(extensionsUpdateCmd)
-
-	extensionsUpdateCmd.Flags().StringVar(&extensionsUpdateName, "name", "", "The name of the extension to update.")
-
-	extensionsUpdateCmd.Flags().BoolVar(&extensionsUpdateAll, "all", false, "Update all extensions.")
-
-	extensionsUpdateCmd.MarkFlagsMutuallyExclusive("name", "all")
-
-
-
-	extensionsCmd.AddCommand(extensionsLinkCmd)
-
-	extensionsLinkCmd.Flags().StringVar(&extensionsLinkPath, "path", "", "The path to the local extension to link.")
-
-	_ = extensionsLinkCmd.MarkFlagRequired("path")
-
 }
-
-
-
-var extensionsCmd = &cobra.Command{
-
-	Use:   "extensions",
-
-	Short: "Manage extensions",
-
-	Long:  `Manage extensions for the Go Gemini CLI.`,
-
-}
-
-
 
 var extensionsListCmd = &cobra.Command{
-
 	Use:   "list",
-
-	Short: "List installed extensions",
-
+	Short: "List all available extensions",
 	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.ListExtensions()
-
-		if err != nil {
-
-			fmt.Printf("Error listing extensions: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
+		// TODO: Implement actual listing of extensions.
+		fmt.Println("Listing all extensions (not yet implemented).")
 	},
-
 }
-
-
-
-var extensionsInstallCmd = &cobra.Command{
-
-	Use:   "install",
-
-	Short: "Install an extension",
-
-	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.Install(extension.InstallArgs{
-
-			Source:          extensionsInstallSource,
-
-			Ref:             extensionsInstallRef,
-
-			AutoUpdate:      extensionsInstallAutoUpdate,
-
-						AllowPreRelease: extensionsInstallAllowPreRelease,
-
-						Consent:         extensionsInstallConsent,
-
-						Force:           extensionsInstallForce,
-
-					})
-
-		if err != nil {
-
-			fmt.Printf("Error installing extension: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
-	},
-
-}
-
-
-
-var extensionsUninstallCmd = &cobra.Command{
-
-	Use:   "uninstall",
-
-	Short: "Uninstall an extension",
-
-	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.Uninstall(extensionsUninstallName)
-
-		if err != nil {
-
-			fmt.Printf("Error uninstalling extension: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
-	},
-
-}
-
-
-
-var extensionsNewCmd = &cobra.Command{
-
-	Use:   "new",
-
-	Short: "Create a new extension",
-
-	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.New(extension.NewArgs{
-
-			Path:     extensionsNewPath,
-
-			Template: extensionsNewTemplate,
-
-		})
-
-		if err != nil {
-
-			fmt.Printf("Error creating new extension: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
-	},
-
-}
-
-
 
 var extensionsEnableCmd = &cobra.Command{
-
-	Use:   "enable",
-
-	Short: "Enable an extension",
-
+	Use:   "enable <extension_name>",
+	Short: "Enable a specific extension",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.Enable(extension.ExtensionScopeArgs{
-
-			Name:  extensionsEnableName,
-
-			Scope: extensionsEnableScope,
-
-		})
-
-		if err != nil {
-
-			fmt.Printf("Error enabling extension: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
+		extensionName := args[0]
+		// TODO: Implement actual enabling of extensions.
+		fmt.Printf("Enabling extension: '%s' (not yet implemented).\n", extensionName)
 	},
-
 }
-
-
 
 var extensionsDisableCmd = &cobra.Command{
-
-	Use:   "disable",
-
-	Short: "Disable an extension",
-
+	Use:   "disable <extension_name>",
+	Short: "Disable a specific extension",
+	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.Disable(extension.ExtensionScopeArgs{
-
-			Name:  extensionsDisableName,
-
-			Scope: extensionsDisableScope,
-
-		})
-
-		if err != nil {
-
-			fmt.Printf("Error disabling extension: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
+		extensionName := args[0]
+		// TODO: Implement actual disabling of extensions.
+		fmt.Printf("Disabling extension: '%s' (not yet implemented).\n", extensionName)
 	},
-
 }
-
-
-
-var extensionsUpdateCmd = &cobra.Command{
-
-	Use:   "update [<name>] [--all]",
-
-	Short: "Update an extension",
-
-	Long:  `Updates all extensions or a named extension to the latest version.`,
-
-	PreRunE: func(cmd *cobra.Command, args []string) error {
-
-		if extensionsUpdateName == "" && !extensionsUpdateAll {
-
-			return fmt.Errorf("either an extension name or --all must be provided")
-
-		}
-
-		return nil
-
-	},
-
-		Run: func(cmd *cobra.Command, args []string) {
-
-			extensions := commands.NewExtensionsCommand()
-
-			err := extensions.Update(extensionsUpdateName, extensionsUpdateAll)
-
-			if err != nil {
-
-				fmt.Printf("Error updating extension: %v\n", err)
-
-				os.Exit(1)
-
-			}
-
-		},
-
-	}
-
-
-
-var extensionsLinkCmd = &cobra.Command{
-
-	Use:   "link",
-
-	Short: "Link a local extension",
-
-	Run: func(cmd *cobra.Command, args []string) {
-
-		extensions := commands.NewExtensionsCommand()
-
-		err := extensions.Link(extensionsLinkPath)
-
-		if err != nil {
-
-			fmt.Printf("Error linking extension: %v\n", err)
-
-			os.Exit(1)
-
-		}
-
-	},
-
-}
-
-

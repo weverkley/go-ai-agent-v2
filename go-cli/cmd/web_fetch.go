@@ -16,7 +16,6 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(webFetchCmd)
 	webFetchCmd.Flags().StringArrayVarP(&webFetchUrls, "url", "u", []string{}, "The URL(s) to fetch content from.")
 	webFetchCmd.Flags().BoolVar(&webFetchSummarize, "summarize", false, "Whether to summarize the fetched content.")
 	webFetchCmd.Flags().BoolVar(&webFetchExtractKeyPoints, "extract-key-points", false, "Whether to extract key points from the fetched content.")

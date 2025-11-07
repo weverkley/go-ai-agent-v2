@@ -11,7 +11,6 @@ import (
 var gitBranchPath string
 
 func init() {
-	rootCmd.AddCommand(gitBranchCmd)
 	gitBranchCmd.Flags().StringVarP(&gitBranchPath, "path", "p", ".", "The path to the Git repository")
 }
 

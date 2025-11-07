@@ -15,7 +15,6 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(readFileCmd)
 	readFileCmd.Flags().StringVarP(&readFileAbsolutePath, "absolute-path", "a", "", "The absolute path to the file to read.")
 	readFileCmd.Flags().IntVar(&readFileOffset, "offset", 0, "Optional: For text files, the 0-based line number to start reading from.")
 	readFileCmd.Flags().IntVar(&readFileLimit, "limit", 0, "Optional: For text files, maximum number of lines to read.")

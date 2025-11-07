@@ -12,7 +12,6 @@ import (
 var lsPath string
 
 func init() {
-	rootCmd.AddCommand(lsCmd)
 	lsCmd.Flags().StringVarP(&lsPath, "path", "p", ".", "The path to the directory to list")
 }
 

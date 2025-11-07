@@ -17,7 +17,6 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(globCmd)
 	globCmd.Flags().StringVarP(&globPattern, "pattern", "p", "", "The glob pattern to match against.")
 	globCmd.Flags().StringVar(&globPath, "path", ".", "The absolute path to the directory to search within.")
 	globCmd.Flags().BoolVar(&globCaseSensitive, "case-sensitive", false, "Whether the search should be case-sensitive.")

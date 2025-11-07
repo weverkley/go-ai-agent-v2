@@ -13,7 +13,6 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(webSearchCmd)
 	webSearchCmd.Flags().StringVarP(&webSearchQuery, "query", "q", "", "The search query to find information on the web.")
 	_ = webSearchCmd.MarkFlagRequired("query")
 }

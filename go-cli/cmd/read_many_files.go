@@ -19,7 +19,6 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(readManyFilesCmd)
 	readManyFilesCmd.Flags().StringArrayVarP(&readManyFilesPaths, "paths", "p", []string{}, "An array of file paths or directory paths to search within.")
 	readManyFilesCmd.Flags().StringArrayVar(&readManyFilesInclude, "include", []string{}, "Optional: Glob patterns for files to include.")
 	readManyFilesCmd.Flags().StringArrayVar(&readManyFilesExclude, "exclude", []string{}, "Optional: Glob patterns for files/directories to exclude.")

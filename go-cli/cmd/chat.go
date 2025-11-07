@@ -25,7 +25,6 @@ var chatCmd = &cobra.Command{
 
 func init() {
 	chatService = services.NewChatService(cfg) // cfg is from root.go
-	rootCmd.AddCommand(chatCmd)
 
 	// Add subcommands here
 	chatCmd.AddCommand(chatListCmd)

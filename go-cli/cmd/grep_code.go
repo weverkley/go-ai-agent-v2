@@ -17,12 +17,6 @@ import (
 	"github.com/charmbracelet/bubbletea"
 )
 
-
-func init() {
-	rootCmd.AddCommand(grepCodeCmd)
-	grepCodeCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
-}
-
 var grepCodeCmd = &cobra.Command{
 	Use:   "grep-code [pattern]",
 	Short: "Summarize findings for a given code pattern.",
@@ -50,7 +44,7 @@ var grepCodeCmd = &cobra.Command{
 		executorFactory := core.NewExecutorFactory()
 		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error creating executor: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -82,16 +76,13 @@ var grepCodeCmd = &cobra.Command{
 		}
 
 		// The prompt content from grep-code.toml
-		promptTemplate := `Please summarize the findings for the pattern %s.
-
-Search Results:
-%s`
+		promptTemplate := `Please summarize the findings for the pattern %s.\n\nSearch Results:\n%s`
 		
 		finalPrompt := fmt.Sprintf(promptTemplate, pattern, grepOutput)
 
 		resp, err := executor.GenerateContent(core.NewUserContent(finalPrompt))
 		if err != nil {
-			fmt.Printf("Error generating content: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error generating content: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -108,5 +99,5 @@ Search Results:
 }
 
 func init() {
-	rootCmd.AddCommand(grepCodeCmd)
+	grepCodeCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }

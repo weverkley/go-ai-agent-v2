@@ -68,5 +68,4 @@ var cleanupBackToMainCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(cleanupBackToMainCmd)
 }

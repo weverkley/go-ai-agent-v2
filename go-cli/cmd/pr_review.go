@@ -16,12 +16,6 @@ import (
 	"github.com/charmbracelet/bubbletea"
 )
 
-
-func init() {
-	rootCmd.AddCommand(prReviewCmd)
-	prReviewCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
-}
-
 var prReviewCmd = &cobra.Command{
 	Use:   "pr-review [pr_identifier]",
 	Short: "Review a specific pull request",
@@ -49,7 +43,7 @@ It evaluates code quality, adherence to standards, and readiness for merging, pr
 		executorFactory := core.NewExecutorFactory()
 		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
-			fmt.Printf("Error creating executor: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -106,7 +100,7 @@ Your task is to conduct a comprehensive review of the pull request identified by
 		for {
 			resp, err := executor.GenerateContent(contents...)
 			if err != nil {
-				fmt.Printf("Error generating content: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Error generating content: %v\n", err)
 				os.Exit(1)
 			}
 
@@ -138,7 +132,7 @@ Your task is to conduct a comprehensive review of the pull request identified by
 				for _, fc := range toolCalls {
 					toolResult, err := executor.ExecuteTool(fc)
 					if err != nil {
-						fmt.Printf("Error executing tool %s: %v\n", fc.Name, err)
+						fmt.Fprintf(os.Stderr, "Error executing tool %s: %v\n", fc.Name, err)
 						os.Exit(1)
 					}
 					toolResponses = append(toolResponses, core.NewFunctionResponsePart(fc.Name, toolResult.LLMContent))
@@ -156,5 +150,5 @@ Your task is to conduct a comprehensive review of the pull request identified by
 }
 
 func init() {
-	rootCmd.AddCommand(prReviewCmd)
+	prReviewCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }

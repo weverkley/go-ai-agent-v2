@@ -16,7 +16,6 @@ var (
 )
 
 func init() {
-	rootCmd.AddCommand(smartEditCmd)
 	smartEditCmd.Flags().StringVarP(&smartEditFilePath, "file-path", "f", "", "The absolute path to the file to modify.")
 	smartEditCmd.Flags().StringVarP(&smartEditInstruction, "instruction", "i", "", "A clear, semantic instruction for the code change.")
 	smartEditCmd.Flags().StringVarP(&smartEditOldString, "old-string", "o", "", "The exact literal text to replace.")

@@ -18,7 +18,6 @@ import (
 var promptName string
 
 func init() {
-	rootCmd.AddCommand(generateCmd)
 	generateCmd.Flags().StringVarP(&promptName, "prompt", "p", "default", "The name of the prompt to use for content generation")
 	generateCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }

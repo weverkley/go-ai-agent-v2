@@ -11,7 +11,6 @@ import (
 var readFilePath string
 
 func init() {
-	rootCmd.AddCommand(readCmd)
 	readCmd.Flags().StringVarP(&readFilePath, "file", "f", "", "The path to the file to read")
 	_ = readCmd.MarkFlagRequired("file")
 }
