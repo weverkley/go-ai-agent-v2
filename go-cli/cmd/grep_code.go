@@ -10,7 +10,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
-	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/tools" // Add back the import
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
@@ -23,19 +23,22 @@ var grepCodeCmd = &cobra.Command{
 	Long: `This command uses grep to search for a code pattern and then uses AI to summarize the findings.`, 
 	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
 	Run: func(cmd *cobra.Command, args []string) {
-		// Load the configuration within the command's Run function
-		workspaceDir, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error getting current working directory: %v\n", err)
-			os.Exit(1)
-		}
-		loadedSettings := config.LoadSettings(workspaceDir)
-
 		// Initialize the ToolRegistry
 		toolRegistry := tools.RegisterAllTools()
 
+		modelVal, ok := SettingsService.Get("model")
+		if !ok {
+			fmt.Printf("Error: 'model' setting not found.\n")
+			os.Exit(1)
+		}
+		model, ok := modelVal.(string)
+		if !ok {
+			fmt.Printf("Error: 'model' setting is not a string.\n")
+			os.Exit(1)
+		}
+
 		params := &config.ConfigParameters{
-			Model: loadedSettings.Model,
+			Model: model,
 			ToolRegistry: toolRegistry, // Use the initialized tool registry
 		}
 

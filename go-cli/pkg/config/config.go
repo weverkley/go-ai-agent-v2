@@ -1,10 +1,12 @@
 package config
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -18,124 +20,9 @@ const (
 	SettingScopeWorkspace SettingScope = "workspace"
 )
 
-const (
-	SettingsFileName = ".gemini/settings.json"
-)
-
-// Settings represents the application settings.
-type Settings struct {
-	ExtensionPaths []string                       `json:"extensionPaths"`
-	McpServers     map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
-	DebugMode      bool                           `json:"debugMode,omitempty"`
-	UserMemory     string                         `json:"userMemory,omitempty"`
-	ApprovalMode   types.ApprovalMode             `json:"approvalMode,omitempty"`
-	ShowMemoryUsage bool                          `json:"showMemoryUsage,omitempty"`
-	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
-	Model          string                         `json:"model,omitempty"`
-	Proxy          string                         `json:"proxy,omitempty"`
-	EnabledExtensions map[SettingScope][]string `json:"enabledExtensions,omitempty"`
-	ToolDiscoveryCommand string `json:"toolDiscoveryCommand,omitempty"`
-	ToolCallCommand      string `json:"toolCallCommand,omitempty"`
-}
-
-
-// LoadSettings loads the application settings from various sources.
-func LoadSettings(workspaceDir string) *Settings {
-	settingsPath := getSettingsPath(workspaceDir)
-	data, err := os.ReadFile(settingsPath)
-	if err != nil {
-		// Return default settings if file doesn't exist or can't be read
-		return &Settings{
-			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
-			McpServers:     make(map[string]types.MCPServerConfig),
-			DebugMode:      false,
-			UserMemory:     "",
-			ApprovalMode:   types.ApprovalModeDefault,
-			ShowMemoryUsage: false,
-			TelemetryEnabled: false,
-			Model:          "gemini-pro", // Default model
-			Proxy:          "",
-			EnabledExtensions: make(map[SettingScope][]string),
-			ToolDiscoveryCommand: "",
-			ToolCallCommand:      "",
-		}
-	}
-
-	var settings Settings
-	if err := json.Unmarshal(data, &settings); err != nil {
-		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
-		// Return default settings on parsing error
-		return &Settings{
-			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
-			McpServers:     make(map[string]types.MCPServerConfig),
-			DebugMode:      false,
-			UserMemory:     "",
-			ApprovalMode:   types.ApprovalModeDefault,
-			ShowMemoryUsage: false,
-			TelemetryEnabled: false,
-			Model:          "gemini-pro", // Default model
-			Proxy:          "",
-			EnabledExtensions: make(map[SettingScope][]string),
-			ToolDiscoveryCommand: "",
-			ToolCallCommand:      "",
-		}
-	}
-
-	// Apply defaults if not set in the loaded settings
-	if len(settings.ExtensionPaths) == 0 {
-		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".gemini", "extensions")}
-	}
-	if settings.McpServers == nil {
-		settings.McpServers = make(map[string]types.MCPServerConfig)
-	}
-	if settings.ApprovalMode == "" {
-		settings.ApprovalMode = types.ApprovalModeDefault
-	}
-	if settings.Model == "" {
-		settings.Model = "gemini-pro"
-	}
-	if settings.EnabledExtensions == nil {
-		settings.EnabledExtensions = make(map[SettingScope][]string)
-	}
-	if settings.ToolDiscoveryCommand == "" {
-		settings.ToolDiscoveryCommand = ""
-	}
-	if settings.ToolCallCommand == "" {
-		settings.ToolCallCommand = ""
-	}
-
-	return &settings
-}
-
-func getSettingsPath(workspaceDir string) string {
-	return filepath.Join(workspaceDir, SettingsFileName)
-}
-
-// SaveSettings saves the application settings.
-func SaveSettings(workspaceDir string, settings *Settings) error {
-	settingsPath := getSettingsPath(workspaceDir)
-	data, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
-		return fmt.Errorf("failed to create settings directory: %w", err)
-	}
-
-	return os.WriteFile(settingsPath, data, 0644)
-}
-
 // WorkspaceContext defines an interface for accessing workspace-related information.
 type WorkspaceContext interface {
 	GetDirectories() []string
-}
-
-// FileService defines an interface for file system operations.
-type FileService interface {
-	// shouldIgnoreFile checks if a file should be ignored based on filtering options.
-	// This is a placeholder and needs a proper implementation.
-	ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool
 }
 
 // CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
@@ -185,6 +72,7 @@ type Config struct {
 	toolDiscoveryCommand string
 	toolCallCommand      string
 	telemetryLogger telemetry.TelemetryLogger
+	fileService types.FileService // Add FileService to Config struct
 }
 
 func NewConfig(params *ConfigParameters) *Config {
@@ -204,7 +92,14 @@ func NewConfig(params *ConfigParameters) *Config {
 		toolCallCommand:      params.ToolCallCommand,
 	}
 	cfg.telemetryLogger = telemetry.NewTelemetryLogger(params.Telemetry) // Initialize here
+	// fileService will be set by SetConfiguredFileService later
+
 	return cfg
+}
+
+// SetConfiguredFileService sets the FileService for the Config.
+func (c *Config) SetConfiguredFileService(fs types.FileService) {
+	c.fileService = fs
 }
 
 // GetToolDiscoveryCommand returns the tool discovery command.
@@ -212,9 +107,18 @@ func (c *Config) GetToolDiscoveryCommand() string {
 	return c.toolDiscoveryCommand
 }
 
-// GetToolCallCommand returns the tool call command.
-func (c *Config) GetToolCallCommand() string {
-	return c.toolCallCommand
+// GetWorkspaceContext returns the workspace context.
+func (c *Config) GetWorkspaceContext() WorkspaceContext {
+	return &realWorkspaceContext{projectRoot: c.targetDir}
+}
+
+// realWorkspaceContext is a real implementation of WorkspaceContext.
+type realWorkspaceContext struct {
+	projectRoot string
+}
+
+func (rwc *realWorkspaceContext) GetDirectories() []string {
+	return []string{rwc.projectRoot}
 }
 // GetModel returns the configured model name.
 func (c *Config) GetModel() string {
@@ -276,36 +180,357 @@ func (c *Config) Get(key string) (interface{}, bool) {
 	}
 }
 
-// GetWorkspaceContext returns the workspace context.
-func (c *Config) GetWorkspaceContext() WorkspaceContext {
-	// For now, return a dummy implementation.
-	return &dummyWorkspaceContext{}
-}
+const (
+	MAX_ITEMS            = 200
+	TRUNCATION_INDICATOR = "..."
+)
 
-// dummyWorkspaceContext is a placeholder implementation of WorkspaceContext.
-type dummyWorkspaceContext struct{}
-
-func (d *dummyWorkspaceContext) GetDirectories() []string {
-	// For now, return the current working directory.
-	// In a real scenario, this would return configured workspace directories.
-	cwd, err := os.Getwd()
-	if err != nil {
-		return []string{}
+var (
+	DEFAULT_IGNORED_FOLDERS = map[string]bool{
+		"node_modules": true,
+		".git":         true,
+		"dist":         true,
 	}
-	return []string{cwd}
+	DEFAULT_FILE_FILTERING_OPTIONS = types.FileFilteringOptions{
+		RespectGitIgnore:  boolPtr(true),
+		RespectGeminiIgnore: boolPtr(true),
+	}
+)
+
+// boolPtr returns a pointer to a boolean.
+func boolPtr(b bool) *bool {
+	return &b
 }
 
-// GetFileService returns the file service.
-// This is a placeholder and should be replaced with a proper implementation.
-func (c *Config) GetFileService() FileService {
-	// For now, return a dummy implementation.
-	return &DummyFileService{}
+// GetDirectoryContextString generates a string describing the current workspace directories and their structures.
+func (c *Config) GetDirectoryContextString() (string, error) {
+	workspaceContext := c.GetWorkspaceContext()
+	workspaceDirectories := workspaceContext.GetDirectories()
+
+	var folderStructures []string
+	for _, dir := range workspaceDirectories {
+		structure, err := c._getFolderStructure(dir, &types.FolderStructureOptions{}, c.fileService)
+		if err != nil {
+			return "", err
+		}
+		folderStructures = append(folderStructures, structure)
+	}
+
+	folderStructure := strings.Join(folderStructures, "\n")
+
+	var workingDirPreamble string
+	if len(workspaceDirectories) == 1 {
+		workingDirPreamble = fmt.Sprintf("I'm currently working in the directory: %s", workspaceDirectories[0])
+	} else {
+		var dirList []string
+		for _, dir := range workspaceDirectories {
+			dirList = append(dirList, fmt.Sprintf("  - %s", dir))
+		}
+		workingDirPreamble = fmt.Sprintf("I'm currently working in the following directories:\n%s", strings.Join(dirList, "\n"))
+	}
+
+	return fmt.Sprintf("%s\n\n%s%c\n%s", workingDirPreamble, folderStructure, filepath.Separator, strings.Join(folderStructures, "\n")),
+		nil
 }
 
-// DummyFileService is a placeholder implementation of FileService.
-type DummyFileService struct{}
+// _getFolderStructure generates a string representation of a directory's structure.
+func (c *Config) _getFolderStructure(directory string, options *types.FolderStructureOptions, fileService types.FileService) (string, error) {
+	resolvedPath, err := filepath.Abs(directory)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve path: %w", err)
+	}
 
-func (d *DummyFileService) ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool {
-	// For now, always return false.
+	mergedOptions := types.FolderStructureOptions{
+		MaxItems:           intPtr(MAX_ITEMS),
+		IgnoredFolders:     &[]string{}, // Will be merged with DEFAULT_IGNORED_FOLDERS
+		FileIncludePattern: nil,
+		FileFilteringOptions: &DEFAULT_FILE_FILTERING_OPTIONS,
+	}
+
+	if options != nil {
+		if options.MaxItems != nil {
+			mergedOptions.MaxItems = options.MaxItems
+		}
+		if options.IgnoredFolders != nil {
+			mergedOptions.IgnoredFolders = options.IgnoredFolders
+		}
+		if options.FileIncludePattern != nil {
+			mergedOptions.FileIncludePattern = options.FileIncludePattern
+		}
+		if options.FileFilteringOptions != nil {
+			mergedOptions.FileFilteringOptions = options.FileFilteringOptions
+		}
+	}
+
+	// Merge default ignored folders
+	defaultIgnoredMap := make(map[string]bool)
+	for k := range DEFAULT_IGNORED_FOLDERS {
+		defaultIgnoredMap[k] = true
+	}
+	if mergedOptions.IgnoredFolders != nil {
+		for _, folder := range *mergedOptions.IgnoredFolders {
+			defaultIgnoredMap[folder] = true
+		}
+	}
+	mergedOptions.IgnoredFolders = &[]string{}
+	for k := range defaultIgnoredMap {
+		*mergedOptions.IgnoredFolders = append(*mergedOptions.IgnoredFolders, k)
+	}
+
+
+	structureRoot, err := c.readFullStructure(resolvedPath, &mergedOptions, fileService)
+	if err != nil {
+		return "", err
+	}
+	if structureRoot == nil {
+		return fmt.Sprintf("Error: Could not read directory \"%s\". Check path and permissions.", resolvedPath), nil
+	}
+
+	structureLines := []string{}
+	c.formatStructure(structureRoot, "", true, true, &structureLines)
+
+	summary := fmt.Sprintf("Showing up to %d items (files + folders).", *mergedOptions.MaxItems)
+
+	if c.isTruncated(structureRoot) {
+		summary += fmt.Sprintf(" Folders or files indicated with %s contain more items not shown, were ignored, or the display limit (%d items) was reached.", TRUNCATION_INDICATOR, *mergedOptions.MaxItems)
+	}
+
+	return fmt.Sprintf("%s\n\n%s%c\n%s", summary, resolvedPath, filepath.Separator, strings.Join(structureLines, "\n")),
+		nil
+}
+
+// intPtr returns a pointer to an int.
+func intPtr(i int) *int {
+	return &i
+}
+
+// readFullStructure reads the directory structure using BFS, respecting maxItems.
+func (c *Config) readFullStructure(rootPath string, options *types.FolderStructureOptions, fileService types.FileService) (*types.FullFolderInfo, error) {
+	rootName := filepath.Base(rootPath)
+	rootNode := &types.FullFolderInfo{
+		Name:       rootName,
+		Path:       rootPath,
+		Files:      []string{},
+		SubFolders: []types.FullFolderInfo{},
+	}
+
+	queue := []struct {
+		folderInfo  *types.FullFolderInfo
+		currentPath string
+	}{
+		{folderInfo: rootNode, currentPath: rootPath},
+	}
+	currentItemCount := 0
+	processedPaths := make(map[string]bool)
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		folderInfo := current.folderInfo
+		currentPath := current.currentPath
+
+		if processedPaths[currentPath] {
+			continue
+		}
+		processedPaths[currentPath] = true
+
+		if currentItemCount >= *options.MaxItems {
+			continue
+		}
+
+		entries, err := os.ReadDir(currentPath)
+		if err != nil {
+			if os.IsPermission(err) || os.IsNotExist(err) {
+				// debugLogger.Warn(fmt.Sprintf("Warning: Could not read directory %s: %v", currentPath, err))
+				// If root directory itself not found
+				if currentPath == rootPath && os.IsNotExist(err) {
+					return nil, nil 
+				}
+				continue
+			}
+			return nil, fmt.Errorf("failed to read directory %s: %w", currentPath, err)
+		}
+
+		sort.Slice(entries, func(i, j int) bool {
+			return entries[i].Name() < entries[j].Name()
+		})
+
+		filesInCurrentDir := []string{}
+		subFoldersInCurrentDir := []types.FullFolderInfo{}
+
+		// Process files first
+		for _, entry := range entries {
+			if entry.Type().IsRegular() {
+				if currentItemCount >= *options.MaxItems {
+					folderInfo.HasMoreFiles = true
+					break
+				}
+				fileName := entry.Name()
+				
+
+				// TODO: Implement shouldIgnoreFile using fileService
+				// For now, a dummy check
+				isIgnored := false
+				if fileService != nil {
+					isIgnored = fileService.ShouldIgnoreFile(filepath.Join(currentPath, fileName), *options.FileFilteringOptions)
+				}
+
+				if isIgnored {
+					continue
+				}
+
+				if options.FileIncludePattern == nil || regexp.MustCompile(*options.FileIncludePattern).MatchString(fileName) {
+					filesInCurrentDir = append(filesInCurrentDir, fileName)
+					currentItemCount++
+					folderInfo.TotalFiles++
+					folderInfo.TotalChildren++
+				}
+			}
+		}
+		folderInfo.Files = filesInCurrentDir
+
+		// Then process directories and queue them
+		for _, entry := range entries {
+			if entry.IsDir() {
+				if currentItemCount >= *options.MaxItems {
+					folderInfo.HasMoreSubfolders = true
+					break
+				}
+
+				subFolderName := entry.Name()
+				subFolderPath := filepath.Join(currentPath, subFolderName)
+
+				isIgnored := false
+				if containsString(*options.IgnoredFolders, subFolderName) {
+					isIgnored = true
+				}
+				if fileService != nil {
+					fileServiceIgnored := fileService.ShouldIgnoreFile(subFolderPath, *options.FileFilteringOptions)
+					if fileServiceIgnored {
+						isIgnored = true
+					}
+				}
+
+				if isIgnored {
+					ignoredSubFolder := types.FullFolderInfo{
+						Name:        subFolderName,
+						Path:        subFolderPath,
+						IsIgnored:   true,
+						Files:       []string{},
+						SubFolders:  []types.FullFolderInfo{},
+						TotalChildren: 0,
+						TotalFiles:  0,
+					}
+					subFoldersInCurrentDir = append(subFoldersInCurrentDir, ignoredSubFolder)
+					currentItemCount++
+					folderInfo.TotalChildren++
+					continue
+				}
+
+				subFolderNode := &types.FullFolderInfo{
+					Name:       subFolderName,
+					Path:       subFolderPath,
+					Files:      []string{},
+					SubFolders: []types.FullFolderInfo{},
+				}
+				subFoldersInCurrentDir = append(subFoldersInCurrentDir, *subFolderNode)
+				currentItemCount++
+				folderInfo.TotalChildren++
+
+				queue = append(queue, struct {
+					folderInfo  *types.FullFolderInfo
+					currentPath string
+				}{folderInfo: subFolderNode, currentPath: subFolderPath})
+			}
+		}
+		folderInfo.SubFolders = subFoldersInCurrentDir
+	}
+
+	return rootNode, nil
+}
+
+// formatStructure formats the FullFolderInfo into a string.
+func (c *Config) formatStructure(
+	node *types.FullFolderInfo,
+	currentIndent string,
+	isLastChildOfParent bool,
+	isProcessingRootNode bool,
+	builder *[]string,
+) {
+	connector := "├───"
+	if isLastChildOfParent {
+		connector = "└───"
+	}
+
+	if !isProcessingRootNode || node.IsIgnored {
+		indicator := ""
+		if node.IsIgnored {
+			indicator = TRUNCATION_INDICATOR
+		}
+		*builder = append(*builder, fmt.Sprintf("%s%s%s%c%s", currentIndent, connector, node.Name, filepath.Separator, indicator))
+	}
+
+	indentForChildren := currentIndent
+	if !isProcessingRootNode {
+		if isLastChildOfParent {
+			indentForChildren += "    "
+		} else {
+			indentForChildren += "│   "
+		}
+	}
+
+	// Render files
+	fileCount := len(node.Files)
+	for i, file := range node.Files {
+		isLastFileAmongSiblings := i == fileCount-1 && len(node.SubFolders) == 0 && !node.HasMoreSubfolders
+		fileConnector := "├───"
+		if isLastFileAmongSiblings {
+			fileConnector = "└───"
+		}
+		*builder = append(*builder, fmt.Sprintf("%s%s%s", indentForChildren, fileConnector, file))
+	}
+	if node.HasMoreFiles {
+		isLastIndicatorAmongSiblings := len(node.SubFolders) == 0 && !node.HasMoreSubfolders
+		fileConnector := "├───"
+		if isLastIndicatorAmongSiblings {
+			fileConnector = "└───"
+		}
+		*builder = append(*builder, fmt.Sprintf("%s%s%s", indentForChildren, fileConnector, TRUNCATION_INDICATOR))
+	}
+
+	// Render subfolders
+	subFolderCount := len(node.SubFolders)
+	for i := range node.SubFolders {
+		isLastSubfolderAmongSiblings := i == subFolderCount-1 && !node.HasMoreSubfolders
+		c.formatStructure(&node.SubFolders[i], indentForChildren, isLastSubfolderAmongSiblings, false, builder)
+	}
+	if node.HasMoreSubfolders {
+		*builder = append(*builder, fmt.Sprintf("%s└───%s", indentForChildren, TRUNCATION_INDICATOR))
+	}
+}
+
+// isTruncated checks if any part of the folder structure was truncated or ignored.
+func (c *Config) isTruncated(node *types.FullFolderInfo) bool {
+	if node.HasMoreFiles || node.HasMoreSubfolders || node.IsIgnored {
+		return true
+	}
+	for i := range node.SubFolders {
+		if c.isTruncated(&node.SubFolders[i]) {
+			return true
+		}
+	}
+	return false
+}
+
+// containsString checks if a string is present in a slice of strings.
+func containsString(slice []string, str string) bool {
+	if slice == nil {
+		return false
+	}
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
 	return false
 }

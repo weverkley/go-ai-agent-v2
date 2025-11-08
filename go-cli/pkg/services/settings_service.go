@@ -1,19 +1,126 @@
 package services
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sync"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
+
+const (
+	SettingsFileName = ".gemini/settings.json"
+)
+
+// Settings represents the application settings.
+type Settings struct {
+	ExtensionPaths []string                       `json:"extensionPaths"`
+	McpServers     map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
+	DebugMode      bool                           `json:"debugMode,omitempty"`
+	UserMemory     string                         `json:"userMemory,omitempty"`
+	ApprovalMode   types.ApprovalMode             `json:"approvalMode,omitempty"`
+	ShowMemoryUsage bool                          `json:"showMemoryUsage,omitempty"`
+	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
+	Model          string                         `json:"model,omitempty"`
+	Proxy          string                         `json:"proxy,omitempty"`
+	EnabledExtensions map[types.SettingScope][]string `json:"enabledExtensions,omitempty"`
+	ToolDiscoveryCommand string `json:"toolDiscoveryCommand,omitempty"`
+	ToolCallCommand      string `json:"toolCallCommand,omitempty"`
+}
+
+// LoadSettings loads the application settings from various sources.
+func LoadSettings(workspaceDir string) *Settings {
+	settingsPath := getSettingsPath(workspaceDir)
+	data, err := os.ReadFile(settingsPath)
+	if err != nil {
+		// Return default settings if file doesn't exist or can't be read
+		return &Settings{
+			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
+			McpServers:     make(map[string]types.MCPServerConfig),
+			DebugMode:      false,
+			UserMemory:     "",
+			ApprovalMode:   types.ApprovalModeDefault,
+			ShowMemoryUsage: false,
+			TelemetryEnabled: false,
+			Model:          "gemini-pro", // Default model
+			Proxy:          "",
+			EnabledExtensions: make(map[types.SettingScope][]string),
+			ToolDiscoveryCommand: "",
+			ToolCallCommand:      "",
+		}
+	}
+
+	var settings Settings
+	if err := json.Unmarshal(data, &settings); err != nil {
+		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
+		// Return default settings on parsing error
+		return &Settings{
+			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
+			McpServers:     make(map[string]types.MCPServerConfig),
+			DebugMode:      false,
+			UserMemory:     "",
+			ApprovalMode:   types.ApprovalModeDefault,
+			ShowMemoryUsage: false,
+			TelemetryEnabled: false,
+			Model:          "gemini-pro", // Default model
+			Proxy:          "",
+			EnabledExtensions: make(map[types.SettingScope][]string),
+			ToolDiscoveryCommand: "",
+			ToolCallCommand:      "",
+		}
+	}
+
+	// Apply defaults if not set in the loaded settings
+	if len(settings.ExtensionPaths) == 0 {
+		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".gemini", "extensions")}
+	}
+	if settings.McpServers == nil {
+		settings.McpServers = make(map[string]types.MCPServerConfig)
+	}
+	if settings.ApprovalMode == "" {
+		settings.ApprovalMode = types.ApprovalModeDefault
+	}
+	if settings.Model == "" {
+		settings.Model = "gemini-pro"
+	}
+	if settings.EnabledExtensions == nil {
+		settings.EnabledExtensions = make(map[types.SettingScope][]string)
+	}
+	if settings.ToolDiscoveryCommand == "" {
+		settings.ToolDiscoveryCommand = ""
+	}
+	if settings.ToolCallCommand == "" {
+		settings.ToolCallCommand = ""
+	}
+
+	return &settings
+}
+
+func getSettingsPath(workspaceDir string) string {
+	return filepath.Join(workspaceDir, SettingsFileName)
+}
+
+// SaveSettings saves the application settings.
+func SaveSettings(workspaceDir string, settings *Settings) error {
+	settingsPath := getSettingsPath(workspaceDir)
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal settings: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
+		return fmt.Errorf("failed to create settings directory: %w", err)
+	}
+
+	return os.WriteFile(settingsPath, data, 0644)
+}
 
 // SettingsService manages application settings.
 type SettingsService struct {
 	mu        sync.RWMutex
-	settings  *config.Settings
+	settings  *Settings
 	baseDir   string // Base directory to resolve settings file
 }
 
@@ -22,7 +129,7 @@ func NewSettingsService(baseDir string) *SettingsService {
 	ss := &SettingsService{
 		baseDir: baseDir,
 	}
-	ss.settings = config.LoadSettings(baseDir) // Load initial settings
+	ss.settings = LoadSettings(baseDir) // Load initial settings
 	return ss
 }
 
@@ -159,12 +266,12 @@ func (ss *SettingsService) Reset() error {
 	defer ss.mu.Unlock()
 
 	// Delete the settings file to ensure defaults are loaded
-	settingsPath := filepath.Join(ss.baseDir, config.SettingsFileName)
+	settingsPath := filepath.Join(ss.baseDir, SettingsFileName)
 	if err := os.Remove(settingsPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove settings file: %w", err)
 	}
 
-	ss.settings = config.LoadSettings(ss.baseDir) // Reload to get defaults
+	ss.settings = LoadSettings(ss.baseDir) // Reload to get defaults
 	return nil
 }
 
@@ -172,5 +279,5 @@ func (ss *SettingsService) Reset() error {
 func (ss *SettingsService) Save() error {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return config.SaveSettings(ss.baseDir, ss.settings)
+	return SaveSettings(ss.baseDir, ss.settings)
 }

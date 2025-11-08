@@ -107,6 +107,16 @@ func init() {
 		ToolRegistry: toolRegistry, // Pass the populated toolRegistry
 	}
 
+	// Initialize FileFilteringService
+	fileFilteringService, err := services.NewFileFilteringService(projectRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to initialize FileFilteringService: %v\n", err)
+		// Fallback to a dummy implementation if initialization fails
+		Cfg.SetConfiguredFileService(&services.DummyFileService{}) 
+	} else {
+		Cfg.SetConfiguredFileService(fileFilteringService)
+	}
+
 	// Create the final Config instance
 	Cfg = config.NewConfig(params)
 

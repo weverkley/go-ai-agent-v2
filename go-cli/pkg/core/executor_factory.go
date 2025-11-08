@@ -3,7 +3,6 @@ package core
 import (
 	"fmt"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -18,7 +17,7 @@ func NewExecutorFactory() *ExecutorFactory {
 }
 
 // CreateExecutor creates an Executor based on the provided type.
-func (ef *ExecutorFactory) CreateExecutor(executorType string, cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (ef *ExecutorFactory) CreateExecutor(executorType string, cfg types.GeminiConfigProvider, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
 	switch executorType {
 	case "gemini":
 		return NewGeminiChat(cfg, generationConfig, startHistory)

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core" // Import core package
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
 )
@@ -22,12 +22,12 @@ const (
 
 // ChatService provides methods for managing chat checkpoints.
 type ChatService struct {
-	config   *config.Config
+	config   types.GeminiDirProvider
 	executor core.Executor // Add executor field
 }
 
 // NewChatService creates a new ChatService instance.
-func NewChatService(cfg *config.Config, executor core.Executor) *ChatService {
+func NewChatService(cfg types.GeminiDirProvider, executor core.Executor) *ChatService {
 	return &ChatService{config: cfg, executor: executor}
 }
 

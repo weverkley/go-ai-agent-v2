@@ -27,16 +27,19 @@ var generateCmd = &cobra.Command{
 	Short: "Generate content using a prompt",
 	Long:  `Generate content using a specified prompt. If no prompt is provided, an interactive UI will be launched.`, 
 	Run: func(cmd *cobra.Command, args []string) {
-		// Load the configuration within the command's Run function
-		workspaceDir, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error getting current working directory: %v\n", err)
+		modelVal, ok := SettingsService.Get("model")
+		if !ok {
+			fmt.Printf("Error: 'model' setting not found.\n")
 			os.Exit(1)
 		}
-		loadedSettings := config.LoadSettings(workspaceDir)
+		model, ok := modelVal.(string)
+		if !ok {
+			fmt.Printf("Error: 'model' setting is not a string.\n")
+			os.Exit(1)
+		}
 
 		params := &config.ConfigParameters{
-			Model: loadedSettings.Model,
+			Model: model,
 		}
 		appConfig := config.NewConfig(params)
 

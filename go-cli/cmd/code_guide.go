@@ -6,46 +6,46 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/types"
-	"go-ai-agent-v2/go-cli/pkg/ui"
-	"go-ai-agent-v2/go-cli/pkg/tools"
-
-	"github.com/google/generative-ai-go/genai"
-	"github.com/spf13/cobra"
-	tea "github.com/charmbracelet/bubbletea"
-)
-
-var codeGuideCmd = &cobra.Command{
-	Use:   "code-guide [question]",
-	Short: "Answer questions about the Gemini CLI codebase",
-	Long: `Answer questions about the Gemini CLI codebase with explanations and code snippets.
-
-This command acts as a specialized AI prompt to help new engineers understand the Gemini CLI codebase.
-It provides clear explanations grounded in the actual source code, including full file paths and design choices.`,
-	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
-	Run: func(cmd *cobra.Command, args []string) {
-		// Load the configuration within the command's Run function
-		// This ensures that cfg is initialized correctly based on the current working directory
-		workspaceDir, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error getting current working directory: %v\n", err)
-			os.Exit(1)
-		}
-		loadedSettings := config.LoadSettings(workspaceDir)
-
-		// Initialize the ToolRegistry
-		toolRegistry := tools.RegisterAllTools()
-
-		// Create a ConfigParameters object
-		params := &config.ConfigParameters{
-			Model: loadedSettings.Model,
-			ToolRegistry: toolRegistry, // Use the initialized tool registry
-		}
-
-		// Create a config.Config object
-		appConfig := config.NewConfig(params)
-
+		"go-ai-agent-v2/go-cli/pkg/core"
+		"go-ai-agent-v2/go-cli/pkg/types"
+		"go-ai-agent-v2/go-cli/pkg/ui"
+		"go-ai-agent-v2/go-cli/pkg/tools" // Add back the import	
+	    "github.com/google/generative-ai-go/genai"
+	    "github.com/spf13/cobra"
+	    tea "github.com/charmbracelet/bubbletea"
+	)
+	
+	var codeGuideCmd = &cobra.Command{
+	    Use:   "code-guide [question]",
+	    Short: "Answer questions about the Gemini CLI codebase",
+	    Long: `Answer questions about the Gemini CLI codebase with explanations and code snippets.
+	
+	This command acts as a specialized AI prompt to help new engineers understand the Gemini CLI codebase.
+	It provides clear explanations grounded in the actual source code, including full file paths and design choices.`,
+	    Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
+	    Run: func(cmd *cobra.Command, args []string) {
+			// Initialize the ToolRegistry
+			toolRegistry := tools.RegisterAllTools()
+	
+			modelVal, ok := SettingsService.Get("model")
+			if !ok {
+				fmt.Printf("Error: 'model' setting not found.\n")
+				os.Exit(1)
+			}
+			model, ok := modelVal.(string)
+			if !ok {
+				fmt.Printf("Error: 'model' setting is not a string.\n")
+				os.Exit(1)
+			}
+	
+			// Create a ConfigParameters object
+			params := &config.ConfigParameters{
+				Model:     model,
+				ToolRegistry: toolRegistry, // Use the initialized tool registry
+			}
+	
+			// Create a config.Config object
+			appConfig := config.NewConfig(params)
 		executorFactory := core.NewExecutorFactory()
 		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {

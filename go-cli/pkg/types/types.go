@@ -3,12 +3,21 @@ package types
 import (
 	"context"
 	"fmt"
+	"sync" // Add sync import
 
 	"github.com/google/generative-ai-go/genai"
 )
 
 // ApprovalMode defines the approval mode for tool calls.
 type ApprovalMode string
+
+// SettingScope defines the scope of a setting.
+type SettingScope string
+
+const (
+	SettingScopeUser      SettingScope = "user"
+	SettingScopeWorkspace SettingScope = "workspace"
+)
 
 // MCPServerStatus represents the connection status of an MCP server.
 type MCPServerStatus struct {
@@ -406,9 +415,27 @@ func (bdt *BaseDeclarativeTool) Execute(args map[string]any) (ToolResult, error)
 	return ToolResult{}, fmt.Errorf("Execute method not implemented for BaseDeclarativeTool")
 }
 
-// ToolRegistry holds all the registered tools.
+// ToolRegistry manages the registration and retrieval of tools.
 type ToolRegistry struct {
+	mu    sync.RWMutex
 	tools map[string]Tool
+}
+
+// FileService defines an interface for file system operations.
+type FileService interface {
+	// ShouldIgnoreFile checks if a file should be ignored based on filtering options.
+	ShouldIgnoreFile(filePath string, options FileFilteringOptions) bool
+}
+
+// GeminiDirProvider provides the path to the .gemini directory.
+type GeminiDirProvider interface {
+	GetGeminiDir() string
+}
+
+// GeminiConfigProvider provides configuration for Gemini.
+type GeminiConfigProvider interface {
+	GetModel() string
+	GetToolRegistry() *ToolRegistry
 }
 
 // NewToolRegistry creates a new instance of ToolRegistry.

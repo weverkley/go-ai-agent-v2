@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -29,7 +28,7 @@ type GeminiChat struct {
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
-func NewGeminiChat(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func NewGeminiChat(cfg types.GeminiConfigProvider, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
