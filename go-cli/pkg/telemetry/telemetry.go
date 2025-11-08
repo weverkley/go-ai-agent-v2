@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
@@ -13,6 +14,7 @@ import (
 type TelemetryLogger interface {
 	LogAgentStart(event types.AgentStartEvent)
 	LogAgentFinish(event types.AgentFinishEvent)
+	LogErrorf(format string, args ...interface{})
 }
 
 // noopTelemetryLogger is a no-operation implementation of TelemetryLogger.
@@ -20,6 +22,7 @@ type noopTelemetryLogger struct{}
 
 func (l *noopTelemetryLogger) LogAgentStart(event types.AgentStartEvent) {}
 func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent) {}
+func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{}) {}
 
 // fileTelemetryLogger logs telemetry events to a specified file.
 type fileTelemetryLogger struct {
@@ -97,6 +100,26 @@ func (l *fileTelemetryLogger) writeLog(data []byte) {
 		fmt.Fprintf(os.Stderr, "Error writing newline to telemetry log file %s: %v\n", l.filePath, err)
 		return
 	}
+}
+
+func (l *fileTelemetryLogger) LogErrorf(format string, args ...interface{}) {
+	if !l.enabled {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	logEntry := map[string]interface{}{
+		"type":    "Error",
+		"message": fmt.Sprintf(format, args...),
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling error log entry: %v\n", err)
+		return
+	}
+	l.writeLog(data)
 }
 
 // NewTelemetryLogger creates a TelemetryLogger based on the provided telemetry settings.

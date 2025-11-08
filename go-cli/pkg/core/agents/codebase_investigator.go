@@ -81,7 +81,7 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 
 	ToolConfig: &ToolConfig{
 		// Grant access only to read-only tools.
-		Tools: []string{types.LS_TOOL_NAME, types.READ_FILE_TOOL_NAME, types.GLOB_TOOL_NAME, types.GREP_TOOL_NAME},
+		Tools: []string{types.LS_TOOL_NAME, types.READ_FILE_TOOL_NAME, types.GLOB_TOOL_NAME, types.GREP_TOOL_NAME, types.FIND_UNUSED_CODE_TOOL_NAME},
 	},
 
 	PromptConfig: PromptConfig{

@@ -55,6 +55,9 @@ func RegisterAllTools() *types.ToolRegistry {
 	if err := registry.Register(NewExecuteCommandTool()); err != nil {
 		fmt.Printf("Error registering ExecuteCommandTool: %v\n", err)
 	}
+	if err := registry.Register(NewFindUnusedCodeTool()); err != nil {
+		fmt.Printf("Error registering FindUnusedCodeTool: %v\n", err)
+	}
 
 	return registry
 }

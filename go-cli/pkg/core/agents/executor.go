@@ -176,7 +176,7 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 		startHistory,
 	)
 	if err != nil {
-		utils.LogErrorf(ae.RuntimeContext, "Failed to create chat object: %v", err)
+		ae.RuntimeContext.GetTelemetryLogger().LogErrorf("Failed to create chat object: %v", err)
 		return nil, fmt.Errorf("failed to create chat object: %w", err)
 	}
 
@@ -220,7 +220,7 @@ func (ae *AgentExecutor) buildSystemPrompt(inputs AgentInputs) (string, error) {
 
 	finalPrompt := utils.TemplateString(promptConfig.SystemPrompt, inputs)
 
-	dirContext, err := utils.GetDirectoryContextString(ae.RuntimeContext)
+	dirContext, err := ae.RuntimeContext.GetDirectoryContextString()
 	if err != nil {
 		return "", fmt.Errorf("failed to get directory context string: %w", err)
 	}
@@ -603,7 +603,7 @@ func validateTools(toolRegistry *types.ToolRegistry, agentName string) error {
 		types.WEB_FETCH_TOOL_NAME:       true,
 	}
 
-	for _, tool := range toolRegistry.GetAllRegisteredTools() {
+	for _, tool := range toolRegistry.GetAllTools() {
 		if !allowlist[tool.Name()] {
 			return fmt.Errorf("tool \"%s\" is not on the allow-list for non-interactive execution in agent \"%s\". Only tools that do not require user confirmation can be used in subagents.", tool.Name(), agentName)
 		}

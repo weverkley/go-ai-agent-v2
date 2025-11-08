@@ -19,6 +19,27 @@ const (
 	SettingScopeWorkspace SettingScope = "workspace"
 )
 
+// Tool names
+const (
+	LS_TOOL_NAME                = "ls"
+	READ_FILE_TOOL_NAME         = "read_file"
+	GLOB_TOOL_NAME              = "glob"
+	GREP_TOOL_NAME              = "grep"
+	SMART_EDIT_TOOL_NAME        = "smart_edit"
+	WEB_FETCH_TOOL_NAME         = "web_fetch"
+	WEB_SEARCH_TOOL_NAME        = "web_search"
+	MEMORY_TOOL_NAME            = "memory"
+	WRITE_TODOS_TOOL_NAME       = "write_todos"
+	LIST_DIRECTORY_TOOL_NAME    = "list_directory"
+	GET_CURRENT_BRANCH_TOOL_NAME = "get_current_branch"
+	GET_REMOTE_URL_TOOL_NAME    = "get_remote_url"
+	CHECKOUT_BRANCH_TOOL_NAME   = "checkout_branch"
+	PULL_TOOL_NAME              = "pull"
+	EXECUTE_COMMAND_TOOL_NAME   = "execute_command"
+	READ_MANY_FILES_TOOL_NAME   = "read_many_files"
+	FIND_UNUSED_CODE_TOOL_NAME  = "find_unused_code"
+)
+
 // MCPServerStatus represents the connection status of an MCP server.
 type MCPServerStatus struct {
 	Name        string
@@ -92,6 +113,11 @@ type MessageParams struct {
 
 // StreamEventType defines the type of event in the stream.
 type StreamEventType string
+
+const (
+	StreamEventTypeChunk StreamEventType = "chunk"
+	StreamEventTypeError StreamEventType = "error"
+)
 
 // StreamResponse represents a response from the stream.
 type StreamResponse struct {
@@ -176,6 +202,10 @@ type StreamStats struct {
 // ToolErrorType defines types of tool errors.
 type ToolErrorType string
 
+const (
+	ToolErrorTypeExecutionFailed ToolErrorType = "EXECUTION_FAILED"
+)
+
 // FunctionCall represents a function call requested by the model.
 type FunctionCall struct {
 	ID   string                 `json:"id,omitempty"`
@@ -215,6 +245,30 @@ type ToolResultDisplay struct {
 
 // ToolConfirmationOutcome defines the outcome of a tool confirmation.
 type ToolConfirmationOutcome string
+
+const (
+	ToolConfirmationOutcomeProceedAlways ToolConfirmationOutcome = "PROCEED_ALWAYS"
+)
+
+// AgentTerminateMode defines the reasons an agent might terminate.
+type AgentTerminateMode string
+
+const (
+	AgentTerminateModeAborted AgentTerminateMode = "ABORTED"
+	AgentTerminateModeError   AgentTerminateMode = "ERROR"
+	AgentTerminateModeGoal    AgentTerminateMode = "GOAL"
+	AgentTerminateModeMaxTurns AgentTerminateMode = "MAX_TURNS"
+	AgentTerminateModeTimeout AgentTerminateMode = "TIMEOUT"
+)
+
+const (
+	TASK_COMPLETE_TOOL_NAME = "task_complete"
+)
+
+const (
+	ApprovalModeDefault ApprovalMode = "DEFAULT"
+)
+
 
 // ToolCallConfirmationDetails represents details for tool call confirmation.
 type ToolCallConfirmationDetails struct {
@@ -519,9 +573,6 @@ type CodebaseInvestigatorSettings struct {
 	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
 	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
 }
-
-// AgentTerminateMode defines the reasons an agent might terminate.
-type AgentTerminateMode string
 
 // AgentStartEvent is a placeholder for telemetry event.
 type AgentStartEvent struct {
