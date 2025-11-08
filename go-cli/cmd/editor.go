@@ -13,7 +13,6 @@ var editorCmd = &cobra.Command{
 	Long:  `The editor command allows you to set your preferred external editor for opening files.`, //nolint:staticcheck
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to set external editor preferences.
-		fmt.Println("Setting external editor preference (not yet implemented).")
+		fmt.Println("Setting external editor preference is not yet implemented. This feature may be available in a future version.")
 	},
 }

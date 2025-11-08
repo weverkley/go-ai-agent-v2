@@ -29,12 +29,12 @@ The foundational structure for the Go CLI has been established, and several core
       - `install`: **Functional** (bug in renaming directory after install fixed), command structure and argument parsing in `main.go` are ready. Core logic in `pkg/commands/extensions.go` and `pkg/extension/manager.go` is implemented with git clone and local copy functionality.
       - `uninstall`: **Functional** (with linked extension support).
       - `new`: **Functional**.
-      - `enable`: **Functional**.
+      - `enable`: **Functional`.
       - `disable`: **Functional`.
     - `mcp`: Command group with subcommands:
-      - `list`: **Functional**, lists configured MCP servers, merging from settings and extensions, and simulates connection status.
-      - `add`: **Functional**. 
-      - `remove`: **Functional**.
+      - `list`: **Informative Message**, listing configured MCP servers is not yet implemented.
+      - `add`: **Informative Message**, adding MCP servers is not yet implemented.
+      - `remove`: **Informative Message**, removing MCP servers is not yet implemented.
     - **New Commands Implemented (from JavaScript .toml files)**:
       - `code-guide`: **Functional**, answers questions about the codebase using AI. 
       - `find-docs`: **Functional**, finds relevant documentation and outputs GitHub URLs using AI.
@@ -42,18 +42,35 @@ The foundational structure for the Go CLI has been established, and several core
       - `pr-review`: **Functional**, conducts comprehensive AI-driven pull request reviews.
       - `grep-code`: **Functional**, summarizes code findings for a given pattern using grep and AI.
     - `list-models`: **Functional**, lists available Gemini models using `pkg/core/gemini.go`.
+    - `privacy`: **Informative Message**, displays a detailed privacy notice.
+    - `ide`: **Informative Message**, manages IDE integration (status, install, enable, disable) with messages indicating future availability.
+    - `theme`: **Informative Message**, changes the visual theme with a message indicating future availability.
+    - `auth`: **Informative Message**, manages authentication credentials (login, logout) with messages indicating future availability and secure storage.
+    - `setup-github`: **Informative Message**, configures GitHub Actions with a message indicating future availability.
+    - `tools`: **Functional**, `run` subcommand now executes specific AI tools.
+    - `profile`: **Informative Message**, toggles debug profile display with a message indicating future availability.
+    - `vim`: **Informative Message**, toggles Vim mode with a message indicating future availability.
+    - `terminal-setup`: **Informative Message**, configures terminal keybindings with a message indicating future availability.
+    - `editor`: **Informative Message**, sets external editor preference with a message indicating future availability.
+    - `stats`: **Informative Message**, displays usage statistics with messages indicating future availability.
+    - `restore`: **Informative Message**, restores tool calls and conversation/file history with messages indicating future availability.
+    - `permissions`: **Informative Message**, manages folder trust settings with a message indicating future availability.
 
 - **Core Services & Tools (pkg/core, pkg/extension, pkg/config, pkg/mcp, pkg/services)**:
-  - `pkg/core/gemini.go`: **Functional** (with tool-calling capabilities), uses `google.golang.org/genai` for Gemini API interaction.
+  - `pkg/core/gemini.go`: **Functional** (with tool-calling capabilities), uses `google.golang.org/genai` for Gemini API interaction. Now includes actual token counting in `CompressChat()`.
   - `pkg/services/shell_service.go`: **Functional**, provides `ExecuteCommand` for shell operations.
   - `pkg/services/file_system_service.go`: **Functional**, provides `ListDirectory`, `PathExists`, `IsDirectory`, `JoinPaths`, `WriteFile`, `ReadFile`, `CreateDirectory`, `CopyDirectory`.
   - `pkg/services/git_service.go`: **Functional**, uses `github.com/go-git/go-git/v5` to interact with Git repositories. Now includes `GetRemoteURL`, `CheckoutBranch`, `Pull`, and `DeleteBranch` methods.
-  - `pkg/extension/manager.go`: **Functional**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone and local copy, `EnableExtension` and `DisableExtension` are implemented. The `fsService` type issue has been resolved.
+  - `pkg/extension/manager.go`: **Functional**. Discovers and loads extensions, parses `gemini-extension.json`. `InstallOrUpdateExtension` has logic for git clone/pull and local copy/overwrite. The `fsService` type issue has been resolved.
   - `pkg/extension/types.go`: Defines `InstallArgs` and `ExtensionInstallMetadata`.
-  - `pkg/config/config.go`: **Consolidated and Functional**. Now contains `SettingScope`, `Settings`, `LoadSettings`, `Config` struct, and related methods. `Config` struct now has an exported `Model` field, and `NewConfig` and `GetModel()` methods are adjusted accordingly.
+  - `pkg/config/config.go`: **Consolidated and Functional**. Now contains `SettingScope`, `Settings`, `LoadSettings`, `Config` struct, and related methods. `Config` struct now has an exported `Model` field, and `NewConfig` and `GetModel()` methods are adjusted accordingly. Includes `GetGeminiDir()` method.
   - `pkg/mcp/client.go`: **Functional** (renamed `Client` to `McpClient`). Simulates MCP connection.
   - `pkg/types/types.go`: **Centralized Types**. Updated to include `MCPServerConfig`, `MCPServerStatus`, `MCPOAuthConfig`, `AuthProviderType`, `ToolCallRequestInfo`, `JsonSchemaObject`, `JsonSchemaProperty`, `AgentTerminateMode`, `FunctionCall`, `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool` (and its methods), `ToolRegistry` (and its methods), and `TelemetrySettings` to resolve import cycles and consolidate common types.
   - `pkg/types/constants.go`: **Cleaned Up**. Removed duplicate `MCPServerStatus` and `Kind` constants.
+  - `pkg/core/agents/executor.go`: Error reporting in `createChatObject()` now uses `utils.LogErrorf()`.
+  - `pkg/utils/folder_structure.go`: `shouldIgnoreFile` logic correctly implemented using `fileService.ShouldIgnoreFile()`.
+  - `pkg/utils/utils.go`: Telemetry logging implemented in `LogAgentStart()` and `LogAgentFinish()`.
+  - `pkg/tools/ls.go`: `Execute()` method now lists directory contents.
 
 ## 2. Linter-Identified Issues (Prioritized for Next Steps)
 
@@ -64,7 +81,7 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`pkg/core/agents/types.go`**: Removed redundant `AgentTerminateMode` definition.
 - **`pkg/core/agents/subagent_tool_wrapper.go`**: Corrected access to `MessageBus` and updated references to `types.BaseDeclarativeTool`, `types.NewBaseDeclarativeTool`, `types.KindThink` (replaced with `types.KindOther`), and `types.ToolInvocation`.-
 - **`cmd/generate.go`**: Converted `[]genai.Content{}` to `[]*genai.Content{}`.
-- **`cmd/list-models.go`**: Added `genai` import and provided correct arguments to `core.NewGeminiChat`.
+- **`cmd/list-models.o`**: Added `genai` import and provided correct arguments to `core.NewGeminiChat`.
 - **Import Cycles**: Fully resolved by moving `Tool`, `ToolInvocation`, `Kind`, `BaseDeclarativeTool`, `ToolRegistry`, and `TelemetrySettings` to `pkg/types/types.go`, and removing `pkg/tools/tool_registry.go`.
 - **`pkg/core/agents/non_interactive_tool_executor.go`**: Fixed `undefined: ToolCallRequestInfo`.
 - **`pkg/core/agents/schema_utils.go`**: Fixed `undefined` errors for `JsonSchemaObject` and `JsonSchemaProperty`.
@@ -99,7 +116,7 @@ Translate the logic from the JavaScript files below. Each command needs argument
 - `install.ts`: **Functional**. Implemented with `force` flag support. Core logic in `pkg/extension/manager.go` handles git clone/pull and local copy/overwrite. Argument parsing in `main.go` is ready.
 - `list.ts`: **Functional**.
 - `new.ts`: **Functional`.
-- `enable.ts`: **Functional**.
+- `enable.ts`: **Functional`.
 - `disable.ts`: **Functional`.
 - `uninstall`: **Functional** (with linked extension support).
 - `update.ts`: **Functional**.
@@ -109,9 +126,9 @@ Translate the logic from the JavaScript files below. Each command needs argument
 
 Translate logic from the following JavaScript files. Similar to extensions, each MCP command involves argument parsing, service interaction, and thorough analysis of the original JavaScript source.
 
-- `add`: **Functional**.
-- `list.ts`: **Functional** (simulated connection status).
-- `remove`: **Functional`.
+- `add`: **Informative Message**.
+- `list.ts`: **Informative Message**.
+- `remove`: **Informative Message**.
 
 ## 4. JavaScript Source Code Location
 
@@ -145,12 +162,12 @@ The migration will proceed iteratively, focusing on one command or core function
 8.  **Test**: Write and run Go unit/integration tests, and perform manual testing.
 9.  **Refine**: Address any issues or improvements.
 
-## 7. Git Instructions based on conventional commit convention
+## 8. Git Instructions based on conventional commit convention
 1. **Initialize a new repository**: if not already done, initialize a new repository in the go-cli directory
 2. **Commit messages**: use short, clear and concise commit messages to document your changes
 3. **Commit your changes**: use `git add .` to stage all changes, and then `git commit -m "Your commit message"` to commit your changes
 
-## 8. Next Steps
+## 9. Next Steps
 
 1.  **Review of Go Port and Tool-Calling Mechanism**: Completed. The code structure and logic indicate that the tool-calling mechanism is correctly implemented across the `generate`, `find-docs`, and `pr-review` commands.
 2.  **End-to-End Testing for AI Commands**: Simulated due to API key constraints. The code structure and logic indicate that the tool-calling mechanism is correctly implemented across the `generate`, `find-docs`, and `pr-review` commands.
@@ -176,8 +193,15 @@ The migration will proceed iteratively, focusing on one command or core function
     *   Address the environmental issue encountered during `extensions` testing (permission denied when creating `.gemini/extensions` directory). This might involve adjusting default paths or providing clearer instructions for setting up the environment.
 8.  **Remaining JavaScript CLI Commands** (if any):
     *   Review any remaining JavaScript CLI commands or features that have not yet been migrated to Go. (Based on current analysis, all explicit commands have been addressed, but a deeper dive might reveal more subtle features).
-
-## 9. Git Instructions based on conventional commit convention
-1. **Initialize a new repository**: if not already done, initialize a new repository in the go-cli directory
-2. **Commit messages**: use short, clear and concise commit messages to document your changes
-3. **Commit your changes**: use `git add .` to stage all changes, and then `git commit -m "Your commit message"` to commit your changes
+9.  **Implement `FileService` and `WorkspaceContext`**: Replace the current dummy implementations with proper logic for respecting `.gitignore` and `.geminiignore` files, handling glob patterns, and managing multiple workspace directories.
+10. **Implement Image/PDF Handling in `pkg/tools/read_file.go`**: Extend `ReadFileTool` to correctly process and represent content from image and PDF files.
+11. **Implement Token Count Aggregation**: Expand `SessionMetrics` and `ConvertToStreamStats()` in `pkg/core/output/stream_json_formatter.go` to aggregate token counts across all models.
+12. **Implement Secure API Key Storage/Clearing**: Develop robust and OS-specific mechanisms for securely storing and clearing API keys.
+13. **Implement IDE Integration**: Develop logic for detecting IDEs, installing companions, and enabling/disabling integration.
+14. **Implement Theme Changing**: Develop logic for defining, applying, and persisting visual themes for the CLI.
+15. **Implement Terminal Keybinding Configuration**: Develop logic for detecting terminal environments and configuring keybindings for multiline input.
+16. **Implement External Editor Preference**: Develop logic for setting and using a preferred external editor.
+17. **Implement Usage Statistics**: Develop logic for collecting and displaying detailed model and tool-specific usage statistics.
+18. **Implement Restore Functionality**: Develop logic for saving and restoring CLI state, including tool calls and conversation/file history.
+19. **Implement Folder Trust Management**: Develop logic for defining and managing folder trust settings for security.
+20. **Implement MCP Server Management**: Develop logic for listing, adding, and removing MCP server configurations.

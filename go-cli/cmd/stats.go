@@ -26,8 +26,7 @@ var statsModelCmd = &cobra.Command{
 	Short: "Show model-specific usage statistics",
 	Long:  `Displays statistics related to model usage during the session.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual model-specific stats display logic.
-		fmt.Println("Displaying model-specific usage statistics (not yet implemented).")
+		fmt.Println("Displaying model-specific usage statistics is not yet implemented. This feature may be available in a future version.")
 	},
 }
 
@@ -36,8 +35,7 @@ var statsToolsCmd = &cobra.Command{
 	Short: "Show tool-specific usage statistics",
 	Long:  `Displays statistics related to tool usage during the session.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual tool-specific stats display logic.
-		fmt.Println("Displaying tool-specific usage statistics (not yet implemented).")
+		fmt.Println("Displaying tool-specific usage statistics is not yet implemented. This feature may be available in a future version.")
 	},
 }
 

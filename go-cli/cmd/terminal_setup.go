@@ -12,11 +12,10 @@ var terminalSetupCmd = &cobra.Command{
 	Short: "Configure terminal keybindings for multiline input",
 	Long:  `The terminal-setup command configures terminal keybindings for multiline input in supported environments (e.g., VS Code, Cursor, Windsurf).`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to configure terminal keybindings.
-		fmt.Println("Configuring terminal keybindings for multiline input (not yet implemented).")
-		fmt.Println("  - Detecting terminal environment...")
-		fmt.Println("  - Configuring keybindings...")
-		fmt.Println("  - Restart may be required for changes to take effect.")
-		fmt.Println("Terminal setup complete (placeholder).")
+		fmt.Println("Configuring terminal keybindings for multiline input is not yet implemented. This feature may be available in a future version.")
+		fmt.Println("Implementing this would involve:")
+		fmt.Println("  - Detecting terminal environment.")
+		fmt.Println("  - Configuring keybindings specific to the detected environment.")
+		fmt.Println("  - Restart of the terminal or IDE may be required for changes to take effect.")
 	},
 }

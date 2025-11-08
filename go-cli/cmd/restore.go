@@ -13,13 +13,12 @@ var restoreCmd = &cobra.Command{
 	Long:  `The restore command restores a tool call, resetting the conversation and file history to the state it was in when the tool call was suggested.`, //nolint:staticcheck
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to restore tool calls and conversation/file history.
+		fmt.Println("Restoring tool calls and conversation/file history is not yet implemented. This feature may be available in a future version.")
 		if len(args) == 0 {
-			fmt.Println("Listing available tool call checkpoints (not yet implemented).")
 			fmt.Println("To restore, use: gemini restore <checkpoint_name>")
 		} else {
 			checkpointName := args[0]
-			fmt.Printf("Restoring tool call checkpoint '%s' and conversation/file history (not yet implemented).\n", checkpointName)
+			fmt.Printf("Attempted to restore checkpoint '%s'. This functionality is not yet available.\n", checkpointName)
 		}
 	},
 }

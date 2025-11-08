@@ -18,8 +18,7 @@ var ideStatusCommand = &cobra.Command{
 	Short: "Check status of IDE integration",
 	Long:  `Checks the current status of the IDE integration.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to check IDE integration status.
-		fmt.Println("Checking IDE integration status (not yet implemented).")
+		fmt.Println("IDE integration status check is not yet implemented. This feature may be available in a future version.")
 	},
 }
 
@@ -28,8 +27,7 @@ var ideInstallCommand = &cobra.Command{
 	Short: "Install required IDE companion",
 	Long:  `Installs the required IDE companion extension for the detected IDE.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to install IDE companion.
-		fmt.Println("Installing IDE companion (not yet implemented).")
+		fmt.Println("Installing IDE companion is not yet implemented. This feature may be available in a future version.")
 	},
 }
 
@@ -38,8 +36,7 @@ var ideEnableCommand = &cobra.Command{
 	Short: "Enable IDE integration",
 	Long:  `Enables the IDE integration.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to enable IDE integration.
-		fmt.Println("Enabling IDE integration (not yet implemented).")
+		fmt.Println("Enabling IDE integration is not yet implemented. This feature may be available in a future version.")
 	},
 }
 
@@ -48,8 +45,7 @@ var ideDisableCommand = &cobra.Command{
 	Short: "Disable IDE integration",
 	Long:  `Disables the IDE integration.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual logic to disable IDE integration.
-		fmt.Println("Disabling IDE integration (not yet implemented).")
+		fmt.Println("Disabling IDE integration is not yet implemented. This feature may be available in a future version.")
 	},
 }
 

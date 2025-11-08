@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings" // Import strings package
 
 	"github.com/spf13/cobra"
 )
@@ -55,6 +56,43 @@ var toolsRunCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		toolName := args[0]
 		toolArgs := args[1:]
-		fmt.Printf("Running tool '%s' with args %v (not yet implemented).\n", toolName, toolArgs)
+
+		toolRegistry := Cfg.GetToolRegistry()
+		if toolRegistry == nil {
+			fmt.Println("Tool registry not initialized.")
+			return
+		}
+
+		tool, err := toolRegistry.GetTool(toolName)
+		if err != nil {
+			fmt.Printf("Error: Tool '%s' not found: %v\n", toolName, err)
+			return
+		}
+
+		parsedArgs := make(map[string]any)
+		for _, arg := range toolArgs {
+			parts := strings.SplitN(arg, "=", 2)
+			if len(parts) == 2 {
+				parsedArgs[parts[0]] = parts[1]
+			} else {
+				fmt.Printf("Warning: Invalid argument format '%s'. Expected key=value.\n", arg)
+			}
+		}
+
+		result, err := tool.Execute(parsedArgs)
+		if err != nil {
+			fmt.Printf("Error executing tool '%s': %v\n", toolName, err)
+			return
+		}
+
+		if result.Error != nil {
+			fmt.Printf("Tool '%s' returned an error: %s\n", toolName, result.Error.Message)
+		} else {
+			fmt.Printf("Tool '%s' executed successfully.\n", toolName)
+			if result.ReturnDisplay != "" {
+				fmt.Println("Output:")
+				fmt.Println(result.ReturnDisplay)
+			}
+		}
 	},
 }

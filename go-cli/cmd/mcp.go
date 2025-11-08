@@ -27,8 +27,7 @@ var mcpListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List configured MCP servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual listing of MCP servers.
-		fmt.Println("Listing configured MCP servers (not yet implemented).")
+		fmt.Println("Listing configured MCP servers is not yet implemented. This feature may be available in a future version.")
 	},
 }
 
@@ -39,8 +38,7 @@ var mcpAddCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
 		url := args[1]
-		// TODO: Implement actual adding of MCP servers.
-		fmt.Printf("Adding MCP server '%s' with URL '%s' (not yet implemented).\n", name, url)
+		fmt.Printf("Adding MCP server '%s' with URL '%s' is not yet implemented. This feature may be available in a future version.\n", name, url)
 	},
 }
 
@@ -50,7 +48,6 @@ var mcpRemoveCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		name := args[0]
-		// TODO: Implement actual removing of MCP servers.
-		fmt.Printf("Removing MCP server '%s' (not yet implemented).\n", name)
+		fmt.Printf("Removing MCP server '%s' is not yet implemented. This feature may be available in a future version.\n", name)
 	},
 }
