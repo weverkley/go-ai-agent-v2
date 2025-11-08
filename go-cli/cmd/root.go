@@ -107,6 +107,9 @@ func init() {
 		ToolRegistry: toolRegistry, // Pass the populated toolRegistry
 	}
 
+	// Create the final Config instance
+	Cfg = config.NewConfig(params)
+
 	// Initialize FileFilteringService
 	fileFilteringService, err := services.NewFileFilteringService(projectRoot)
 	if err != nil {
@@ -114,9 +117,6 @@ func init() {
 		os.Exit(1)
 	}
 	Cfg.SetConfiguredFileService(fileFilteringService)
-
-	// Create the final Config instance
-	Cfg = config.NewConfig(params)
 
 	// Initialize the global telemetry logger
 	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(params.Telemetry)
