@@ -222,9 +222,21 @@ type ToolCallConfirmationDetails struct {
 	IsModifying     bool                   `json:"isModifying,omitempty"`
 }
 
-// EditorType represents the type of editor.
-type EditorType string
+// Content represents a message in the chat history, simplified from @google/genai Content type.
+type Content struct {
+	Parts []Part `json:"parts"`
+	Role  string `json:"role"`
+}
 
+	// EditorType represents the type of editor.
+	type EditorType string
+
+	// ChatCompressionResult represents the result of a chat compression operation.
+	type ChatCompressionResult struct {
+		OriginalTokenCount int    `json:"originalTokenCount"`
+		NewTokenCount      int    `json:"newTokenCount"`
+		CompressionStatus  string `json:"compressionStatus"`
+	}
 // ToolCallResponseInfo represents the response information for a tool call.
 type ToolCallResponseInfo struct {
 	CallID        string             `json:"callId"`
@@ -245,9 +257,11 @@ type JsonSchemaObject struct {
 
 // JsonSchemaProperty defines the structure for a property within a JsonSchemaObject.
 type JsonSchemaProperty struct {
-	Type        string                  `json:"type"` // "string", "number", "integer", "boolean", "array"
-	Description string                  `json:"description"`
-	Items       *JsonSchemaPropertyItem `json:"items,omitempty"`
+	Type        string                        `json:"type"` // "string", "number", "integer", "boolean", "array", "object"
+	Description string                        `json:"description"`
+	Items       *JsonSchemaPropertyItem       `json:"items,omitempty"`
+	Properties  map[string]JsonSchemaProperty `json:"properties,omitempty"` // Added Properties field
+	Required    []string                      `json:"required,omitempty"`   // Added Required field for nested objects
 }
 
 // JsonSchemaPropertyItem defines the structure for items within a JsonSchemaProperty.
@@ -258,6 +272,8 @@ type JsonSchemaPropertyItem struct {
 // Tool is the interface that all tools must implement.
 type Tool interface {
 	Name() string
+	Description() string
+	ServerName() string // Add ServerName to the interface
 	Definition() *genai.Tool
 	Execute(args map[string]any) (ToolResult, error)
 }
@@ -286,6 +302,7 @@ type BaseDeclarativeTool struct {
 	isOutputMarkdown bool
 	canUpdateOutput  bool
 	MessageBus       interface{}
+	serverName       string // Add serverName field
 }
 
 // NewBaseDeclarativeTool creates a new BaseDeclarativeTool.
@@ -308,12 +325,23 @@ func NewBaseDeclarativeTool(
 		isOutputMarkdown: isOutputMarkdown,
 		canUpdateOutput:  canUpdateOutput,
 		MessageBus:       MessageBus,
+		serverName:       "", // Default to empty
 	}
 }
 
 // Name returns the name of the tool.
 func (bdt *BaseDeclarativeTool) Name() string {
 	return bdt.name
+}
+
+// Description returns the description of the tool.
+func (bdt *BaseDeclarativeTool) Description() string {
+	return bdt.description
+}
+
+// ServerName returns the server name of the tool.
+func (bdt *BaseDeclarativeTool) ServerName() string {
+	return bdt.serverName
 }
 
 // Definition returns the genai.Tool definition for the Gemini API.
@@ -417,8 +445,8 @@ func (r *ToolRegistry) GetTools() []*genai.Tool {
 	return toolDefs
 }
 
-// GetAllRegisteredTools returns all registered tools as a slice of Tool.
-func (r *ToolRegistry) GetAllRegisteredTools() []Tool {
+// GetAllTools returns all registered tools as a slice of Tool.
+func (r *ToolRegistry) GetAllTools() []Tool {
 	var registeredTools []Tool
 	for _, t := range r.tools {
 		registeredTools = append(registeredTools, t)

@@ -3,14 +3,20 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"text/tabwriter"
+	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/services"
+	"encoding/json"
 
+	"github.com/google/generative-ai-go/genai"
+
+	"go-ai-agent-v2/go-cli/pkg/types"
+
+	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
-
-var chatService *services.ChatService
 
 // chatCmd represents the chat command
 var chatCmd = &cobra.Command{
@@ -24,8 +30,6 @@ var chatCmd = &cobra.Command{
 }
 
 func init() {
-	chatService = services.NewChatService(cfg) // cfg is from root.go
-
 	// Add subcommands here
 	chatCmd.AddCommand(chatListCmd)
 	chatCmd.AddCommand(chatSaveCmd)
@@ -77,10 +81,25 @@ var chatSaveCmd = &cobra.Command{
 		}
 
 		if exists {
-			// TODO: Implement interactive overwrite confirmation using bubbletea
-			// For now, just print a message and exit.
-			fmt.Fprintf(os.Stderr, "Error: Checkpoint with tag '%s' already exists. Please use a different tag or delete the existing one.\n", tag)
-			os.Exit(1)
+			prompt := promptui.Prompt{
+				Label:     fmt.Sprintf("Checkpoint with tag '%s' already exists. Overwrite?", tag),
+				IsConfirm: true,
+			}
+
+			result, err := prompt.Run()
+			if err != nil {
+				if err == promptui.ErrInterrupt {
+					fmt.Println("Operation cancelled.")
+					os.Exit(0)
+				}
+				fmt.Fprintf(os.Stderr, "Prompt failed %v\n", err)
+				os.Exit(1)
+			}
+
+			if result != "y" && result != "Y" {
+				fmt.Println("Operation cancelled.")
+				os.Exit(0)
+			}
 		}
 
 		history, err := executor.GetHistory()
@@ -163,8 +182,113 @@ var chatShareCmd = &cobra.Command{
 	Long:  `Share the current conversation to a markdown or json file. Usage: /chat share [file]`, //nolint:staticcheck
 	Args:  cobra.MaximumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("Sharing chat with tag: %s (Not yet implemented)\n", args[0])
-		// TODO: Implement chat share logic (e.g., generate a shareable URL or format)
-		// nolint:staticcheck
+		filePathArg := ""
+		if len(args) > 0 {
+			filePathArg = args[0]
+		}
+
+		if filePathArg == "" {
+			filePathArg = fmt.Sprintf("gemini-conversation-%d.json", time.Now().Unix())
+		}
+
+		filePath := filePathArg
+		extension := filepath.Ext(filePath)
+
+		if extension != ".md" && extension != ".json" {
+			fmt.Fprintf(os.Stderr, "Error: Invalid file format. Only .md and .json are supported.\n")
+			os.Exit(1)
+		}
+
+		historyGenai, err := executor.GetHistory()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting chat history: %v\n", err)
+			os.Exit(1)
+		}
+
+		var userInitiatedHistoryGenai []*genai.Content
+		if len(historyGenai) > 2 {
+			userInitiatedHistoryGenai = historyGenai[2:] // Skip the first two messages (system/context)
+		}
+
+		var history []types.Content
+		for _, item := range userInitiatedHistoryGenai { // Iterate over user-initiated history
+			var parts []types.Part
+			for _, part := range item.Parts {
+				newPart := types.Part{}
+				switch p := part.(type) {
+				case genai.Text:
+					newPart.Text = string(p)
+				case *genai.FunctionCall:
+					newPart.FunctionCall = &types.FunctionCall{Name: p.Name, Args: p.Args}
+				case *genai.FunctionResponse:
+					newPart.FunctionResponse = &types.FunctionResponse{Name: p.Name, Response: p.Response}
+				}
+				parts = append(parts, newPart)
+			}
+			history = append(history, types.Content{Role: item.Role, Parts: parts})
+		}
+
+		if len(history) == 0 { // Now check if there's any actual conversation
+			fmt.Println("No conversation found to share.")
+			return
+		}
+
+		var content string
+		if extension == ".json" {
+			jsonContent, err := json.MarshalIndent(history, "", "  ")
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error marshalling chat history to JSON: %v\n", err)
+				os.Exit(1)
+			}
+			content = string(jsonContent)
+		} else { // .md
+			content = serializeHistoryToMarkdown(history)
+		}
+
+		err = os.WriteFile(filePath, []byte(content), 0644)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing conversation to file: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("Conversation shared to %s\n", filePath)
 	},
+}
+
+// serializeHistoryToMarkdown converts a slice of types.Content to a Markdown string.
+func serializeHistoryToMarkdown(history []types.Content) string {
+	var sb strings.Builder
+
+	for i, item := range history {
+		if i > 0 {
+			sb.WriteString("\n\n---\n\n")
+		}
+
+		var textParts []string
+		for _, part := range item.Parts {
+			if part.Text != "" {
+				textParts = append(textParts, part.Text)
+			} else if part.FunctionCall != nil {
+				jsonCall, err := json.MarshalIndent(part.FunctionCall, "", "  ")
+				if err == nil {
+					textParts = append(textParts, fmt.Sprintf("**Tool Command**:\n```json\n%s\n```", string(jsonCall)))
+				}
+			} else if part.FunctionResponse != nil {
+				jsonResponse, err := json.MarshalIndent(part.FunctionResponse, "", "  ")
+				if err == nil {
+					textParts = append(textParts, fmt.Sprintf("**Tool Response**:\n```json\n%s\n```", string(jsonResponse)))
+				}
+			}
+		}
+
+		text := strings.Join(textParts, "")
+		roleIcon := "✨"
+		if item.Role == "user" {
+			roleIcon = "🧑‍💻"
+		}
+
+		sb.WriteString(fmt.Sprintf("%s ## %s\n\n%s", roleIcon, strings.ToUpper(item.Role), text))
+	}
+
+	return sb.String()
 }

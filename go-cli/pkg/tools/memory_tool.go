@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 const (
@@ -17,37 +15,32 @@ const (
 )
 
 // MemoryTool represents the memory tool.
-type MemoryTool struct{}
+type MemoryTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewMemoryTool creates a new instance of MemoryTool.
 func NewMemoryTool() *MemoryTool {
-	return &MemoryTool{}
-}
-
-// Name returns the name of the tool.
-func (t *MemoryTool) Name() string {
-	return "save_memory"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *MemoryTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Saves a specific piece of information or fact to your long-term memory.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"fact": {
-							Type:        genai.TypeString,
-							Description: "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
-						},
+	return &MemoryTool{
+		types.NewBaseDeclarativeTool(
+			"save_memory",
+			"save_memory",
+			"Saves a specific piece of information or fact to your long-term memory.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"fact": {
+						Type:        "string",
+						Description: "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
 					},
-					Required: []string{"fact"},
 				},
+				Required: []string{"fact"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

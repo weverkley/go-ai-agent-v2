@@ -3,531 +3,128 @@ package extension
 import (
 	"encoding/json"
 	"fmt"
-	configPkg "go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/services"
-	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"path/filepath"
-	"strings"
-
-	"github.com/go-git/go-git/v5"
+	"sync"
 )
 
-// Extension represents a simplified extension structure.
+const (
+	settingsFile = ".gemini/settings.json"
+)
+
+// Extension represents a Gemini CLI extension.
 type Extension struct {
-	Name          string `json:"name"`
-	Path          string
-	Description   string                       `json:"description"`
-	McpServers    map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
-	InstallType   string
-	InstallSource string
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Enabled     bool   `json:"enabled"`
+	// Add other extension properties as needed
 }
 
-// ExtensionConfig represents the structure of gemini-extension.json
-type ExtensionConfig struct {
-	Name        string                           `json:"name"`
-	Description string                           `json:"description"`
-	McpServers  map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
-	// Add other fields as needed from the JSON config
+// ExtensionManager manages Gemini CLI extensions.
+type Manager struct {
+	mu        sync.RWMutex
+	extensions map[string]*Extension
+	baseDir   string // Base directory to resolve settingsFile
 }
 
-// ExtensionManager manages the loading and interaction with extensions.
-type ExtensionManager struct {
-	workspaceDir string
-	settings     *configPkg.Settings
-	fsService    services.FileSystemService // Add FileSystemService dependency
-	gitService   *services.GitService        // Add GitService dependency
-	// Add other dependencies like consent handlers
-}
-
-// NewExtensionManager creates a new instance of ExtensionManager.
-func NewExtensionManager(workspaceDir string) *ExtensionManager {
-	settings := configPkg.LoadSettings(workspaceDir)
-	return &ExtensionManager{
-		workspaceDir: workspaceDir,
-		settings:     settings,
-		fsService:    services.NewFileSystemService(), // Initialize FileSystemService
-		gitService:   services.NewGitService(),        // Initialize GitService
+// NewManager creates a new ExtensionManager instance.
+func NewManager(baseDir string) *Manager {
+	em := &Manager{
+		extensions: make(map[string]*Extension),
+		baseDir:    baseDir,
 	}
+	// Attempt to load existing extension statuses on creation
+	_ = em.LoadExtensionStatus() // Ignore error for initial load
+	return em
 }
 
-// LoadExtensions discovers and loads extensions from configured paths.
-func (em *ExtensionManager) LoadExtensions() ([]Extension, error) {
-	var loadedExtensions []Extension
-	for _, extPath := range em.settings.ExtensionPaths {
-		entries, err := em.fsService.ListDirectory(extPath, []string{}, true, true)
-		if err != nil {
-			// Log error but continue with other paths
-			fmt.Printf("Warning: Failed to list directory %s: %v\n", extPath, err)
-			continue
-		}
+// ListExtensions returns a list of all managed extensions.
+func (em *Manager) ListExtensions() []*Extension {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
 
-		for _, entry := range entries {
-			fullPath := em.fsService.JoinPaths(extPath, entry)
-
-			fileInfo, err := os.Lstat(fullPath) // Use Lstat to get info about the link itself
-			if err != nil {
-				fmt.Printf("Warning: Failed to get file info for %s: %v\n", fullPath, err)
-				continue
-			}
-
-			var actualPath string
-			var installType string
-			var installSource string
-
-			if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-				// It's a symlink, resolve it
-				resolvedPath, err := os.Readlink(fullPath)
-				if err != nil {
-					fmt.Printf("Warning: Failed to read symlink %s: %v\n", fullPath, err)
-					continue
-				}
-				// If the symlink is relative, resolve it against the workspace directory
-				if !filepath.IsAbs(resolvedPath) {
-					resolvedPath = filepath.Join(em.workspaceDir, resolvedPath)
-				}
-				actualPath = resolvedPath
-				installType = "link"
-				installSource = actualPath // For linked extensions, source is the resolved path
-			} else if fileInfo.IsDir() {
-				actualPath = fullPath
-				// Check if it's a git repository
-				gitRepoPath := em.fsService.JoinPaths(actualPath, ".git")
-				exists, err := em.fsService.PathExists(gitRepoPath)
-				if err != nil {
-					fmt.Printf("Warning: Failed to check if %s is a git repository: %v\n", actualPath, err)
-					installType = "local"
-					installSource = actualPath
-				} else if exists {
-					installType = "git"
-					installSource = actualPath // For git, source is the path itself for now
-				} else {
-					installType = "local"
-					installSource = actualPath
-				}
-			} else {
-				continue // Not a directory or symlink to a directory
-			}
-
-			extensionConfigFile := em.fsService.JoinPaths(actualPath, "gemini-extension.json")
-			exists, err := em.fsService.PathExists(extensionConfigFile)
-			if err != nil {
-				fmt.Printf("Warning: Failed to check existence of %s: %v\n", extensionConfigFile, err)
-				continue
-			}
-
-			if exists {
-				// Read and parse gemini-extension.json
-				configBytes, err := os.ReadFile(extensionConfigFile)
-				if err != nil {
-					fmt.Printf("Warning: Failed to read extension config file %s: %v\n", extensionConfigFile, err)
-					continue
-				}
-
-				var extConfig ExtensionConfig
-				if err = json.Unmarshal(configBytes, &extConfig); err != nil {
-					fmt.Printf("Warning: Failed to parse extension config file %s: %v\n", extensionConfigFile, err)
-					continue
-				}
-
-				loadedExtensions = append(loadedExtensions, Extension{
-					Name:          extConfig.Name,
-					Path:          actualPath,
-					Description:   extConfig.Description,
-					McpServers:    extConfig.McpServers,
-					InstallType:   installType,
-					InstallSource: installSource,
-				})
-			}
-		}
+	list := make([]*Extension, 0, len(em.extensions))
+	for _, ext := range em.extensions {
+		list = append(list, ext)
 	}
-
-	return loadedExtensions, nil
+	return list
 }
 
-// ToOutputString converts an Extension to a string for output.
-func (em *ExtensionManager) ToOutputString(ext Extension) string {
-	return fmt.Sprintf("Name: %s\nPath: %s\nDescription: %s", ext.Name, ext.Path, ext.Description)
+// RegisterExtension registers a new extension with the manager.
+func (em *Manager) RegisterExtension(ext *Extension) {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+	em.extensions[ext.Name] = ext
 }
 
-// InstallOrUpdateExtension installs or updates an extension.
-func (em *ExtensionManager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata, force bool) (string, error) {
-	fmt.Printf("Installing/updating extension from source: %s (type: %s)\n", metadata.Source, metadata.Type)
+// EnableExtension enables a specific extension.
+func (em *Manager) EnableExtension(name string) error {
+	em.mu.Lock()
+	defer em.mu.Unlock()
 
-	// Determine installation path
-	var extensionName string
-	if metadata.Type == "git" {
-		// Extract repository name from git URL
-		repoName := filepath.Base(metadata.Source)
-		repoName = strings.TrimSuffix(repoName, ".git")
-		extensionName = repoName
-	} else {
-		extensionName = filepath.Base(metadata.Source)
+	ext, ok := em.extensions[name]
+	if !ok {
+		return fmt.Errorf("extension '%s' not found", name)
 	}
-		installPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extensionName) // For simplicity, use first extension path
-	
-		if metadata.Type == "git" {
-			fmt.Printf("Cloning/fetching git repository %s to %s\n", metadata.Source, installPath)
-			// Check if directory already exists
-			exists, err := em.fsService.PathExists(installPath)
-			if err != nil {
-				return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
-			}
-	
-			if exists {
-				if force {
-					fmt.Printf("Force flag is true. Removing existing repository at %s before re-cloning.\n", installPath)
-					err = os.RemoveAll(installPath)
-					if err != nil {
-						return "", fmt.Errorf("failed to remove existing repository at %s: %w", installPath, err)
-					}
-					// Proceed to clone
-				} else {
-					// If exists and not force, assume update (just pull)
-					fmt.Printf("Repository already exists, pulling latest changes in %s\n", installPath)
-					r, err := git.PlainOpen(installPath)
-					if err != nil {
-						return "", fmt.Errorf("failed to open git repository at %s for update: %w", installPath, err)
-					}
-					w, err := r.Worktree()
-					if err != nil {
-						return "", fmt.Errorf("failed to get worktree for %s: %w", installPath, err)
-					}
-					err = w.Pull(&git.PullOptions{})
-					if err != nil && err != git.NoErrAlreadyUpToDate {
-						return "", fmt.Errorf("failed to pull latest changes for %s: %w", installPath, err)
-					}
-					// Read the extension config from the source to get the real name before returning
-					configPath := em.fsService.JoinPaths(installPath, "gemini-extension.json")
-					configBytes, readErr := em.fsService.ReadFile(configPath)
-					if readErr != nil {
-						return "", fmt.Errorf("failed to read extension config file after pull: %w", readErr)
-					}
-					var pulledExtConfig ExtensionConfig
-					if unmarshalErr := json.Unmarshal([]byte(configBytes), &pulledExtConfig); unmarshalErr != nil {
-						return "", fmt.Errorf("failed to parse extension config file after pull: %w", unmarshalErr)
-					}
-					return pulledExtConfig.Name, nil // Return early after pull
-				}
-			}
-			// If not exists, or if force was true and existing repo was removed, clone
-			fmt.Printf("Cloning repository %s to %s\n", metadata.Source, installPath)
-			_, err = git.PlainClone(installPath, false, &git.CloneOptions{
-				URL:               metadata.Source,
-				RecurseSubmodules: git.DefaultSubmoduleRecursionDepth, // Handle submodules
-			})
-			if err != nil {
-				return "", fmt.Errorf("failed to clone git repository %s to %s: %w", metadata.Source, installPath, err)
-			}
-	
-		} else if metadata.Type == "local" {
-			fmt.Printf("Copying local extension from %s to %s\n", metadata.Source, installPath)
-			// Ensure destination directory is clean before copying
-			exists, err := em.fsService.PathExists(installPath)
-			if err != nil {
-				return "", fmt.Errorf("failed to check existence of install path %s: %w", installPath, err)
-			}
-			if exists {
-				if !force {
-					return "", fmt.Errorf("local extension already exists at %s. Use --force to overwrite.", installPath)
-				}
-				fmt.Printf("Removing existing local extension at %s for update (force).", installPath)
-				err = os.RemoveAll(installPath)
-				if err != nil {
-					return "", fmt.Errorf("failed to copy local extension: %w", err)
-				}
-			}
-			// Implement actual file copying
-			err = em.fsService.CopyDirectory(metadata.Source, installPath)
-			if err != nil {
-				return "", fmt.Errorf("failed to copy local extension: %w", err)
-			}
-		}
-	
-		// Read the extension config from the source to get the real name
-		configPath := em.fsService.JoinPaths(installPath, "gemini-extension.json")
-		configBytes, err := em.fsService.ReadFile(configPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to read extension config file from source: %w", err)
-		}
-	
-		var extConfig ExtensionConfig
-		err = json.Unmarshal([]byte(configBytes), &extConfig)
-		if err != nil {
-			return "", fmt.Errorf("failed to parse extension config file from source: %w", err)
-		}
-	
-		// Potentially update the config file if needed (e.g., with installation metadata)
-		// For now, we'll just use the name from the config
-		// The original code had a WriteFile here, but it was writing the original configBytes back.
-		// If we want to update the config file with install metadata, we should re-marshal extConfig.
-		// For now, I'll remove this WriteFile as it doesn’t seem to serve a purpose here.
-		// err = em.fsService.WriteFile(configPath, configBytes)
-		// if err != nil {
-		// 	return "", fmt.Errorf("failed to write extension config file: %w", err)
-		// }
-	
-		// Rename the extension directory to the name from the config
-		newInstallPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], extConfig.Name)
-		if installPath != newInstallPath {
-			fmt.Printf("Renaming extension directory from %s to %s\n", installPath, newInstallPath)
-			if err := os.Rename(installPath, newInstallPath); err != nil {
-				return "", fmt.Errorf("failed to rename extension directory: %w", err)
-			}
-		}
-	
-		return extConfig.Name, nil}
+	ext.Enabled = true
+	return em.SaveExtensionStatus()
+}
 
-// UpdateExtension updates an installed extension.
-func (em *ExtensionManager) UpdateExtension(name string) error {
-	installedExtensions, err := em.LoadExtensions()
+// DisableExtension disables a specific extension.
+func (em *Manager) DisableExtension(name string) error {
+	em.mu.Lock()
+	defer em.mu.Unlock()
+
+	ext, ok := em.extensions[name]
+	if !ok {
+		return fmt.Errorf("extension '%s' not found", name)
+	}
+	ext.Enabled = false
+	return em.SaveExtensionStatus()
+}
+
+// SaveExtensionStatus persists the current extension statuses to a file.
+func (em *Manager) SaveExtensionStatus() error {
+	em.mu.RLock()
+	defer em.mu.RUnlock()
+
+	filePath := filepath.Join(em.baseDir, settingsFile)
+	data, err := json.MarshalIndent(em.extensions, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to load installed extensions: %w", err)
+		return fmt.Errorf("failed to marshal extension statuses: %w", err)
 	}
 
-	var targetExtension *Extension
-	for _, ext := range installedExtensions {
-		if ext.Name == name {
-			targetExtension = &ext
-			break
-		}
-	}
-
-	if targetExtension == nil {
-		return fmt.Errorf("extension \"%s\" not found", name)
-	}
-
-	// Check if it's a git repository
-	gitRepoPath := em.fsService.JoinPaths(targetExtension.Path, ".git")
-	exists, err := em.fsService.PathExists(gitRepoPath)
+	// Ensure the parent directory exists
+	err = os.MkdirAll(filepath.Dir(filePath), 0755)
 	if err != nil {
-		return fmt.Errorf("failed to check if %s is a git repository: %w", targetExtension.Path, err)
+		return fmt.Errorf("failed to create directory for settings file: %w", err)
 	}
 
-	if exists {
-		fmt.Printf("Updating git-based extension \"%s\" at %s\n", name, targetExtension.Path)
-		r, err := git.PlainOpen(targetExtension.Path)
-		if err != nil {
-			return fmt.Errorf("failed to open git repository at %s for update: %w", targetExtension.Path, err)
-		}
-		w, err := r.Worktree()
-		if err != nil {
-			return fmt.Errorf("failed to get worktree for %s: %w", targetExtension.Path, err)
-		}
-		err = w.Pull(&git.PullOptions{})
-		if err != nil && err != git.NoErrAlreadyUpToDate {
-			return fmt.Errorf("failed to pull latest changes for %s: %w", targetExtension.Path, err)
-		}
-		fmt.Printf("Extension \"%s\" updated successfully.\n", name)
-	} else if targetExtension.InstallType == "local" {
-		fmt.Printf("Extension \"%s\" at %s is a local extension and cannot be updated automatically.\n", name, targetExtension.Path)
-	} else if targetExtension.InstallType == "link" {
-		fmt.Printf("Extension \"%s\" at %s is a linked extension and cannot be updated automatically.\n", name, targetExtension.Path)
-	} else {
-		return fmt.Errorf("unsupported extension type \"%s\" for update", targetExtension.InstallType)
+	if err := os.WriteFile(filePath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write settings file: %w", err)
 	}
-
 	return nil
 }
 
-	// UninstallExtension removes an installed extension.
-func (em *ExtensionManager) UninstallExtension(name string, _ bool) error {
-	// For now, we ignore the `_ bool` (force) argument as we don't have interactive consent.
+// LoadExtensionStatus loads extension statuses from a file.
+func (em *Manager) LoadExtensionStatus() error {
+	em.mu.Lock()
+	defer em.mu.Unlock()
 
-	installedExtensions, err := em.LoadExtensions()
+	filePath := filepath.Join(em.baseDir, settingsFile)
+	data, err := os.ReadFile(filePath)
+	if os.IsNotExist(err) {
+		em.extensions = make(map[string]*Extension) // File doesn't exist, start with empty
+		return nil
+	}
 	if err != nil {
-		return fmt.Errorf("failed to load installed extensions: %w", err)
+		return fmt.Errorf("failed to read settings file: %w", err)
 	}
 
-	var targetExtension *Extension
-	for _, ext := range installedExtensions {
-		if ext.Name == name {
-			targetExtension = &ext
-			break
-		}
+	var loadedExtensions map[string]*Extension
+	if err := json.Unmarshal(data, &loadedExtensions); err != nil {
+		return fmt.Errorf("failed to unmarshal extension statuses: %w", err)
 	}
-
-	if targetExtension == nil {
-		return fmt.Errorf("extension \"%s\" not found", name)
-	}
-
-	if targetExtension.InstallType == "link" {
-		// For linked extensions, remove the symlink itself
-		symlinkPath := em.fsService.JoinPaths(em.settings.ExtensionPaths[0], name)
-		fmt.Printf("Removing extension symlink: %s\n", symlinkPath)
-		if err := os.Remove(symlinkPath); err != nil {
-			return fmt.Errorf("failed to remove extension symlink %s: %w", symlinkPath, err)
-		}
-	} else {
-		// For other types, remove the directory
-		fmt.Printf("Removing extension directory: %s\n", targetExtension.Path)
-		if err := os.RemoveAll(targetExtension.Path); err != nil {
-			return fmt.Errorf("failed to remove extension directory %s: %w", targetExtension.Path, err)
-		}
-	}
-
-	fmt.Printf("Extension \"%s\" successfully uninstalled.\n", name)
-	return nil
-}
-// EnableExtension enables an extension.
-func (em *ExtensionManager) EnableExtension(name string, scope configPkg.SettingScope) error {
-	// 1. Check if the extension exists
-	installedExtensions, err := em.LoadExtensions()
-	if err != nil {
-		return fmt.Errorf("failed to load installed extensions: %w", err)
-	}
-
-	found := false
-	for _, ext := range installedExtensions {
-		if ext.Name == name {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("extension \"%s\" not found", name)
-	}
-
-	// 2. Load current settings (em.settings is already loaded)
-
-	// 3. Add extension to EnabledExtensions for the given scope
-	currentEnabled := em.settings.EnabledExtensions[scope]
-
-	// Check if already enabled
-	for _, enabledName := range currentEnabled {
-		if enabledName == name {
-			return nil // Already enabled, do nothing
-		}
-	}
-
-	// Append if not already enabled
-	if err := configPkg.SaveSettings(em.workspaceDir, em.settings); err != nil {
-		return fmt.Errorf("failed to save settings: %w", err)
-	}
-
-	return nil
-}
-
-// DisableExtension disables an extension.
-func (em *ExtensionManager) DisableExtension(name string, scope configPkg.SettingScope) error {
-	// 1. Check if the extension exists
-	installedExtensions, err := em.LoadExtensions()
-	if err != nil {
-		return fmt.Errorf("failed to load installed extensions: %w", err)
-	}
-
-	found := false
-	for _, ext := range installedExtensions {
-		if ext.Name == name {
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("extension \"%s\" not found", name)
-	}
-
-	// 2. Load current settings (em.settings is already loaded)
-
-	// 3. Remove extension from EnabledExtensions for the given scope
-	currentEnabled := em.settings.EnabledExtensions[scope]
-	var newEnabled []string
-	removed := false
-	for _, enabledName := range currentEnabled {
-		if enabledName == name {
-			removed = true
-		} else {
-			newEnabled = append(newEnabled, enabledName)
-		}
-	}
-
-	if !removed {
-		return nil // Extension not found in enabled list, nothing to do
-	}
-
-	em.settings.EnabledExtensions[scope] = newEnabled
-
-	// 4. Save updated settings
-	if err := configPkg.SaveSettings(em.workspaceDir, em.settings); err != nil {
-		return fmt.Errorf("failed to save settings: %w", err)
-	}
-
-	return nil
-}
-
-// LinkExtension links a local extension.
-func (em *ExtensionManager) LinkExtension(localPath string) error {
-	// 1. Check if local path exists and is a directory
-	exists, err := em.fsService.PathExists(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to check existence of local path %s: %w", localPath, err)
-	}
-	if !exists {
-		return fmt.Errorf("local extension path not found: %s", localPath)
-	}
-	isDir, err := em.fsService.IsDirectory(localPath)
-	if err != nil {
-		return fmt.Errorf("failed to check if %s is a directory: %w", localPath, err)
-	}
-	if !isDir {
-		return fmt.Errorf("local extension path is not a directory: %s", localPath)
-	}
-
-	// 2. Read gemini-extension.json to get the extension name
-	configPath := em.fsService.JoinPaths(localPath, "gemini-extension.json")
-	configBytes, err := em.fsService.ReadFile(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to read gemini-extension.json from %s: %w", localPath, err)
-	}
-
-	var extConfig ExtensionConfig
-	if err := json.Unmarshal([]byte(configBytes), &extConfig); err != nil {
-		return fmt.Errorf("failed to parse gemini-extension.json from %s: %w", localPath, err)
-	}
-
-	if extConfig.Name == "" {
-		return fmt.Errorf("extension name not found in gemini-extension.json at %s", localPath)
-	}
-
-	// 3. Determine target link path
-	installDir := em.settings.ExtensionPaths[0] // For simplicity, use the first extension path
-	linkPath := em.fsService.JoinPaths(installDir, extConfig.Name)
-
-	// Ensure the installation directory exists
-	if err := os.MkdirAll(installDir, 0755); err != nil {
-		return fmt.Errorf("failed to create extension installation directory %s: %w", installDir, err)
-	}
-
-	// Check if a link or directory already exists at linkPath
-	exists, err = em.fsService.PathExists(linkPath)
-	if err != nil {
-		return fmt.Errorf("failed to check existence of link path %s: %w", linkPath, err)
-	}
-	if exists {
-		// If it exists, and is a symlink, remove it. If it's a directory, return an error.
-		fileInfo, err := os.Lstat(linkPath)
-		if err != nil {
-			return fmt.Errorf("failed to get file info for %s: %w", linkPath, err)
-		}
-		if fileInfo.Mode()&os.ModeSymlink == os.ModeSymlink {
-			fmt.Printf("Removing existing symlink at %s\n", linkPath)
-			if err := os.Remove(linkPath); err != nil {
-				return fmt.Errorf("failed to remove existing symlink at %s: %w", linkPath, err)
-			}
-		} else if fileInfo.IsDir() {
-			return fmt.Errorf("a directory already exists at %s. Cannot link extension.", linkPath)
-		} else {
-			return fmt.Errorf("a file already exists at %s. Cannot link extension.", linkPath)
-		}
-	}
-
-	// 4. Create symbolic link
-	fmt.Printf("Creating symlink from %s to %s\n", localPath, linkPath)
-	if err := os.Symlink(localPath, linkPath); err != nil {
-		return fmt.Errorf("failed to create symlink: %w", err)
-	}
-
+	em.extensions = loadedExtensions
 	return nil
 }

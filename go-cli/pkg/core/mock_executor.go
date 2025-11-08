@@ -19,6 +19,7 @@ type MockExecutor struct {
 	DefaultExecuteToolResult    *types.ToolResult              // New field for configurable default tool execution result
 	GetHistoryFunc              func() ([]*genai.Content, error) // New field for configurable mock history
 	SetHistoryFunc              func(history []*genai.Content) error
+	CompressChatFunc            func(promptId string, force bool) (*types.ChatCompressionResult, error)
 	mockHistory                 []*genai.Content // Field to store mock history
 }
 
@@ -96,6 +97,13 @@ func NewMockExecutor(defaultResponse *genai.GenerateContentResponse, defaultTool
 			me.mockHistory = history
 			return nil
 		}
+	me.CompressChatFunc = func(promptId string, force bool) (*types.ChatCompressionResult, error) {
+		return &types.ChatCompressionResult{
+			OriginalTokenCount: 100,
+			NewTokenCount:      10,
+			CompressionStatus:  "mocked_success",
+		}, nil
+	}
 	return me
 }
 
@@ -127,4 +135,9 @@ func (me *MockExecutor) GetHistory() ([]*genai.Content, error) {
 // SetHistory implements the Executor interface.
 func (me *MockExecutor) SetHistory(history []*genai.Content) error {
 	return me.SetHistoryFunc(history)
+}
+
+// CompressChat implements the Executor interface.
+func (me *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
+	return me.CompressChatFunc(promptId, force)
 }

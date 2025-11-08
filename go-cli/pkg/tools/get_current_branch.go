@@ -5,8 +5,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // GetCurrentBranchTool implements the Tool interface for getting the current Git branch.
@@ -57,9 +55,4 @@ func (t *GetCurrentBranchTool) Execute(args map[string]any) (types.ToolResult, e
 		LLMContent:    branch,
 		ReturnDisplay: fmt.Sprintf("Current Git branch in %s: %s", dir, branch),
 	}, nil
-}
-
-// Definition returns the tool definition for the Gemini API.
-func (t *GetCurrentBranchTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

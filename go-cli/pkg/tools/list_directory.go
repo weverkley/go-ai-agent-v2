@@ -6,20 +6,18 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // ListDirectoryTool implements the Tool interface for listing directory contents.
 type ListDirectoryTool struct {
-	types.BaseDeclarativeTool // Embed BaseDeclarativeTool directly
+	*types.BaseDeclarativeTool // Embed BaseDeclarativeTool directly
 	fileSystemService services.FileSystemService // Use the interface
 }
 
 // NewListDirectoryTool creates a new ListDirectoryTool.
 func NewListDirectoryTool() *ListDirectoryTool {
 	return &ListDirectoryTool{
-		BaseDeclarativeTool: *types.NewBaseDeclarativeTool(
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			"list_directory",
 			"List Directory",
 			"Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.",
@@ -36,13 +34,19 @@ func NewListDirectoryTool() *ListDirectoryTool {
 						Description: "List of glob patterns to ignore",
 						Items:       &types.JsonSchemaPropertyItem{Type: "string"},
 					},
-					"respect_git_ignore": {
-						Type:        "boolean",
-						Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
-					},
-					"respect_gemini_ignore": {
-						Type:        "boolean",
-						Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+					"file_filtering_options": {
+						Type:        "object",
+						Description: "Whether to respect ignore patterns from .gitignore or .geminiignore",
+						Properties: map[string]types.JsonSchemaProperty{
+							"respect_git_ignore": {
+								Type:        "boolean",
+								Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
+							},
+							"respect_gemini_ignore": {
+								Type:        "boolean",
+								Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+							},
+						},
 					},
 				},
 				Required: []string{"path"},
@@ -91,9 +95,4 @@ func (t *ListDirectoryTool) Execute(args map[string]any) (types.ToolResult, erro
 		ReturnDisplay: fmt.Sprintf("Listed directory %s: %d items", path, len(files)),
 	},
 	nil
-}
-
-// Definition returns the tool definition for the Gemini API.
-func (t *ListDirectoryTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

@@ -5,8 +5,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // GetRemoteURLTool implements the Tool interface for getting the Git remote URL.
@@ -57,9 +55,4 @@ func (t *GetRemoteURLTool) Execute(args map[string]any) (types.ToolResult, error
 		LLMContent:    remoteURL,
 		ReturnDisplay: fmt.Sprintf("Git remote URL for %s: %s", dir, remoteURL),
 	}, nil
-}
-
-// Definition returns the tool definition for the Gemini API.
-func (t *GetRemoteURLTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

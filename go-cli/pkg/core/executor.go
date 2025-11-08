@@ -14,4 +14,5 @@ type Executor interface {
 	ListModels() ([]string, error)
 	GetHistory() ([]*genai.Content, error)
 	SetHistory(history []*genai.Content) error
+	CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error)
 }

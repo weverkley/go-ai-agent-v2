@@ -6,54 +6,47 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // SmartEditTool represents the smart-edit tool.
-type SmartEditTool struct{}
+type SmartEditTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewSmartEditTool creates a new instance of SmartEditTool.
 func NewSmartEditTool() *SmartEditTool {
-	return &SmartEditTool{}
-}
-
-// Name returns the name of the tool.
-func (t *SmartEditTool) Name() string {
-	return "smart_edit"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *SmartEditTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Replaces text within a file. Replaces a single occurrence.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"file_path": {
-							Type:        genai.TypeString,
-							Description: "The absolute path to the file to modify. Must start with '/'.",
-						},
-						"instruction": {
-							Type:        genai.TypeString,
-							Description: "A clear, semantic instruction for the code change.",
-						},
-						"old_string": {
-							Type:        genai.TypeString,
-							Description: "The exact literal text to replace.",
-						},
-						"new_string": {
-							Type:        genai.TypeString,
-							Description: "The exact literal text to replace old_string with.",
-						},
+	return &SmartEditTool{
+		types.NewBaseDeclarativeTool(
+			"smart_edit",
+			"smart_edit",
+			"Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the read_file tool to examine the file's current content before attempting a text replacement.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"file_path": {
+						Type:        "string",
+						Description: "The absolute path to the file to modify. Must start with '/'.",
 					},
-					Required: []string{"file_path", "instruction", "old_string", "new_string"},
+					"instruction": {
+						Type:        "string",
+						Description: "A clear, semantic instruction for the code change, acting as a high-quality prompt for an expert LLM assistant.",
+					},
+					"old_string": {
+						Type:        "string",
+						Description: "The exact literal text to replace (including all whitespace, indentation, newlines, and surrounding code etc.).",
+					},
+					"new_string": {
+						Type:        "string",
+						Description: "The exact literal text to replace `old_string` with (also including all whitespace, indentation, newlines, and surrounding code etc.). Ensure the resulting code is correct and idiomatic and that `old_string` and `new_string` are different.",
+					},
 				},
+				Required: []string{"file_path", "instruction", "old_string", "new_string"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

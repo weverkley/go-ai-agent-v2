@@ -1,15 +1,27 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
-	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/telemetry"
-	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
+	    "fmt"
+	    "os"
+	    "time" // Import time package
+	
+	    	"go-ai-agent-v2/go-cli/pkg/config"
+	
+	    	"go-ai-agent-v2/go-cli/pkg/core"
+	
+	    	"go-ai-agent-v2/go-cli/pkg/extension"
+	
+	    	"go-ai-agent-v2/go-cli/pkg/services"
+	
+	    	"go-ai-agent-v2/go-cli/pkg/telemetry"
+	
+	    	"go-ai-agent-v2/go-cli/pkg/tools"
+	
+	    	"go-ai-agent-v2/go-cli/pkg/types"
+	
+	    
+	
+	    	"github.com/google/generative-ai-go/genai"
 
 	"github.com/spf13/cobra"
 )
@@ -20,6 +32,17 @@ var rootCmd = &cobra.Command{
 	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// This will run before any subcommand. We can use it to set up common configurations.
+		// Initialize the executor here so it's available to all subcommands
+		executorFactory := core.NewExecutorFactory()
+		var err error
+		executor, err = executorFactory.CreateExecutor(executorType, Cfg, types.GenerateContentConfig{}, []*genai.Content{})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Initialize chatService here, after executor is available
+		chatService = services.NewChatService(Cfg, executor)
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
@@ -29,9 +52,15 @@ var rootCmd = &cobra.Command{
 	},
 }
 
-var cfg *config.Config
+var Cfg *config.Config
 var executorType string
 var executor core.Executor // Declare package-level executor
+var chatService *services.ChatService // Declare package-level chatService
+var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
+var ExtensionManager *extension.Manager // Declare package-level extensionManager
+var MemoryService *services.MemoryService // Declare package-level memoryService
+var SessionStartTime time.Time // Declare sessionStartTime
+var SettingsService *services.SettingsService // Declare package-level settingsService
 
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
@@ -41,9 +70,29 @@ func Execute() {
 }
 
 func init() {
+	// Initialize sessionStartTime
+	SessionStartTime = time.Now()
+
+	// Initialize workspaceService here
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+	WorkspaceService = services.NewWorkspaceService(projectRoot)
+
+	// Initialize extensionManager here
+	ExtensionManager = extension.NewManager(projectRoot)
+
+	// Initialize memoryService here
+	MemoryService = services.NewMemoryService(projectRoot)
+
+	// Initialize settingsService here
+	SettingsService = services.NewSettingsService(projectRoot)
+
 	rootCmd.PersistentFlags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
-	// Create a dummy config for initial tool registry creation
-	toolRegistry := types.NewToolRegistry()
+	// Register all tools
+	toolRegistry := tools.RegisterAllTools()
 
 	// Initialize ConfigParameters
 	params := &config.ConfigParameters{
@@ -55,11 +104,11 @@ func init() {
 			Outfile: "",    // Default to no outfile
 		},
 		// Add other parameters as needed
-		ToolRegistry: toolRegistry, // Pass the toolRegistry directly
+		ToolRegistry: toolRegistry, // Pass the populated toolRegistry
 	}
 
 	// Create the final Config instance
-	cfg = config.NewConfig(params)
+	Cfg = config.NewConfig(params)
 
 	// Initialize the global telemetry logger
 	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(params.Telemetry)
@@ -113,16 +162,5 @@ func init() {
 	rootCmd.AddCommand(terminalSetupCmd)
 	rootCmd.AddCommand(themeCmd)
 	rootCmd.AddCommand(vimCmd)
-
-	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		// Initialize the executor here so it's available to all subcommands
-		executorFactory := core.NewExecutorFactory()
-		var err error
-		executor, err = executorFactory.CreateExecutor(executorType, cfg, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
-			os.Exit(1)
-		}
-	}
 }
 

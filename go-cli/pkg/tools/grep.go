@@ -9,50 +9,43 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // GrepTool represents the grep tool.
-type GrepTool struct{}
+type GrepTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewGrepTool creates a new instance of GrepTool.
 func NewGrepTool() *GrepTool {
-	return &GrepTool{}
-}
-
-// Name returns the name of the tool.
-func (t *GrepTool) Name() string {
-	return "grep"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *GrepTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Searches for a regular expression pattern within files in a specified directory.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"pattern": {
-							Type:        genai.TypeString,
-							Description: "The regular expression (regex) pattern to search for.",
-						},
-						"path": {
-							Type:        genai.TypeString,
-							Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
-						},
-						"include": {
-							Type:        genai.TypeString,
-							Description: "Optional: A glob pattern to filter which files are searched (e.g., '*.js', 'src/**').",
-						},
+	return &GrepTool{
+		types.NewBaseDeclarativeTool(
+			"grep",
+			"grep",
+			"Searches for a regular expression pattern within files in a specified directory.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"pattern": {
+						Type:        "string",
+						Description: "The regular expression (regex) pattern to search for.",
 					},
-					Required: []string{"pattern"},
+					"path": {
+						Type:        "string",
+						Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+					},
+					"include": {
+						Type:        "string",
+						Description: "Optional: A glob pattern to filter which files are searched (e.g., '*.js', 'src/**').",
+					},
 				},
+				Required: []string{"pattern"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

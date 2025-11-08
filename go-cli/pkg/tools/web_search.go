@@ -8,43 +8,37 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/customsearch/v1"
 	"google.golang.org/api/option"
 )
 
 // WebSearchTool represents the web-search tool.
-type WebSearchTool struct{}
+type WebSearchTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewWebSearchTool creates a new instance of WebSearchTool.
 func NewWebSearchTool() *WebSearchTool {
-	return &WebSearchTool{}
-}
-
-// Name returns the name of the tool.
-func (t *WebSearchTool) Name() string {
-	return "web_search"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *WebSearchTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Performs a web search using Google Search and returns the results.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"query": {
-							Type:        genai.TypeString,
-							Description: "The search query to find information on the web.",
-						},
+	return &WebSearchTool{
+		types.NewBaseDeclarativeTool(
+			"web_search",
+			"web_search",
+			"Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"query": {
+						Type:        "string",
+						Description: "The search query to find information on the web.",
 					},
-					Required: []string{"query"},
 				},
+				Required: []string{"query"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

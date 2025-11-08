@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -27,8 +28,19 @@ var extensionsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all available extensions",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual listing of extensions.
-		fmt.Println("Listing all extensions (not yet implemented).")
+		extensions := ExtensionManager.ListExtensions()
+		if len(extensions) == 0 {
+			fmt.Println("No extensions found.")
+			return
+		}
+		fmt.Println("Available extensions:")
+		for _, ext := range extensions {
+			status := "Disabled"
+			if ext.Enabled {
+				status = "Enabled"
+			}
+			fmt.Printf("- %s: %s (%s)\n", ext.Name, ext.Description, status)
+		}
 	},
 }
 
@@ -38,8 +50,12 @@ var extensionsEnableCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		extensionName := args[0]
-		// TODO: Implement actual enabling of extensions.
-		fmt.Printf("Enabling extension: '%s' (not yet implemented).\n", extensionName)
+		err := ExtensionManager.EnableExtension(extensionName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error enabling extension '%s': %v\n", extensionName, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Extension '%s' enabled successfully.\n", extensionName)
 	},
 }
 
@@ -49,7 +65,11 @@ var extensionsDisableCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		extensionName := args[0]
-		// TODO: Implement actual disabling of extensions.
-		fmt.Printf("Disabling extension: '%s' (not yet implemented).\n", extensionName)
+		err := ExtensionManager.DisableExtension(extensionName)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error disabling extension '%s': %v\n", extensionName, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Extension '%s' disabled successfully.\n", extensionName)
 	},
 }

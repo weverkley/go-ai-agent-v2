@@ -2,17 +2,46 @@ package cmd
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/spf13/cobra"
+
+	"go-ai-agent-v2/go-cli/pkg/utils" // Import utils package
 )
 
 // statsCmd represents the stats command
 var statsCmd = &cobra.Command{
-	Use:   "stats",
-	Short: "Display Gemini CLI usage statistics",
-	Long:  `The stats command displays various usage statistics for the Gemini CLI.`, //nolint:staticcheck
+	Use:     "stats",
+	Aliases: []string{"usage"},
+	Short:   "Check session stats",
+	Long:    `The stats command displays various usage statistics for the current session, including overall duration and model/tool specific metrics.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual statistics collection and display logic.
-		fmt.Println("Displaying Gemini CLI usage statistics (not yet implemented).")
+		duration := time.Since(SessionStartTime)
+		fmt.Printf("Overall session duration: %s.\n", utils.FormatDuration(duration))
 	},
+}
+
+var statsModelCmd = &cobra.Command{
+	Use:   "model",
+	Short: "Show model-specific usage statistics",
+	Long:  `Displays statistics related to model usage during the session.`, //nolint:staticcheck
+	Run: func(cmd *cobra.Command, args []string) {
+		// TODO: Implement actual model-specific stats display logic.
+		fmt.Println("Displaying model-specific usage statistics (not yet implemented).")
+	},
+}
+
+var statsToolsCmd = &cobra.Command{
+	Use:   "tools",
+	Short: "Show tool-specific usage statistics",
+	Long:  `Displays statistics related to tool usage during the session.`, //nolint:staticcheck
+	Run: func(cmd *cobra.Command, args []string) {
+		// TODO: Implement actual tool-specific stats display logic.
+		fmt.Println("Displaying tool-specific usage statistics (not yet implemented).")
+	},
+}
+
+func init() {
+	statsCmd.AddCommand(statsModelCmd)
+	statsCmd.AddCommand(statsToolsCmd)
 }

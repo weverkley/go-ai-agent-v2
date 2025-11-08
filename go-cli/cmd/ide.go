@@ -2,9 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"runtime"
 
 	"github.com/spf13/cobra"
 )
@@ -12,40 +9,53 @@ import (
 // ideCmd represents the ide command
 var ideCmd = &cobra.Command{
 	Use:   "ide",
-	Short: "Open the current project in an IDE",
-	Long:  `The ide command opens the current project in a configured IDE (e.g., VS Code).`, //nolint:staticcheck
+	Short: "Manage IDE integration",
+	Long:  `The ide command allows you to manage integration with supported IDEs, including checking status, installing companions, and enabling/disabling the integration.`, //nolint:staticcheck
+}
+
+var ideStatusCommand = &cobra.Command{
+	Use:   "status",
+	Short: "Check status of IDE integration",
+	Long:  `Checks the current status of the IDE integration.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// For now, assume VS Code is the default IDE and it's in the PATH.
-		// TODO: Allow configuration of the IDE.
-		var command *exec.Cmd
-
-		projectPath, err := os.Getwd()
-		if err != nil {
-			fmt.Printf("Error getting current working directory: %v\n", err)
-			return
-		}
-
-		switch runtime.GOOS {
-		case "darwin": // macOS
-			command = exec.Command("code", projectPath) // Assumes VS Code is installed and in PATH
-		case "linux": // Linux
-			command = exec.Command("code", projectPath) // Assumes VS Code is installed and in PATH
-		case "windows": // Windows
-			command = exec.Command("cmd", "/c", "code", projectPath) // Assumes VS Code is installed and in PATH
-		default:
-			fmt.Printf("Unsupported operating system: %s\n", runtime.GOOS)
-			return
-		}
-
-		command.Stdout = os.Stdout
-		command.Stderr = os.Stderr
-
-		err = command.Run()
-		if err != nil {
-			fmt.Printf("Error opening project in IDE: %v\n", err)
-			return
-		}
-
-		fmt.Println("Opened project in IDE.")
+		// TODO: Implement actual logic to check IDE integration status.
+		fmt.Println("Checking IDE integration status (not yet implemented).")
 	},
+}
+
+var ideInstallCommand = &cobra.Command{
+	Use:   "install",
+	Short: "Install required IDE companion",
+	Long:  `Installs the required IDE companion extension for the detected IDE.`, //nolint:staticcheck
+	Run: func(cmd *cobra.Command, args []string) {
+		// TODO: Implement actual logic to install IDE companion.
+		fmt.Println("Installing IDE companion (not yet implemented).")
+	},
+}
+
+var ideEnableCommand = &cobra.Command{
+	Use:   "enable",
+	Short: "Enable IDE integration",
+	Long:  `Enables the IDE integration.`, //nolint:staticcheck
+	Run: func(cmd *cobra.Command, args []string) {
+		// TODO: Implement actual logic to enable IDE integration.
+		fmt.Println("Enabling IDE integration (not yet implemented).")
+	},
+}
+
+var ideDisableCommand = &cobra.Command{
+	Use:   "disable",
+	Short: "Disable IDE integration",
+	Long:  `Disables the IDE integration.`, //nolint:staticcheck
+	Run: func(cmd *cobra.Command, args []string) {
+		// TODO: Implement actual logic to disable IDE integration.
+		fmt.Println("Disabling IDE integration (not yet implemented).")
+	},
+}
+
+func init() {
+	ideCmd.AddCommand(ideStatusCommand)
+	ideCmd.AddCommand(ideInstallCommand)
+	ideCmd.AddCommand(ideEnableCommand)
+	ideCmd.AddCommand(ideDisableCommand)
 }

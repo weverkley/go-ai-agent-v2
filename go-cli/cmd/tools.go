@@ -26,8 +26,25 @@ var toolsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all available AI tools",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual listing of tools.
-		fmt.Println("Listing all AI tools (not yet implemented).")
+		toolRegistry := Cfg.GetToolRegistry()
+		if toolRegistry == nil {
+			fmt.Println("Tool registry not initialized.")
+			return
+		}
+
+		tools := toolRegistry.GetAllTools()
+		if len(tools) == 0 {
+			fmt.Println("No AI tools available.")
+			return
+		}
+
+		fmt.Println("Available AI Tools:")
+		for _, tool := range tools {
+			// Filter out MCP tools (assuming MCP tools have a ServerName)
+			if tool.ServerName() == "" {
+				fmt.Printf("- %s: %s\n", tool.Name(), tool.Description())
+			}
+		}
 	},
 }
 

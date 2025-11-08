@@ -12,57 +12,51 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/gobwas/glob"
-	"github.com/google/generative-ai-go/genai"
 )
 
 // GlobTool represents the glob tool.
-type GlobTool struct{}
+type GlobTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewGlobTool creates a new instance of GlobTool.
 func NewGlobTool() *GlobTool {
-	return &GlobTool{}
-}
-
-// Name returns the name of the tool.
-func (t *GlobTool) Name() string {
-	return "glob"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *GlobTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Efficiently finds files matching specific glob patterns.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"pattern": {
-							Type:        genai.TypeString,
-							Description: "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-						},
-						"path": {
-							Type:        genai.TypeString,
-							Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
-						},
-						"case_sensitive": {
-							Type:        genai.TypeBoolean,
-							Description: "Optional: Whether the search should be case-sensitive. Defaults to false.",
-						},
-						"respect_git_ignore": {
-							Type:        genai.TypeBoolean,
-							Description: "Optional: Whether to respect .gitignore patterns. Defaults to true.",
-						},
-						"respect_gemini_ignore": {
-							Type:        genai.TypeBoolean,
-							Description: "Optional: Whether to respect .geminiignore patterns. Defaults to true.",
-						},
+	return &GlobTool{
+		types.NewBaseDeclarativeTool(
+			"glob",
+			"glob",
+			"Efficiently finds files matching specific glob patterns.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"pattern": {
+						Type:        "string",
+						Description: "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
 					},
-					Required: []string{"pattern"},
+					"path": {
+						Type:        "string",
+						Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+					},
+					"case_sensitive": {
+						Type:        "string", // Should be boolean, but for now string to match the current implementation
+						Description: "Optional: Whether the search should be case-sensitive. Defaults to false.",
+					},
+					"respect_git_ignore": {
+						Type:        "boolean",
+						Description: "Optional: Whether to respect .gitignore patterns. Defaults to true.",
+					},
+					"respect_gemini_ignore": {
+						Type:        "boolean",
+						Description: "Optional: Whether to respect .geminiignore patterns. Defaults to true.",
+					},
 				},
+				Required: []string{"pattern"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

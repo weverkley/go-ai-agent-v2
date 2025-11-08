@@ -226,3 +226,52 @@ func (gc *GeminiChat) SetHistory(history []*genai.Content) error {
 	gc.startHistory = history
 	return nil
 }
+
+// CompressChat compresses the chat history by replacing it with a summary.
+func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
+	fmt.Printf("DEBUG: len(gc.startHistory) = %d\n", len(gc.startHistory))
+	// TODO: Implement actual token counting. For now, use placeholder values.
+	originalTokenCount := 100 // Placeholder
+	newTokenCount := 10       // Placeholder
+
+	if len(gc.startHistory) <= 2 { // Only compress if there's a user-initiated conversation
+		return nil, fmt.Errorf("no conversation found to compress")
+	}
+
+	// Construct a prompt to summarize the chat history
+	summaryPrompt := "Summarize the following conversation:\n\n"
+	for _, content := range gc.startHistory {
+		for _, part := range content.Parts {
+			if text, ok := part.(genai.Text); ok {
+				summaryPrompt += string(text) + "\n"
+			}
+		}
+	}
+
+	ctx := context.Background()
+	resp, err := gc.model.GenerateContent(
+		ctx,
+		genai.Text(summaryPrompt),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary: %w", err)
+	}
+
+	generatedSummary := ""
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if text, ok := part.(genai.Text); ok {
+			generatedSummary += string(text)
+		}
+	}
+
+	// Replace the history with the generated summary
+	gc.startHistory = []*genai.Content{
+		{Role: "model", Parts: []genai.Part{genai.Text(generatedSummary)}},
+	}
+
+	return &types.ChatCompressionResult{
+		OriginalTokenCount: originalTokenCount,
+		NewTokenCount:      newTokenCount,
+		CompressionStatus:  "success",
+	}, nil
+}

@@ -6,8 +6,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // ExecuteCommandTool implements the Tool interface for executing shell commands.
@@ -83,9 +81,4 @@ func (t *ExecuteCommandTool) Execute(args map[string]any) (types.ToolResult, err
 		ReturnDisplay: llmContent,
 	},
 	nil
-}
-
-// Definition returns the tool definition for the Gemini API.
-func (t *ExecuteCommandTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

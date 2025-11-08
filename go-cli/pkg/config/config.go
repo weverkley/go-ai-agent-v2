@@ -18,6 +18,10 @@ const (
 	SettingScopeWorkspace SettingScope = "workspace"
 )
 
+const (
+	SettingsFileName = ".gemini/settings.json"
+)
+
 // Settings represents the application settings.
 type Settings struct {
 	ExtensionPaths []string                       `json:"extensionPaths"`
@@ -104,7 +108,7 @@ func LoadSettings(workspaceDir string) *Settings {
 }
 
 func getSettingsPath(workspaceDir string) string {
-	return filepath.Join(workspaceDir, ".gemini", "settings.json")
+	return filepath.Join(workspaceDir, SettingsFileName)
 }
 
 // SaveSettings saves the application settings.

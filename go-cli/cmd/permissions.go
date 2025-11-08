@@ -10,9 +10,9 @@ import (
 var permissionsCmd = &cobra.Command{
 	Use:   "permissions",
 	Short: "Manage Gemini CLI permissions",
-	Long:  `The permissions command allows you to view and manage permissions for the Gemini CLI.`, //nolint:staticcheck
+	Long:  `The permissions command allows you to manage folder trust settings for the Gemini CLI.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual permission management logic.
-		fmt.Println("Managing Gemini CLI permissions (not yet implemented).")
+		// TODO: Implement actual folder trust management logic.
+		fmt.Println("Managing folder trust settings (not yet implemented).")
 	},
 }

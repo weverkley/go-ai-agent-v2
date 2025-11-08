@@ -5,8 +5,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // CheckoutBranchTool implements the Tool interface for checking out a Git branch.
@@ -65,9 +63,4 @@ func (t *CheckoutBranchTool) Execute(args map[string]any) (types.ToolResult, err
 		LLMContent:    fmt.Sprintf("Successfully checked out branch %s in %s.", branchName, dir),
 		ReturnDisplay: fmt.Sprintf("Successfully checked out branch %s in %s.", branchName, dir),
 	}, nil
-}
-
-// Definition returns the tool definition for the Gemini API.
-func (t *CheckoutBranchTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

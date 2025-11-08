@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 const (
@@ -22,45 +20,35 @@ type Todo struct {
 }
 
 // WriteTodosTool represents the write-todos tool.
-type WriteTodosTool struct{}
+type WriteTodosTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewWriteTodosTool creates a new instance of WriteTodosTool.
 func NewWriteTodosTool() *WriteTodosTool {
-	return &WriteTodosTool{}
-}
-
-// Name returns the name of the tool.
-func (t *WriteTodosTool) Name() string {
-	return "write_todos"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *WriteTodosTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "This tool can help you list out the current subtasks that are required to be completed for a given user request.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"todos": {
-							Type:        genai.TypeArray,
-							Description: "The complete list of todo items. This will replace the existing list.",
-							Items: &genai.Schema{
-								Type: genai.TypeObject,
-								Properties: map[string]*genai.Schema{
-									"description": {Type: genai.TypeString},
-									"status":      {Type: genai.TypeString, Enum: []string{"pending", "in_progress", "completed", "cancelled"}},
-								},
-								Required: []string{"description", "status"},
-							},
+	return &WriteTodosTool{
+		types.NewBaseDeclarativeTool(
+			"write_todos",
+			"write_todos",
+			"This tool can help you list out the current subtasks that are required to be completed for a given user request.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"todos": {
+						Type:        "array",
+						Description: "The complete list of todo items. This will replace the existing list.",
+						Items: &types.JsonSchemaPropertyItem{
+							Type: "object", // This should be object, not string
 						},
 					},
-					Required: []string{"todos"},
 				},
+				Required: []string{"todos"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

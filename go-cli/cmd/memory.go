@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -27,8 +28,12 @@ var memoryGetCmd = &cobra.Command{
 	Use:   "get",
 	Short: "Get the current user memory",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual retrieval of user memory.
-		fmt.Println("Retrieving user memory (not yet implemented).")
+		memoryContent := MemoryService.GetMemory()
+		if memoryContent == "" {
+			fmt.Println("Memory is currently empty.")
+		} else {
+			fmt.Printf("Current memory content:\n%s\n", memoryContent)
+		}
 	},
 }
 
@@ -38,8 +43,12 @@ var memorySetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		memoryContent := args[0]
-		// TODO: Implement actual setting of user memory.
-		fmt.Printf("Setting user memory to: '%s' (not yet implemented).\n", memoryContent)
+		err := MemoryService.SetMemory(memoryContent)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error setting user memory: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("User memory set to: '%s'.\n", memoryContent)
 	},
 }
 
@@ -47,7 +56,11 @@ var memoryClearCmd = &cobra.Command{
 	Use:   "clear",
 	Short: "Clear the user memory",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement actual clearing of user memory.
-		fmt.Println("Clearing user memory (not yet implemented).")
+		err := MemoryService.ClearMemory()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error clearing user memory: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("User memory cleared.")
 	},
 }

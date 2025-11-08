@@ -8,42 +8,35 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // WebFetchTool represents the web-fetch tool.
-type WebFetchTool struct{}
+type WebFetchTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewWebFetchTool creates a new instance of WebFetchTool.
 func NewWebFetchTool() *WebFetchTool {
-	return &WebFetchTool{}
-}
-
-// Name returns the name of the tool.
-func (t *WebFetchTool) Name() string {
-	return "web_fetch"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *WebFetchTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Processes content from URL(s) embedded in a prompt.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"prompt": {
-							Type:        genai.TypeString,
-							Description: "A prompt that includes the URL(s) to fetch and instructions on how to process their content.",
-						},
+	return &WebFetchTool{
+		types.NewBaseDeclarativeTool(
+			"web_fetch",
+			"web_fetch",
+			"Processes content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt. Include up to 20 URLs and instructions (e.g., summarize, extract specific data) directly in the 'prompt' parameter.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"prompt": {
+						Type:        "string",
+						Description: "A comprehensive prompt that includes the URL(s) (up to 20) to fetch and specific instructions on how to process their content (e.g., \"Summarize https://example.com/article and extract key points from https://another.com/data\"). All URLs to be fetched must be valid and complete, starting with \"http://\" or \"https://\", and be fully-formed with a valid hostname (e.g., a domain name like \"example.com\" or an IP address). For example, \"https://example.com\" is valid, but \"example.com\" is not.",
 					},
-					Required: []string{"prompt"},
 				},
+				Required: []string{"prompt"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

@@ -9,60 +9,67 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/gobwas/glob"
-	"github.com/google/generative-ai-go/genai"
 )
 
 // ReadManyFilesTool represents the read-many-files tool.
-type ReadManyFilesTool struct{}
+type ReadManyFilesTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewReadManyFilesTool creates a new instance of ReadManyFilesTool.
 func NewReadManyFilesTool() *ReadManyFilesTool {
-	return &ReadManyFilesTool{}
-}
-
-// Name returns the name of the tool.
-func (t *ReadManyFilesTool) Name() string {
-	return "read_many_files"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *ReadManyFilesTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Reads content from multiple files specified by paths or glob patterns...", // Truncated for brevity
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"paths": {
-							Type:        genai.TypeArray,
-							Description: "Required. An array of glob patterns or paths relative to the tool's target directory.",
-							Items:       &genai.Schema{Type: genai.TypeString},
-						},
-						"include": {
-							Type:        genai.TypeArray,
-							Description: "Optional. Additional glob patterns to include.",
-							Items:       &genai.Schema{Type: genai.TypeString},
-						},
-						"exclude": {
-							Type:        genai.TypeArray,
-							Description: "Optional. Glob patterns for files/directories to exclude.",
-							Items:       &genai.Schema{Type: genai.TypeString},
-						},
-						"recursive": {
-							Type:        genai.TypeBoolean,
-							Description: "Optional. Whether to search recursively. Defaults to true.",
-						},
-						"useDefaultExcludes": {
-							Type:        genai.TypeBoolean,
-							Description: "Optional. Apply default exclusion patterns. Defaults to true.",
-						},
+	return &ReadManyFilesTool{
+		types.NewBaseDeclarativeTool(
+			"read_many_files",
+			"read_many_files",
+			"Reads content from multiple files specified by paths or glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"paths": {
+						Type:        "array",
+						Description: "Required. An array of glob patterns or paths relative to the tool's target directory. Examples: ['src/**/*.ts'], ['README.md', 'docs/']",
+						Items:       &types.JsonSchemaPropertyItem{Type: "string"},
 					},
-					Required: []string{"paths"},
-				},
+					"include": {
+						Type:        "array",
+						Description: "Optional. Additional glob patterns to include. These are merged with `paths`. Example: \"*.test.ts\" to specifically add test files if they were broadly excluded.",
+						Items:       &types.JsonSchemaPropertyItem{Type: "string"},
+					},
+					"exclude": {
+						Type:        "array",
+						Description: "Optional. Glob patterns for files/directories to exclude. Added to default excludes if useDefaultExcludes is true. Example: \"**/*.log\", \"temp/\"",
+						Items:       &types.JsonSchemaPropertyItem{Type: "string"},
+					},
+					"recursive": {
+						Type:        "boolean",
+						Description: "Optional. Whether to search recursively (primarily controlled by `**` in glob patterns). Defaults to true.",
+					},
+					"useDefaultExcludes": {
+						Type:        "boolean",
+						Description: "Optional. Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, binary files). Defaults to true.",
+					},
+					                    					"file_filtering_options": {
+					                    						Type:        "object",
+					                    						Description: "Whether to respect ignore patterns from .gitignore or .geminiignore",
+					                    						Properties: map[string]types.JsonSchemaProperty{
+					                    							"respect_git_ignore": {
+					                    								Type:        "boolean",
+					                    								Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
+					                    							},
+					                    							"respect_gemini_ignore": {
+					                    								Type:        "boolean",
+					                    								Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+					                    							},
+					                    						},
+					                    					},				},
+				Required: []string{"paths"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 

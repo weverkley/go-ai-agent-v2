@@ -5,8 +5,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // PullTool implements the Tool interface for pulling latest changes from a Git remote.
@@ -57,9 +55,4 @@ func (t *PullTool) Execute(args map[string]any) (types.ToolResult, error) {
 		LLMContent:    fmt.Sprintf("Successfully pulled latest changes in %s.", dir),
 		ReturnDisplay: fmt.Sprintf("Successfully pulled latest changes in %s.", dir),
 	}, nil
-}
-
-// Definition returns the tool definition for the Gemini API.
-func (t *PullTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

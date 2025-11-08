@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 
 	"github.com/spf13/cobra"
 )
@@ -30,7 +31,7 @@ var settingsGetCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
-		value, found := cfg.Get(key)
+		value, found := SettingsService.Get(key)
 		if !found {
 			fmt.Printf("Setting '%s' not found.\n", key)
 		} else {
@@ -46,8 +47,17 @@ var settingsSetCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		key := args[0]
 		value := args[1]
-		// TODO: Implement actual setting of values in config. For now, just print.
-		fmt.Printf("Setting '%s' to '%s' (not yet saved persistently).\n", key, value)
+		err := SettingsService.Set(key, value)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error setting '%s': %v\n", key, err)
+			os.Exit(1)
+		}
+		err = SettingsService.Save()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Setting '%s' updated to '%s'.\n", key, value)
 	},
 }
 
@@ -55,8 +65,15 @@ var settingsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all available settings and their current values",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement listing all settings. For now, just print a placeholder.
-		fmt.Println("Listing all settings (not yet implemented).")
+		settings := SettingsService.AllSettings()
+		if len(settings) == 0 {
+			fmt.Println("No settings found.")
+			return
+		}
+		fmt.Println("Current settings:")
+		for key, value := range settings {
+			fmt.Printf("- %s: %v\n", key, value)
+		}
 	},
 }
 
@@ -64,7 +81,16 @@ var settingsResetCmd = &cobra.Command{
 	Use:   "reset",
 	Short: "Reset all settings to their default values",
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: Implement resetting settings. For now, just print a placeholder.
-		fmt.Println("Resetting all settings to default values (not yet implemented).")
+		err := SettingsService.Reset()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error resetting settings: %v\n", err)
+			os.Exit(1)
+		}
+		err = SettingsService.Save()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving settings: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Println("All settings reset to default values.")
 	},
 }

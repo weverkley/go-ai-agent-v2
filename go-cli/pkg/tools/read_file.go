@@ -8,50 +8,43 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // ReadFileTool represents the read-file tool.
-type ReadFileTool struct{}
+type ReadFileTool struct {
+	*types.BaseDeclarativeTool
+}
 
 // NewReadFileTool creates a new instance of ReadFileTool.
 func NewReadFileTool() *ReadFileTool {
-	return &ReadFileTool{}
-}
-
-// Name returns the name of the tool.
-func (t *ReadFileTool) Name() string {
-	return "read_file"
-}
-
-// Definition returns the tool's definition for the Gemini API.
-func (t *ReadFileTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        t.Name(),
-				Description: "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
-				Parameters: &genai.Schema{
-					Type: genai.TypeObject,
-					Properties: map[string]*genai.Schema{
-						"absolute_path": {
-							Type:        genai.TypeString,
-							Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
-						},
-						"offset": {
-							Type:        genai.TypeNumber,
-							Description: "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-						},
-						"limit": {
-							Type:        genai.TypeNumber,
-							Description: "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
-						},
+	return &ReadFileTool{
+		types.NewBaseDeclarativeTool(
+			"read_file",
+			"read_file",
+			"Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
+			types.KindOther, // Assuming KindOther for now
+			types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]types.JsonSchemaProperty{
+					"absolute_path": {
+						Type:        "string",
+						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
 					},
-					Required: []string{"absolute_path"},
+					"offset": {
+						Type:        "number",
+						Description: "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
+					},
+					"limit": {
+						Type:        "number",
+						Description: "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
+					},
 				},
+				Required: []string{"absolute_path"},
 			},
-		},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 	}
 }
 
