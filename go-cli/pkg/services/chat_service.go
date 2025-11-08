@@ -53,11 +53,8 @@ type SerializableContent struct {
 
 // getProjectTempDir returns the project's temporary directory.
 func (cs *ChatService) getProjectTempDir() (string, error) {
-	// Assuming config.Config has a method to get the project temp directory
-	// For now, hardcode or get from a known location.
-	// TODO: Get this from config.Config or a more robust mechanism.
-	// nolint:staticcheck
-	return filepath.Join(os.Getenv("HOME"), ".gemini", "checkpoints"), nil
+	geminiDir := cs.config.GetGeminiDir()
+	return filepath.Join(geminiDir, "checkpoints"), nil
 }
 
 // GetSavedChatTags retrieves details of all saved chat checkpoints.

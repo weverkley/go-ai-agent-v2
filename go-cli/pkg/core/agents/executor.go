@@ -176,7 +176,7 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 		startHistory,
 	)
 	if err != nil {
-		// TODO: Implement reportError equivalent
+		utils.LogErrorf(ae.RuntimeContext, "Failed to create chat object: %v", err)
 		return nil, fmt.Errorf("failed to create chat object: %w", err)
 	}
 

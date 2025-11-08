@@ -229,10 +229,22 @@ func (gc *GeminiChat) SetHistory(history []*genai.Content) error {
 
 // CompressChat compresses the chat history by replacing it with a summary.
 func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
+	ctx := context.Background() // Define ctx here
+
 	fmt.Printf("DEBUG: len(gc.startHistory) = %d\n", len(gc.startHistory))
-	// TODO: Implement actual token counting. For now, use placeholder values.
-	originalTokenCount := 100 // Placeholder
-	newTokenCount := 10       // Placeholder
+
+	// Convert []*genai.Content to []genai.Part for token counting
+	var originalHistoryParts []genai.Part
+	for _, content := range gc.startHistory {
+		originalHistoryParts = append(originalHistoryParts, content.Parts...)
+	}
+
+	// Implement actual token counting for original history
+	originalTokenCountResp, err := gc.model.CountTokens(ctx, originalHistoryParts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count tokens for original history: %w", err)
+	}
+	originalTokenCount := originalTokenCountResp.TotalTokens
 
 	if len(gc.startHistory) <= 2 { // Only compress if there's a user-initiated conversation
 		return nil, fmt.Errorf("no conversation found to compress")
@@ -248,7 +260,6 @@ func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatComp
 		}
 	}
 
-	ctx := context.Background()
 	resp, err := gc.model.GenerateContent(
 		ctx,
 		genai.Text(summaryPrompt),
@@ -269,9 +280,22 @@ func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatComp
 		{Role: "model", Parts: []genai.Part{genai.Text(generatedSummary)}},
 	}
 
+	// Convert []*genai.Content to []genai.Part for token counting
+	var newHistoryParts []genai.Part
+	for _, content := range gc.startHistory {
+		newHistoryParts = append(newHistoryParts, content.Parts...)
+	}
+
+	// Implement actual token counting for new history
+	newTokenCountResp, err := gc.model.CountTokens(ctx, newHistoryParts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to count tokens for new history: %w", err)
+	}
+	newTokenCount := newTokenCountResp.TotalTokens
+
 	return &types.ChatCompressionResult{
-		OriginalTokenCount: originalTokenCount,
-		NewTokenCount:      newTokenCount,
+		OriginalTokenCount: int(originalTokenCount), // Cast to int
+		NewTokenCount:      int(newTokenCount),      // Cast to int
 		CompressionStatus:  "success",
 	}, nil
 }

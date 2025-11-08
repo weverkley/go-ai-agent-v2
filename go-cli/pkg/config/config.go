@@ -241,6 +241,11 @@ func (c *Config) GetTelemetryLogger() telemetry.TelemetryLogger {
 	return c.telemetryLogger
 }
 
+// GetGeminiDir returns the path to the .gemini directory within the target directory.
+func (c *Config) GetGeminiDir() string {
+	return filepath.Join(c.targetDir, ".gemini")
+}
+
 // Get returns the value of a configuration setting by key.
 func (c *Config) Get(key string) (interface{}, bool) {
 	switch key {
