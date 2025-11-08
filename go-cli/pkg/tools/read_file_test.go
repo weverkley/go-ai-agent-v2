@@ -119,7 +119,6 @@ func TestReadFileTool_Execute(t *testing.T) {
 			actualPath, cleanup := tt.setup(t)
 			defer cleanup()
 
-			// Replace the placeholder path in args with the actual temporary file path
 			if path, ok := tt.args["absolute_path"].(string); ok && strings.Contains(path, "/path/to/") {
 				tempArgs := make(map[string]any)
 				for k, v := range tt.args {
@@ -127,7 +126,6 @@ func TestReadFileTool_Execute(t *testing.T) {
 				}
 				tempArgs["absolute_path"] = actualPath
 				tt.args = tempArgs
-				// Also update expected content if it contains the placeholder path
 				if strings.Contains(tt.expectedLLMContent, "/path/to/") {
 					tt.expectedLLMContent = strings.ReplaceAll(tt.expectedLLMContent, "/path/to/image.png", actualPath)
 					tt.expectedLLMContent = strings.ReplaceAll(tt.expectedLLMContent, "/path/to/file.txt", actualPath)

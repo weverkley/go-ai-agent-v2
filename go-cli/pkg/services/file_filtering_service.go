@@ -143,11 +143,3 @@ func (fs *FileFilteringService) ShouldIgnoreFile(filePath string, options types.
 
 	return false
 }
-
-// DummyFileService is a placeholder implementation of FileService.
-type DummyFileService struct{}
-
-func (d *DummyFileService) ShouldIgnoreFile(filePath string, options types.FileFilteringOptions) bool {
-	// For now, always return false.
-	return false
-}

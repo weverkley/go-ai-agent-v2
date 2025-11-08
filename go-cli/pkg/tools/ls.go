@@ -25,7 +25,6 @@ func (t *LsTool) Name() string {
 
 // Definition returns the genai.Tool definition for the Gemini API.
 func (t *LsTool) Definition() *genai.Tool {
-	// TODO: Implement the actual tool definition
 	return &genai.Tool{
 		FunctionDeclarations: []*genai.FunctionDeclaration{
 			{

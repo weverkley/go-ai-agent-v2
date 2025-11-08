@@ -23,7 +23,7 @@ var compressCmd = &cobra.Command{
 		}
 
 		// Call CompressChat method
-		result, err := executor.CompressChat("compress-prompt", false) // promptId and force are placeholders for now
+		result, err := executor.CompressChat("", false)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error compressing chat history: %v\n", err)
 			os.Exit(1)

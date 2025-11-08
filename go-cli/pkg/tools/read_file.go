@@ -3,6 +3,10 @@ package tools
 import (
 	"bufio"
 	"fmt"
+	"image" // Add image import
+	_ "image/jpeg" // Register JPEG format
+	_ "image/png"  // Register PNG format
+	_ "image/gif"  // Register GIF format
 	"os"
 	"path/filepath"
 	"strings"
@@ -79,15 +83,67 @@ func (t *ReadFileTool) Execute(args map[string]any) (types.ToolResult, error) {
 		return types.ToolResult{}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
 	}
 
-	// For now, assume all are text files.
-	// TODO: Implement image/pdf handling.
-	ext := strings.ToLower(filepath.Ext(absolutePath))
-	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".pdf" {
-		return types.ToolResult{
-			LLMContent:    fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath),
-			ReturnDisplay: fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath),
-		}, nil
-	}
+		// Handle different file types
+
+		ext := strings.ToLower(filepath.Ext(absolutePath))
+
+		switch ext {
+
+		case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
+
+			file, err := os.Open(absolutePath)
+
+			if err != nil {
+
+				return types.ToolResult{}, fmt.Errorf("failed to open image file %s: %w", absolutePath, err)
+
+			}
+
+			defer file.Close()
+
+	
+
+			config, formatName, err := image.DecodeConfig(file)
+
+			if err != nil {
+
+				return types.ToolResult{
+
+					LLMContent:    fmt.Sprintf("Binary image file (%s), failed to decode config: %v", formatName, err),
+
+					ReturnDisplay: fmt.Sprintf("Binary image file (%s), failed to decode config: %v", formatName, err),
+
+				}, nil
+
+			}
+
+			output := fmt.Sprintf("Image file: %s (Format: %s, Dimensions: %dx%d)", absolutePath, formatName, config.Width, config.Height)
+
+			return types.ToolResult{
+
+				LLMContent:    output,
+
+				ReturnDisplay: output,
+
+			}, nil
+
+		case ".pdf":
+
+			output := fmt.Sprintf("PDF file: %s (binary file, consider using a specialized PDF tool for content extraction)", absolutePath)
+
+			return types.ToolResult{
+
+				LLMContent:    output,
+
+				ReturnDisplay: output,
+
+			}, nil
+
+		default:
+
+			// Assume text file and proceed with existing text reading logic.
+
+		}
 
 	file, err := os.Open(absolutePath)
 	if err != nil {

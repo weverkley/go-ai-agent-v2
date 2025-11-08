@@ -35,13 +35,11 @@ func (sjf *StreamJsonFormatter) ConvertToStreamStats(
 	metrics types.SessionMetrics,
 	durationMs int,
 ) types.StreamStats {
-	// TODO: Implement aggregation of token counts across all models if SessionMetrics is expanded.
-	// For now, using placeholder values or direct mapping if available.
 	return types.StreamStats{
-		TotalTokens: metrics.TotalTurns, // Placeholder
-		InputTokens: metrics.TotalTurns, // Placeholder
-		OutputTokens: metrics.TotalTurns, // Placeholder
+		TotalTokens: metrics.TotalTokens,
+		InputTokens: metrics.InputTokens,
+		OutputTokens: metrics.OutputTokens,
 		DurationMs:  durationMs,
-		ToolCalls:   0, // Placeholder
+		ToolCalls:   0, // Placeholder for now, needs to be tracked separately
 	}
 }

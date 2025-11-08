@@ -134,8 +134,6 @@ func (c *ExtensionsCommand) New(args extension.NewArgs) error {
 
 	if args.Template != "" {
 		// Implement copyDirectory logic here
-		fmt.Printf("Creating new extension from template \"%s\" at %s (placeholder)\n", args.Template, args.Path)
-		// Placeholder for copyDirectory
 		templatePath := fsService.JoinPaths(EXAMPLES_PATH, args.Template)
 		err := fsService.CopyDirectory(templatePath, args.Path)
 		if err != nil {
@@ -144,8 +142,6 @@ func (c *ExtensionsCommand) New(args extension.NewArgs) error {
 		fmt.Printf("Successfully created new extension from template \"%s\" at %s.\n", args.Template, args.Path)
 	} else {
 		// Implement createDirectory and gemini-extension.json creation logic here
-		fmt.Printf("Creating new extension at %s (placeholder)\n", args.Path)
-		// Placeholder for createDirectory
 		err := fsService.CreateDirectory(args.Path)
 		if err != nil {
 			return fmt.Errorf("failed to create new extension directory: %w", err)

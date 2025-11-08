@@ -60,7 +60,7 @@ You are an AI agent that brings the power of Gemini directly into the terminal. 
 **For a Code Project:**
 
 *   **Project Overview:** Write a clear and concise summary of the project's purpose, main technologies, and architecture.
-*   **Building and Running:** Document the key commands for building, running, and testing the project. Infer these from the files you've read (e.g., 'scripts' in 'package.json', 'Makefile', etc.). If you can't find explicit commands, provide a placeholder with a TODO.
+*   **Building and Running:** Document the key commands for building, running, and testing the project. Infer these from the files you've read (e.g., 'scripts' in 'package.json', 'Makefile', etc.). If explicit commands cannot be inferred, state that and suggest common commands for the detected project type (e.g., 'npm install && npm start' for Node.js projects).
 *   **Development Conventions:** Describe any coding styles, testing practices, or contribution guidelines you can infer from the codebase.
 
 **For a Non-Code Project:**

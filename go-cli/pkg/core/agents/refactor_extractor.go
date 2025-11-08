@@ -99,11 +99,50 @@ func ExtractFunction(
 	// This needs significant improvement with type information
 	var params []string
 	var returns []string
+	inferredTypes := make(map[string]string)
+
+	// Basic type inference
+	for _, stmt := range targetStmts {
+		ast.Inspect(stmt, func(n ast.Node) bool {
+			switch expr := n.(type) {
+			case *ast.BinaryExpr:
+				if expr.Op == token.ADD || expr.Op == token.SUB || expr.Op == token.MUL || expr.Op == token.QUO {
+					if left, ok := expr.X.(*ast.Ident); ok {
+						if _, declared := declaredVars[left.Name]; !declared {
+							inferredTypes[left.Name] = "int" // Assume int for arithmetic
+						}
+					}
+					if right, ok := expr.Y.(*ast.Ident); ok {
+						if _, declared := declaredVars[right.Name]; !declared {
+							inferredTypes[right.Name] = "int" // Assume int for arithmetic
+						}
+					}
+				}
+			case *ast.CallExpr:
+				if fun, ok := expr.Fun.(*ast.SelectorExpr); ok {
+					if x, ok := fun.X.(*ast.Ident); ok {
+						if x.Name == "strings" { // Basic check for strings package functions
+							for _, arg := range expr.Args {
+								if argIdent, isIdent := arg.(*ast.Ident); isIdent {
+									if _, declared := declaredVars[argIdent.Name]; !declared {
+										inferredTypes[argIdent.Name] = "string"
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			return true
+		})
+	}
 
 	for varName := range usedVars {
-		// This is a very naive approach. A proper solution requires type information.
-		// For now, assume all used undeclared variables are parameters.
-		params = append(params, varName+" interface{}") // Use interface{} as a placeholder type
+		inferredType, ok := inferredTypes[varName]
+		if !ok {
+			inferredType = "interface{}" // Default to interface{} if no type inferred
+		}
+		params = append(params, varName+" "+inferredType)
 	}
 
 	// Construct the new function/method

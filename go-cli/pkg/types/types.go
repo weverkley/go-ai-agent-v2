@@ -179,10 +179,11 @@ type JsonError struct {
 
 // SessionMetrics represents session-related metrics for telemetry.
 type SessionMetrics struct {
-	// Add fields as needed based on uiTelemetry.js
-	// For now, a placeholder.
-	TotalTurns  int `json:"totalTurns"`
-	TotalTimeMs int `json:"totalTimeMs"`
+	TotalTurns   int `json:"totalTurns"`
+	TotalTimeMs  int `json:"totalTimeMs"`
+	InputTokens  int `json:"inputTokens"`
+	OutputTokens int `json:"outputTokens"`
+	TotalTokens  int `json:"totalTokens"`
 }
 
 // JsonStreamEvent represents a single event in the JSON stream.
@@ -575,13 +576,13 @@ type CodebaseInvestigatorSettings struct {
 	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
 }
 
-// AgentStartEvent is a placeholder for telemetry event.
+// AgentStartEvent is a telemetry event.
 type AgentStartEvent struct {
 	AgentID   string
 	AgentName string
 }
 
-// AgentFinishEvent is a placeholder for telemetry event.
+// AgentFinishEvent is a telemetry event.
 type AgentFinishEvent struct {
 	AgentID         string
 	AgentName       string

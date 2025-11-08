@@ -22,8 +22,6 @@ func TemplateString(template string, inputs map[string]interface{}) string {
 func LogAgentStart(runtimeContext interface{}, event types.AgentStartEvent) {
 	if cfg, ok := runtimeContext.(*config.Config); ok {
 		cfg.GetTelemetryLogger().LogAgentStart(event)
-	} else {
-		fmt.Printf("Telemetry: Agent %s started (placeholder). AgentID: %s\n", event.AgentName, event.AgentID)
 	}
 }
 
@@ -31,7 +29,5 @@ func LogAgentStart(runtimeContext interface{}, event types.AgentStartEvent) {
 func LogAgentFinish(runtimeContext interface{}, event types.AgentFinishEvent) {
 	if cfg, ok := runtimeContext.(*config.Config); ok {
 		cfg.GetTelemetryLogger().LogAgentFinish(event)
-	} else {
-		fmt.Printf("Telemetry: Agent %s finished (placeholder). AgentID: %s, Duration: %dms, Turns: %d, Reason: %s\n", event.AgentName, event.AgentID, event.DurationMs, event.TurnCounter, event.TerminateReason)
 	}
 }
