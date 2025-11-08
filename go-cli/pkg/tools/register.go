@@ -58,6 +58,9 @@ func RegisterAllTools() *types.ToolRegistry {
 	if err := registry.Register(NewFindUnusedCodeTool()); err != nil {
 		fmt.Printf("Error registering FindUnusedCodeTool: %v\n", err)
 	}
+	if err := registry.Register(NewExtractFunctionTool()); err != nil {
+		fmt.Printf("Error registering ExtractFunctionTool: %v\n", err)
+	}
 
 	return registry
 }

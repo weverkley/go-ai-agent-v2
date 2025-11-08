@@ -38,6 +38,7 @@ const (
 	EXECUTE_COMMAND_TOOL_NAME   = "execute_command"
 	READ_MANY_FILES_TOOL_NAME   = "read_many_files"
 	FIND_UNUSED_CODE_TOOL_NAME  = "find_unused_code"
+	EXTRACT_FUNCTION_TOOL_NAME  = "extract_function"
 )
 
 // MCPServerStatus represents the connection status of an MCP server.
