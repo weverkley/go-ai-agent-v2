@@ -4,7 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/types"
+
 	"github.com/spf13/cobra"
 )
 
@@ -23,12 +24,28 @@ var writeCmd = &cobra.Command{
 	Short: "Write content to a file",
 	Long:  `Write content to a specified file.`, 
 	Run: func(cmd *cobra.Command, args []string) {
-		fsService := services.NewFileSystemService()
-		err := fsService.WriteFile(writeFilePath, writeContent)
+		tool, err := Cfg.GetToolRegistry().GetTool(types.WRITE_FILE_TOOL_NAME)
 		if err != nil {
-			fmt.Printf("Error writing file: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("Successfully wrote to %s\n", writeFilePath)
+
+		toolArgs := map[string]any{
+			"file_path": writeFilePath,
+			"content":   writeContent,
+		}
+
+		result, err := tool.Execute(toolArgs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error executing write_file tool: %v\n", err)
+			os.Exit(1)
+		}
+
+		if result.Error != nil {
+			fmt.Fprintf(os.Stderr, "Tool execution error: %s\n", result.Error.Message)
+			os.Exit(1)
+		}
+
+		fmt.Println(result.ReturnDisplay)
 	},
 }
