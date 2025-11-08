@@ -368,8 +368,6 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 				fileName := entry.Name()
 				
 
-				// TODO: Implement shouldIgnoreFile using fileService
-				// For now, a dummy check
 				isIgnored := false
 				if fileService != nil {
 					isIgnored = fileService.ShouldIgnoreFile(filepath.Join(currentPath, fileName), *options.FileFilteringOptions)

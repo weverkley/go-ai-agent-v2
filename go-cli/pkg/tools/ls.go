@@ -10,7 +10,7 @@ import (
 	"github.com/google/generative-ai-go/genai"
 )
 
-// LsTool is a placeholder for the ls tool.
+// LsTool represents the ls tool.
 type LsTool struct{}
 
 // NewLsTool creates a new instance of LsTool.
