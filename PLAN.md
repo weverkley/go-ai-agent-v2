@@ -20,10 +20,12 @@ The foundational structure for the Go CLI has been established, and several core
   - Top-level commands implemented:
     - `generate`: **Functional** (with tool-calling capabilities). Now includes an **Interactive UI** using `charmbracelet/bubbletea` if no prompt is provided. Generates content using `pkg/core/gemini.go` (real Gemini API integration). **Interactive UI is fully functional and tested, including dynamic loading spinner and self-clearing error messages.**
     - `read`: **Functional**, reads file content using `pkg/services/file_system_service.go`.
-    - `write`: **Functional**, writes content to a file using `pkg/services/file_system_service.go`.
+    - `write`: **Functional**, writes content to a file, now utilizing the `write_file` tool.
     - `exec`: **Functional**, executes shell commands (uses `pkg/services/shell_service.go`).
     - `ls`: **Functional**, lists directory contents (uses `pkg/services/file_system_service.go`).
     - `git-branch`: **Functional**, gets the current Git branch name (uses `pkg/services/git_service.go` with `go-git`).
+    - `extract-function`: **Functional**, extracts a code block into a new function or method.
+    - `find-unused-code`: **Functional**, finds unused functions and methods in Go files.
     - `extensions`: Command group with subcommands:
       - `list`: **Functional**, lists discovered extensions by reading `gemini-extension.json` files.
       - `install`: **Functional** (bug in renaming directory after install fixed), command structure and argument parsing in `main.go` are ready. Core logic in `pkg/commands/extensions.go` and `pkg/extension/manager.go` is implemented with git clone and local copy functionality.
@@ -71,10 +73,9 @@ The foundational structure for the Go CLI has been established, and several core
   - `pkg/utils/folder_structure.go`: `shouldIgnoreFile` logic correctly implemented using `fileService.ShouldIgnoreFile()`.
   - `pkg/utils/utils.go`: Telemetry logging implemented in `LogAgentStart()` and `LogAgentFinish()`.
   - `pkg/tools/ls.go`: `Execute()` method now lists directory contents.
+  - `pkg/tools/write_file.go`: Implements the `write_file` tool functionality.
 
 ## 2. Linter-Identified Issues (Prioritized for Next Steps)
-
-Based on results from `golangci-lint`, the following issues need to be addressed before a successful build.
 
 ### Resolved Issues:
 
@@ -102,8 +103,6 @@ Based on results from `golangci-lint`, the following issues need to be addressed
 - **`cmd/pr_review.go`**: Corrected ToolRegistry initialization and syntax error.
 
 ### Remaining Issues:
-
-- None.
 
 ## 3. Command Implementation Strategy (Overview)
 
@@ -169,39 +168,34 @@ The migration will proceed iteratively, focusing on one command or core function
 
 ## 9. Next Steps
 
-1.  **Review of Go Port and Tool-Calling Mechanism**: Completed. The code structure and logic indicate that the tool-calling mechanism is correctly implemented across the `generate`, `find-docs`, and `pr-review` commands.
-2.  **End-to-End Testing for AI Commands**: Simulated due to API key constraints. The code structure and logic indicate that the tool-calling mechanism is correctly implemented across the `generate`, `find-docs`, and `pr-review` commands.
-3.  **Enhance Interactive UI**:
+1.  **Enhance Interactive UI**:
     *   Expand the interactive UI to other commands where user interaction would be beneficial (e.g., `code-guide`, `find-docs`).
     *   Improve the UI/UX of the interactive components (e.g., better loading indicators, error displays, input validation).
     *   **`generate`**: Interactive UI complete.
     *   **`find-docs`**: Interactive UI complete.
     *   **`pr_review`**: Interactive UI complete.
-4.  **Tool Integration for AI Commands**:
+2.  **Tool Integration for AI Commands**:
     *   For commands like `find-docs` and `pr-review`, integrate actual tool-calling capabilities. This would allow the AI to dynamically use `GitService`, `FileSystemService`, and `ShellExecutionService` to gather information or perform actions, rather than relying solely on pre-constructed prompts.
     *   This would involve implementing the `tools` package in Go to register and execute these services as AI tools.
     *   **`find-docs`**: Tool integration complete.
     *   **`pr_review`**: Tool integration for `pr_review` verified through code review. The `promptTemplate` in `cmd/pr_review.go` outlines the tools to be used (`checkout_branch`, `execute_command`, `list_directory`, `read_file`, `pull`).
-5.  **Implement Mock Executor and Executor Factory**:
+3.  **Implement Mock Executor and Executor Factory**:
     *   **Mock Executor**: Create a mock implementation of the `ContentGenerator` interface (or a similar interface that the `GeminiChat` implements) that can simulate responses, including tool calls and their results, without making actual API calls. This will be crucial for comprehensive testing of the entire application flow, especially given Gemini API quota limitations.
     *   **Executor Factory**: Design and implement a factory pattern to create and manage different AI executors (e.g., Gemini, OpenAI, Mock). This will allow the application to dynamically select which executor to use based on configuration or command-line flags, making the application generic and extensible for future AI models.
-6.  **Error Handling and User Feedback**:
+4.  **Error Handling and User Feedback**:
     *   Improve error handling across all commands, providing more user-friendly messages.
     *   Implement a consistent way to provide feedback to the user, especially for long-running operations.
-7.  **Testing**:
+5.  **Testing**:
     *   Implement comprehensive unit and integration tests for all newly added commands and UI components.
     *   Address the environmental issue encountered during `extensions` testing (permission denied when creating `.gemini/extensions` directory). This might involve adjusting default paths or providing clearer instructions for setting up the environment.
-8.  **Remaining JavaScript CLI Commands** (if any):
+6.  **Remaining JavaScript CLI Commands** (if any):
     *   Review any remaining JavaScript CLI commands or features that have not yet been migrated to Go. (Based on current analysis, all explicit commands have been addressed, but a deeper dive might reveal more subtle features).
-9.  **Implement `FileService` and `WorkspaceContext`**: Replace the current dummy implementations with proper logic for respecting `.gitignore` and `.geminiignore` files, handling glob patterns, and managing multiple workspace directories.
-10. **Implement Image/PDF Handling in `pkg/tools/read_file.go`**: Extend `ReadFileTool` to correctly process and represent content from image and PDF files.
-11. **Implement Token Count Aggregation**: Expand `SessionMetrics` and `ConvertToStreamStats()` in `pkg/core/output/stream_json_formatter.go` to aggregate token counts across all models.
-12. **Implement Secure API Key Storage/Clearing**: Develop robust and OS-specific mechanisms for securely storing and clearing API keys.
-13. **Implement IDE Integration**: Develop logic for detecting IDEs, installing companions, and enabling/disabling integration.
-14. **Implement Theme Changing**: Develop logic for defining, applying, and persisting visual themes for the CLI.
-15. **Implement Terminal Keybinding Configuration**: Develop logic for detecting terminal environments and configuring keybindings for multiline input.
-16. **Implement External Editor Preference**: Develop logic for setting and using a preferred external editor.
-17. **Implement Usage Statistics**: Develop logic for collecting and displaying detailed model and tool-specific usage statistics.
-18. **Implement Restore Functionality**: Develop logic for saving and restoring CLI state, including tool calls and conversation/file history.
-19. **Implement Folder Trust Management**: Develop logic for defining and managing folder trust settings for security.
-20. **Implement MCP Server Management**: Develop logic for listing, adding, and removing MCP server configurations.
+7.  **Implement Secure API Key Storage/Clearing**: Develop robust and OS-specific mechanisms for securely storing and clearing API keys.
+8.  **Implement IDE Integration**: Develop logic for detecting IDEs, installing companions, and enabling/disabling integration.
+9.  **Implement Theme Changing**: Develop logic for defining, applying, and persisting visual themes for the CLI.
+10. **Implement Terminal Keybinding Configuration**: Develop logic for detecting terminal environments and configuring keybindings for multiline input.
+11. **Implement External Editor Preference**: Develop logic for setting and using a preferred external editor.
+12. **Implement Usage Statistics**: Develop logic for collecting and displaying detailed model and tool-specific usage statistics.
+13. **Implement Restore Functionality**: Develop logic for saving and restoring CLI state, including tool calls and conversation/file history.
+14. **Implement Folder Trust Management**: Develop logic for defining and managing folder trust settings for security.
+15. **Implement MCP Server Management**: Develop logic for listing, adding, and removing MCP server configurations.

@@ -10,10 +10,12 @@ The foundational structure for the Go CLI is established, with several core serv
 
 *   **`generate`**: Fully functional with tool-calling capabilities and an interactive UI (using `charmbracelet/bubbletea`) for generating content via the Gemini API.
 *   **`read`**: Reads file content.
-*   **`write`**: Writes content to a file.
+*   **`write`**: Writes content to a file, now utilizing the `write_file` tool.
 *   **`exec`**: Executes shell commands.
 *   **`ls`**: Lists directory contents.
 *   **`git-branch`**: Gets the current Git branch name.
+*   **`extract-function`**: Extracts a code block into a new function or method.
+*   **`find-unused-code`**: Finds unused functions and methods in Go files.
 *   **`extensions`**: Command group for managing extensions:
     *   `list`: Lists discovered extensions.
     *   `install`: Installs extensions (supports git clone/pull and local copy).
@@ -43,8 +45,9 @@ The foundational structure for the Go CLI is established, with several core serv
 *   **`pkg/mcp/client.go`**: Simulates MCP connection.
 *   **`pkg/types/types.go`**: Centralized definitions for various application types and interfaces.
 *   **`pkg/utils/folder_structure.go`**: Implements logic for generating folder structures, including file ignoring.
-*   **`pkg/utils/utils.go`**: Provides utility functions, including telemetry logging.
+*   **`pkg/utils/utils.go`**: Provides utility functions, now including actual telemetry logging.
 *   **`pkg/tools/ls.go`**: Implements the `ls` tool functionality.
+*   **`pkg/tools/write_file.go`**: Implements the `write_file` tool functionality.
 
 ## Getting Started
 
@@ -77,6 +80,7 @@ For example:
 ./gemini-cli generate "Write a short story about a robot."
 ./gemini-cli ls .
 ./gemini-cli extensions list
+./gemini-cli extract-function --file-path /path/to/file.go --start-line 10 --end-line 20 --new-function-name MyNewFunction
 ```
 
 To see a list of all available commands and their options, run:
@@ -92,9 +96,6 @@ The project is under active development. Future enhancements include:
 *   **Mock Executor and Executor Factory**: For comprehensive testing and extensibility to other AI models.
 *   **Improved Error Handling and User Feedback**: More user-friendly messages and consistent feedback for long-running operations.
 *   **Comprehensive Testing**: Unit and integration tests for all new components.
-*   **Full `FileService` and `WorkspaceContext` Implementation**: Proper handling of `.gitignore`, `.geminiignore`, glob patterns, and multiple workspace directories.
-*   **Image/PDF Handling**: In `pkg/tools/read_file.go`.
-*   **Token Count Aggregation**: Detailed token usage metrics.
 *   **Secure API Key Management**: Robust OS-specific storage and clearing of API keys.
 *   **IDE Integration**: Full integration with supported IDEs.
 *   **Theme Customization**: Ability to change and persist CLI visual themes.
