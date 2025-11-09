@@ -1,2 +1,3 @@
 docs/*
+!docs/privacy_notice.md
 go-cli/vendor
