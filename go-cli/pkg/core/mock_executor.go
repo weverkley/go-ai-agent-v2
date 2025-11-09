@@ -2,8 +2,6 @@ package core
 
 import (
 	"fmt"
-	"time"
-
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -11,133 +9,69 @@ import (
 
 // MockExecutor is a mock implementation of the Executor interface for testing.
 type MockExecutor struct {
-	GenerateContentFunc         func(contents ...*genai.Content) (*genai.GenerateContentResponse, error)
-	ExecuteToolFunc             func(fc *genai.FunctionCall) (types.ToolResult, error)
-	SendMessageStreamFunc       func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
-	ListModelsFunc              func() ([]string, error)
-	DefaultGenerateContentResponse *genai.GenerateContentResponse // New field for configurable default response
-	DefaultExecuteToolResult    *types.ToolResult              // New field for configurable default tool execution result
-	GetHistoryFunc              func() ([]*genai.Content, error) // New field for configurable mock history
-	SetHistoryFunc              func(history []*genai.Content) error
-	CompressChatFunc            func(promptId string, force bool) (*types.ChatCompressionResult, error)
-	mockHistory                 []*genai.Content // Field to store mock history
+	GenerateContentFunc   func(contents ...*genai.Content) (*genai.GenerateContentResponse, error)
+	ExecuteToolFunc       func(fc *genai.FunctionCall) (types.ToolResult, error)
+	SendMessageStreamFunc func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
+	ListModelsFunc        func() ([]string, error)
+	GetHistoryFunc        func() ([]*genai.Content, error)
+	SetHistoryFunc        func(history []*genai.Content) error
+	CompressChatFunc      func(promptId string, force bool) (*types.ChatCompressionResult, error)
 }
 
-// NewMockExecutor creates a new MockExecutor instance.
-func NewMockExecutor(defaultResponse *genai.GenerateContentResponse, defaultToolResult *types.ToolResult) *MockExecutor {
-	me := &MockExecutor{
-		DefaultGenerateContentResponse: defaultResponse,
-		DefaultExecuteToolResult:    defaultToolResult,
+// GenerateContent mocks the GenerateContent method.
+func (m *MockExecutor) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+	if m.GenerateContentFunc != nil {
+		return m.GenerateContentFunc(contents...)
 	}
-	me.GenerateContentFunc = func(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
-			if me.DefaultGenerateContentResponse != nil {
-				return me.DefaultGenerateContentResponse, nil
-			}
-			// Default mock implementation: return a dummy response
-			return &genai.GenerateContentResponse{
-				Candidates: []*genai.Candidate{
-					{
-						Content: &genai.Content{
-							Parts: []genai.Part{genai.Text("Mocked response from GenerateContent.")},
-						},
-					},
-				},
-			}, nil
-		}
-	me.ExecuteToolFunc = func(fc *genai.FunctionCall) (types.ToolResult, error) {
-			if me.DefaultExecuteToolResult != nil {
-				return *me.DefaultExecuteToolResult, nil
-			}
-			// Default mock implementation: return a generic success
-			return types.ToolResult{
-				LLMContent:    fmt.Sprintf("Mocked result for tool %s with args %v", fc.Name, fc.Args),
-				ReturnDisplay: fmt.Sprintf("Mocked result for tool %s with args %v", fc.Name, fc.Args),
-			}, nil
-		}
-			me.SendMessageStreamFunc = func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
-					respChan := make(chan types.StreamResponse)
-					go func() {
-						defer close(respChan)
-						// Simulate a streamed response
-						respChan <- types.StreamResponse{
-							Type: types.StreamEventTypeChunk,
-							Value: &genai.GenerateContentResponse{
-								Candidates: []*genai.Candidate{
-									{
-										Content: &genai.Content{
-											Parts: []genai.Part{genai.Text("Mocked streamed response chunk 1.")},
-										},
-									},
-								},
-							},
-						}
-						time.Sleep(50 * time.Millisecond)
-						respChan <- types.StreamResponse{
-							Type: types.StreamEventTypeChunk,
-							Value: &genai.GenerateContentResponse{
-								Candidates: []*genai.Candidate{
-									{
-										Content: &genai.Content{
-											Parts: []genai.Part{genai.Text("Mocked streamed response chunk 2.")},
-										},
-									},
-								},
-							},
-						}
-					}()
-					return respChan, nil
-				}
-	me.ListModelsFunc = func() ([]string, error) {
-			return []string{"mock-model-1", "mock-model-2"}, nil
-		}
-	me.GetHistoryFunc = func() ([]*genai.Content, error) {
-			return me.mockHistory, nil
-		}
-	me.SetHistoryFunc = func(history []*genai.Content) error {
-			me.mockHistory = history
-			return nil
-		}
-	me.CompressChatFunc = func(promptId string, force bool) (*types.ChatCompressionResult, error) {
-		return &types.ChatCompressionResult{
-			OriginalTokenCount: 100,
-			NewTokenCount:      10,
-			CompressionStatus:  "mocked_success",
-		}, nil
+	return nil, fmt.Errorf("GenerateContent not implemented in mock")
+}
+
+// ExecuteTool mocks the ExecuteTool method.
+func (m *MockExecutor) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
+	if m.ExecuteToolFunc != nil {
+		return m.ExecuteToolFunc(fc)
 	}
-	return me
+	return types.ToolResult{}, fmt.Errorf("ExecuteTool not implemented in mock")
 }
 
-// GenerateContent implements the Executor interface.
-func (me *MockExecutor) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
-	return me.GenerateContentFunc(contents...)
+// SendMessageStream mocks the SendMessageStream method.
+func (m *MockExecutor) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
+	if m.SendMessageStreamFunc != nil {
+		return m.SendMessageStreamFunc(modelName, messageParams, promptId)
+	}
+	respChan := make(chan types.StreamResponse)
+	close(respChan)
+	return respChan, fmt.Errorf("SendMessageStream not implemented in mock")
 }
 
-// ExecuteTool implements the Executor interface.
-func (me *MockExecutor) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
-	return me.ExecuteToolFunc(fc)
+// ListModels mocks the ListModels method.
+func (m *MockExecutor) ListModels() ([]string, error) {
+	if m.ListModelsFunc != nil {
+		return m.ListModelsFunc()
+	}
+	return nil, fmt.Errorf("ListModels not implemented in mock")
 }
 
-// SendMessageStream implements the Executor interface.
-func (me *MockExecutor) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
-	return me.SendMessageStreamFunc(modelName, messageParams, promptId)
+// GetHistory mocks the GetHistory method.
+func (m *MockExecutor) GetHistory() ([]*genai.Content, error) {
+	if m.GetHistoryFunc != nil {
+		return m.GetHistoryFunc()
+	}
+	return nil, fmt.Errorf("GetHistory not implemented in mock")
 }
 
-// ListModels implements the Executor interface.
-func (me *MockExecutor) ListModels() ([]string, error) {
-	return me.ListModelsFunc()
+// SetHistory mocks the SetHistory method.
+func (m *MockExecutor) SetHistory(history []*genai.Content) error {
+	if m.SetHistoryFunc != nil {
+		return m.SetHistoryFunc(history)
+	}
+	return fmt.Errorf("SetHistory not implemented in mock")
 }
 
-// GetHistory implements the Executor interface.
-func (me *MockExecutor) GetHistory() ([]*genai.Content, error) {
-	return me.GetHistoryFunc()
-}
-
-// SetHistory implements the Executor interface.
-func (me *MockExecutor) SetHistory(history []*genai.Content) error {
-	return me.SetHistoryFunc(history)
-}
-
-// CompressChat implements the Executor interface.
-func (me *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	return me.CompressChatFunc(promptId, force)
+// CompressChat mocks the CompressChat method.
+func (m *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
+	if m.CompressChatFunc != nil {
+		return m.CompressChatFunc(promptId, force)
+	}
+	return nil, fmt.Errorf("CompressChat not implemented in mock")
 }

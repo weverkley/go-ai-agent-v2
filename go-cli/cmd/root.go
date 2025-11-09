@@ -33,9 +33,12 @@ var rootCmd = &cobra.Command{
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// This will run before any subcommand. We can use it to set up common configurations.
 		// Initialize the executor here so it's available to all subcommands
-		executorFactory := core.NewExecutorFactory()
-		var err error
-		executor, err = executorFactory.CreateExecutor(executorType, Cfg, types.GenerateContentConfig{}, []*genai.Content{})
+		factory, err := core.NewExecutorFactory(executorType)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
+			os.Exit(1)
+		}
+		executor, err = factory.NewExecutor(Cfg, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 			os.Exit(1)
