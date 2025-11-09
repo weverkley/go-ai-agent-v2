@@ -19,3 +19,36 @@ At first before you start crafting, you need to understand the JavaScript's inte
 My mock executor is a new feature that i started implementing, it must mock calls to AI, i will use it to
 test my full execution flow. Soon i will implement multiple executors other than only gemini and mock, like qwen, openai.
 
+-----------------------
+
+Based on the updated PLAN.md and README.md, here's a prioritized plan for migrating your JavaScript CLI
+   to Go:
+
+  High-Priority:
+   1. Implement Mock Executor and Executor Factory: Essential for robust testing and future AI model
+      extensibility. Design interfaces, implement a basic mock, and set up the architecture for multiple
+      executors.
+   2. Improve Error Handling and User Feedback: Standardize error types, implement consistent reporting,
+      and focus on user-friendly messages.
+   3. Comprehensive Testing: Write unit and integration tests for all migrated commands and core services,
+       leveraging the mock executor.
+
+  Mid-Priority:
+   4. Enhance Interactive UI: Expand charmbracelet/bubbletea UI to other commands like code-guide and
+      grep-code for improved user experience.
+   5. Tool Integration for AI Commands: Ensure AI commands like code-guide and grep-code can dynamically
+      use GitService, FileSystemService, and ShellExecutionService by registering them as AI tools.
+   6. Implement Secure API Key Storage/Clearing: Research and implement OS-specific secure storage for API
+       keys.
+
+  Lower-Priority / Future Enhancements:
+   7. Remaining JavaScript CLI Commands: Review the original codebase for any missed functionality.
+   8. Other Features: Prioritize IDE integration, theme changing, terminal keybinding, external editor,
+      usage statistics, restore functionality, folder trust management, and MCP server management based on
+       user demand.
+
+  General Recommendations:
+   * Maintain iterative development, regular linting, and updated documentation.
+   * Continue using clear commit messages.
+
+  What would you like to tackle first?
