@@ -25,14 +25,7 @@ type WorkspaceContext interface {
 	GetDirectories() []string
 }
 
-// CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
-type CodebaseInvestigatorSettings struct {
-	Enabled        bool    `json:"enabled,omitempty"`
-	Model          string  `json:"model,omitempty"`
-	ThinkingBudget *int    `json:"thinkingBudget,omitempty"`
-	MaxTimeMinutes *int    `json:"maxTimeMinutes,omitempty"`
-	MaxNumTurns    *int    `json:"maxNumTurns,omitempty"`
-}
+
 
 // OutputSettings represents the output settings.
 type OutputSettings struct {
@@ -45,12 +38,12 @@ type ConfigParameters struct {
 	EmbeddingModel string
 	TargetDir      string
 	DebugMode      bool
-	Model          string
+	ModelName          string
 	McpServers     map[string]types.MCPServerConfig
 	ApprovalMode   types.ApprovalMode // Use ApprovalMode from types package
 	Telemetry      *types.TelemetrySettings
 	Output         *OutputSettings
-	CodebaseInvestigator *CodebaseInvestigatorSettings
+	CodebaseInvestigator *types.CodebaseInvestigatorSettings
 	ToolRegistry *types.ToolRegistry // Changed to exported
 	ToolDiscoveryCommand string
 	ToolCallCommand      string
@@ -62,12 +55,12 @@ type Config struct {
 	embeddingModel string
 	targetDir      string
 	debugMode      bool
-	Model          string
+	modelName          string
 	mcpServers     map[string]types.MCPServerConfig
 	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
 	telemetry      *types.TelemetrySettings
 	output         *OutputSettings
-	codebaseInvestigatorSettings *CodebaseInvestigatorSettings
+	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
 	ToolRegistry *types.ToolRegistry // Changed to exported
 	toolDiscoveryCommand string
 	toolCallCommand      string
@@ -81,7 +74,7 @@ func NewConfig(params *ConfigParameters) *Config {
 		embeddingModel: params.EmbeddingModel,
 		targetDir:      params.TargetDir,
 		debugMode:      params.DebugMode,
-		Model:          params.Model,
+		modelName:      params.ModelName,
 		mcpServers:     params.McpServers,
 		approvalMode:   params.ApprovalMode,
 		telemetry:      params.Telemetry,
@@ -120,13 +113,13 @@ type realWorkspaceContext struct {
 func (rwc *realWorkspaceContext) GetDirectories() []string {
 	return []string{rwc.projectRoot}
 }
-// GetModel returns the configured model name.
-func (c *Config) GetModel() string {
-	return c.Model
+// Model returns the configured model name.
+func (c *Config) Model() string {
+	return c.modelName
 }
 
 // GetCodebaseInvestigatorSettings returns the Codebase Investigator settings.
-func (c *Config) GetCodebaseInvestigatorSettings() *CodebaseInvestigatorSettings {
+func (c *Config) GetCodebaseInvestigatorSettings() *types.CodebaseInvestigatorSettings {
 	return c.codebaseInvestigatorSettings
 }
 
@@ -154,7 +147,7 @@ func (c *Config) GetGeminiDir() string {
 func (c *Config) Get(key string) (interface{}, bool) {
 	switch key {
 	case "model":
-		return c.Model, true
+		return c.modelName, true
 	case "debugMode":
 		return c.debugMode, true
 	case "sessionID":

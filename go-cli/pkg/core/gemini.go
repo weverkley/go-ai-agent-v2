@@ -40,7 +40,7 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	model := client.GenerativeModel(cfg.GetModel())
+	model := client.GenerativeModel(cfg.Model())
 
 	// Apply generation config
 	model.SetTemperature(generationConfig.Temperature)
@@ -54,7 +54,7 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 	return &GeminiChat{
 		client:           client,
 		model:            model,
-		Name:             cfg.GetModel(),
+		Name:             cfg.Model(),
 		generationConfig: generationConfig,
 		startHistory:     startHistory,
 		toolRegistry:     cfg.GetToolRegistry(), // Store the ToolRegistry

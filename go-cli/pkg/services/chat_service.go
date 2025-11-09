@@ -61,7 +61,7 @@ func (cs *ChatService) getProjectTempDir() (string, error) {
 func (cs *ChatService) GetSavedChatTags(mtSortDesc bool) ([]ChatDetail, error) {
 	geminiDir, err := cs.getProjectTempDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get project temp directory: %w", err)
+		return nil, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
 	}
 
 	// Ensure the directory exists
@@ -71,7 +71,7 @@ func (cs *ChatService) GetSavedChatTags(mtSortDesc bool) ([]ChatDetail, error) {
 
 	files, err := os.ReadDir(geminiDir)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read directory %s: %w", geminiDir, err)
+		return nil, fmt.Errorf("could not read chat checkpoint directory '%s': %w", geminiDir, err)
 	}
 
 	chatDetails := []ChatDetail{}
@@ -113,12 +113,12 @@ func (cs *ChatService) GetSavedChatTags(mtSortDesc bool) ([]ChatDetail, error) {
 func (cs *ChatService) SaveCheckpoint(history []*genai.Content, tag string) error {
 	geminiDir, err := cs.getProjectTempDir()
 	if err != nil {
-		return fmt.Errorf("failed to get project temp directory: %w", err)
+		return fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
 	}
 
 	// Ensure the directory exists
 	if err := os.MkdirAll(geminiDir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", geminiDir, err)
+		return fmt.Errorf("could not create checkpoint directory '%s': %w", geminiDir, err)
 	}
 
 	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
@@ -144,11 +144,11 @@ func (cs *ChatService) SaveCheckpoint(history []*genai.Content, tag string) erro
 
 	data, err := json.MarshalIndent(serializableHistory, "", "  ")
 	if err != nil {
-		return fmt.Errorf("failed to marshal history: %w", err)
+		return fmt.Errorf("could not prepare chat history for saving: %w", err)
 	}
 
 	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write checkpoint file %s: %w", filePath, err)
+		return fmt.Errorf("could not write checkpoint file '%s': %w", filePath, err)
 	}
 
 	return nil
@@ -158,19 +158,19 @@ func (cs *ChatService) SaveCheckpoint(history []*genai.Content, tag string) erro
 func (cs *ChatService) LoadCheckpoint(tag string) ([]*genai.Content, error) {
 	geminiDir, err := cs.getProjectTempDir()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get project temp directory: %w", err)
+		return nil, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
 	}
 
 	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
 
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read checkpoint file %s: %w", filePath, err)
+		return nil, fmt.Errorf("could not read checkpoint file '%s': %w", filePath, err)
 	}
 
 	var serializableHistory []*SerializableContent
 	if err := json.Unmarshal(data, &serializableHistory); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal history from %s: %w", filePath, err)
+		return nil, fmt.Errorf("could not parse chat history from '%s': %w", filePath, err)
 	}
 
 	// Convert []*SerializableContent back to []*genai.Content
@@ -199,7 +199,7 @@ func (cs *ChatService) LoadCheckpoint(tag string) ([]*genai.Content, error) {
 func (cs *ChatService) CheckpointExists(tag string) (bool, error) {
 	geminiDir, err := cs.getProjectTempDir()
 	if err != nil {
-		return false, fmt.Errorf("failed to get project temp directory: %w", err)
+		return false, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
 	}
 
 	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
@@ -211,14 +211,14 @@ func (cs *ChatService) CheckpointExists(tag string) (bool, error) {
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	return false, fmt.Errorf("failed to check if checkpoint exists: %w", err)
+	return false, fmt.Errorf("could not determine if checkpoint '%s' exists: %w", tag, err)
 }
 
 // DeleteCheckpoint deletes a checkpoint with the specified tag.
 func (cs *ChatService) DeleteCheckpoint(tag string) (bool, error) {
 	geminiDir, err := cs.getProjectTempDir()
 	if err != nil {
-		return false, fmt.Errorf("failed to get project temp directory: %w", err)
+		return false, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
 	}
 
 	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
@@ -228,7 +228,7 @@ func (cs *ChatService) DeleteCheckpoint(tag string) (bool, error) {
 	}
 
 	if err := os.Remove(filePath); err != nil {
-		return false, fmt.Errorf("failed to delete checkpoint file %s: %w", filePath, err)
+		return false, fmt.Errorf("could not delete checkpoint file '%s': %w", filePath, err)
 	}
 
 	return true, nil

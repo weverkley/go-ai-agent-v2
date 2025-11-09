@@ -101,7 +101,7 @@ func init() {
 	params := &config.ConfigParameters{
 		// Set default values or load from settings file
 		DebugMode: false,
-		Model:     config.DEFAULT_GEMINI_MODEL,
+		ModelName: config.DEFAULT_GEMINI_MODEL,
 		Telemetry: &types.TelemetrySettings{ // Initialize TelemetrySettings
 			Enabled: false, // Default to disabled
 			Outfile: "",    // Default to no outfile

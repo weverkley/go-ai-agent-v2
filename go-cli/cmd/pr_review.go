@@ -38,13 +38,17 @@ It evaluates code quality, adherence to standards, and readiness for merging, pr
 		}
 
 		params := &config.ConfigParameters{
-			Model: model,
+			ModelName: model,
 			ToolRegistry: toolRegistry, // Use the initialized tool registry
 		}
 		appConfig := config.NewConfig(params)
 
-		executorFactory := core.NewExecutorFactory()
-		executor, err := executorFactory.CreateExecutor(executorType, appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		factory, err := core.NewExecutorFactory(executorType)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
+			os.Exit(1)
+		}
+		executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 			os.Exit(1)
