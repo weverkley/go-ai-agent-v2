@@ -60,5 +60,39 @@ func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServer
 		delete(m.runningServers, name) // Clean up after exit
 	}()
 
+// Stop stops all running local MCP servers and closes all client connections.
+func (m *McpClientManager) Stop() error {
+	fmt.Println("Stopping MCP clients and local servers...")
+
+	var allErrors []error
+
+	// Close client connections
+	for name, client := range m.clients {
+		if err := client.Close(); err != nil {
+			allErrors = append(allErrors, fmt.Errorf("error closing client %s: %w", name, err))
+		}
+		delete(m.clients, name)
+	}
+
+	// Terminate local server processes
+	for name, cmd := range m.runningServers {
+		if cmd.Process != nil {
+			fmt.Printf("Terminating local MCP server '%s' (PID: %d)...
+", name, cmd.Process.Pid)
+			if err := cmd.Process.Kill(); err != nil {
+				allErrors = append(allErrors, fmt.Errorf("error killing process for server %s (PID %d): %w", name, cmd.Process.Pid, err))
+			} else {
+				fmt.Printf("Local MCP server '%s' (PID: %d) terminated.
+", name, cmd.Process.Pid)
+			}
+		}
+		delete(m.runningServers, name)
+	}
+
+	if len(allErrors) > 0 {
+		return fmt.Errorf("multiple errors occurred during MCP stop: %v", allErrors)
+	}
+
+	fmt.Println("All MCP clients and local servers stopped.")
 	return nil
 }
