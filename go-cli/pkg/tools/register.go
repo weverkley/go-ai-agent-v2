@@ -3,11 +3,12 @@ package tools
 import (
 	"fmt"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools() *types.ToolRegistry {
+func RegisterAllTools(fs services.FileSystemService) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
@@ -37,7 +38,7 @@ func RegisterAllTools() *types.ToolRegistry {
 	if err := registry.Register(NewWriteTodosTool()); err != nil {
 		fmt.Printf("Error registering WriteTodosTool: %v\n", err)
 	}
-	if err := registry.Register(NewListDirectoryTool()); err != nil {
+	if err := registry.Register(NewListDirectoryTool(fs)); err != nil {
 		fmt.Printf("Error registering ListDirectoryTool: %v\n", err)
 	}
 	if err := registry.Register(NewGetCurrentBranchTool()); err != nil {

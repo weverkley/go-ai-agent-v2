@@ -6,26 +6,26 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
-		"go-ai-agent-v2/go-cli/pkg/core"
-		"go-ai-agent-v2/go-cli/pkg/types"
-		"go-ai-agent-v2/go-cli/pkg/ui"
-		"go-ai-agent-v2/go-cli/pkg/tools" // Add back the import	
-	    "github.com/google/generative-ai-go/genai"
-	    "github.com/spf13/cobra"
-	    tea "github.com/charmbracelet/bubbletea"
-	)
-	
-	var codeGuideCmd = &cobra.Command{
-	    Use:   "code-guide [question]",
-	    Short: "Answer questions about the Gemini CLI codebase",
-	    Long: `Answer questions about the Gemini CLI codebase with explanations and code snippets.
-	
-	This command acts as a specialized AI prompt to help new engineers understand the Gemini CLI codebase.
-	It provides clear explanations grounded in the actual source code, including full file paths and design choices.`,
-	    Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
-	    Run: func(cmd *cobra.Command, args []string) {
-			// Initialize the ToolRegistry
-			toolRegistry := tools.RegisterAllTools()
+	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/ui"
+	"go-ai-agent-v2/go-cli/pkg/tools" // Add back the import	
+    "github.com/google/generative-ai-go/genai"
+    "github.com/spf13/cobra"
+    tea "github.com/charmbracelet/bubbletea"
+)
+
+var codeGuideCmd = &cobra.Command{
+    Use:   "code-guide [question]",
+    Short: "Answer questions about the Gemini CLI codebase",
+    Long: `Answer questions about the Gemini CLI codebase with explanations and code snippets.
+
+This command acts as a specialized AI prompt to help new engineers understand the Gemini CLI codebase.
+It provides clear explanations grounded in the actual source code, including full file paths and design choices.`,
+    Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
+    Run: func(cmd *cobra.Command, args []string) {
+		// Initialize the ToolRegistry
+		toolRegistry := tools.RegisterAllTools(FSService)
 	
 			modelVal, ok := SettingsService.Get("model")
 			if !ok {

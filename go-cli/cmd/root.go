@@ -65,6 +65,8 @@ var MemoryService *services.MemoryService // Declare package-level memoryService
 var SessionStartTime time.Time // Declare sessionStartTime
 var SettingsService *services.SettingsService // Declare package-level settingsService
 
+var FSService services.FileSystemService // Declare package-level FileSystemService
+
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
@@ -94,8 +96,10 @@ func init() {
 	SettingsService = services.NewSettingsService(projectRoot)
 
 	rootCmd.PersistentFlags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
+	// Initialize FileSystemService
+	FSService = services.NewFileSystemService()
 	// Register all tools
-	toolRegistry := tools.RegisterAllTools()
+	toolRegistry := tools.RegisterAllTools(FSService)
 
 	// Initialize ConfigParameters
 	params := &config.ConfigParameters{

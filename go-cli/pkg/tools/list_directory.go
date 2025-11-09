@@ -15,7 +15,7 @@ type ListDirectoryTool struct {
 }
 
 // NewListDirectoryTool creates a new ListDirectoryTool.
-func NewListDirectoryTool() *ListDirectoryTool {
+func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 	return &ListDirectoryTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			"list_directory",
@@ -55,7 +55,7 @@ func NewListDirectoryTool() *ListDirectoryTool {
 			false,
 			nil,
 		),
-		fileSystemService: services.NewFileSystemService(),
+		fileSystemService: fs,
 	}
 }
 

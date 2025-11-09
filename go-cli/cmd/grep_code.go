@@ -7,7 +7,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/services" // Keep this import for shellService
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
 	"go-ai-agent-v2/go-cli/pkg/tools" // Add back the import
@@ -24,7 +24,7 @@ var grepCodeCmd = &cobra.Command{
 	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize the ToolRegistry
-		toolRegistry := tools.RegisterAllTools()
+		toolRegistry := tools.RegisterAllTools(FSService)
 
 		modelVal, ok := SettingsService.Get("model")
 		if !ok {

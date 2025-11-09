@@ -30,7 +30,7 @@ This command uses AI to search for documentation files related to your question 
 	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize the ToolRegistry
-		toolRegistry := tools.RegisterAllTools()
+		toolRegistry := tools.RegisterAllTools(FSService)
 
 		modelVal, ok := SettingsService.Get("model")
 		if !ok {
