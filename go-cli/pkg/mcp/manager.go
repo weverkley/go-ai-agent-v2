@@ -2,10 +2,10 @@ package mcp
 
 import (
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/config" // Re-add config import
 	"go-ai-agent-v2/go-cli/pkg/types"
-	"os/exec" // Import os/exec
-	"time"
+	"os"
+	"os/exec"
 )
 
 // McpClientManager manages the lifecycle of multiple MCP clients and local servers.
@@ -60,6 +60,40 @@ func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServer
 		delete(m.runningServers, name) // Clean up after exit
 	}()
 
+	return nil
+}
+
+// ListServers returns a list of configured MCP servers with their status.
+func (m *McpClientManager) ListServers(cliConfig *config.Config) []types.MCPServerStatus {
+	var statuses []types.MCPServerStatus
+
+	mcpServers := cliConfig.GetMcpServers()
+	for name, serverConfig := range mcpServers {
+		currentStatus := types.MCPServerStatus{
+			Name:        name,
+			Url:         serverConfig.Url,
+			Description: serverConfig.Description,
+			Status:      types.MCPServerStatusDisconnected, // Default to disconnected
+		}
+
+		// Check if client is connected
+		if _, ok := m.clients[name]; ok {
+			currentStatus.Status = types.MCPServerStatusConnected
+		}
+
+		// Check if local server process is running
+		if cmd, ok := m.runningServers[name]; ok && cmd.Process != nil {
+			if currentStatus.Status == types.MCPServerStatusDisconnected { // Only if not already connected
+				currentStatus.Status = "RUNNING" // Custom status for running local server
+			} else {
+				currentStatus.Status = types.MCPServerStatusConnected // Connected and running
+			}
+		}
+		statuses = append(statuses, currentStatus)
+	}
+
+	return statuses
+}
 // Stop stops all running local MCP servers and closes all client connections.
 func (m *McpClientManager) Stop() error {
 	fmt.Println("Stopping MCP clients and local servers...")
@@ -77,13 +111,11 @@ func (m *McpClientManager) Stop() error {
 	// Terminate local server processes
 	for name, cmd := range m.runningServers {
 		if cmd.Process != nil {
-			fmt.Printf("Terminating local MCP server '%s' (PID: %d)...
-", name, cmd.Process.Pid)
+			fmt.Printf("Terminating local MCP server '%s' (PID: %d)...\n", name, cmd.Process.Pid)
 			if err := cmd.Process.Kill(); err != nil {
 				allErrors = append(allErrors, fmt.Errorf("error killing process for server %s (PID %d): %w", name, cmd.Process.Pid, err))
 			} else {
-				fmt.Printf("Local MCP server '%s' (PID: %d) terminated.
-", name, cmd.Process.Pid)
+				fmt.Printf("Local MCP server '%s' (PID: %d) terminated.\n", name, cmd.Process.Pid)
 			}
 		}
 		delete(m.runningServers, name)
