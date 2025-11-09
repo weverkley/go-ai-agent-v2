@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"os/exec" // Import os/exec
+	"time"
 )
 
-// McpClientManager manages the lifecycle of multiple MCP clients.
+// McpClientManager manages the lifecycle of multiple MCP clients and local servers.
 type McpClientManager struct {
 	clients map[string]*McpClient
-	toolRegistry *types.ToolRegistry // Placeholder for now
+	toolRegistry *types.ToolRegistry
+	runningServers map[string]*exec.Cmd // Map to store running local server processes
 }
 
 // NewMcpClientManager creates a new instance of McpClientManager.
@@ -17,71 +20,45 @@ func NewMcpClientManager(toolRegistry *types.ToolRegistry) *McpClientManager {
 	return &McpClientManager{
 		clients: make(map[string]*McpClient),
 		toolRegistry: toolRegistry,
+		runningServers: make(map[string]*exec.Cmd),
 	}
 }
 
-// DiscoverAllMcpTools initiates the tool discovery process for all configured MCP servers.
-func (m *McpClientManager) DiscoverAllMcpTools(cliConfig *config.Config) error {
-	fmt.Println("Discovering MCP tools...")
-
-	mcpServers := cliConfig.GetMcpServers()
-	if len(mcpServers) == 0 {
-		fmt.Println("No MCP servers configured.")
-		return nil
+// StartServer starts a local MCP server process.
+func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServerConfig) error {
+	if serverConfig.Command == "" {
+		return fmt.Errorf("MCP server '%s' has no command specified", name)
 	}
 
-	for name, serverConfig := range mcpServers {
-		fmt.Printf("Connecting to MCP server: %s (URL: %s)\n", name, serverConfig.Url)
-		client := NewMcpClient(name, "v1.0", serverConfig) // Pass serverConfig
-		
-		// Simulate connection
-		if err := client.Connect(5*time.Second); err != nil {
-			fmt.Printf("Error connecting to MCP server %s: %v\n", name, err)
-			continue
-		}
-		m.clients[name] = client
-
-		// Simulate tool discovery and registration
-		fmt.Printf("Simulating tool discovery for %s...\n", name)
-		discoveredTools, err := client.GetTools()
-		if err != nil {
-			fmt.Printf("Error getting simulated tools from MCP server %s: %v\n", name, err)
-			continue
-		}
-
-		for _, tool := range discoveredTools {
-			if err := m.toolRegistry.Register(tool); err != nil {
-				fmt.Printf("Error registering tool %s from MCP server %s: %v\n", tool.Name(), name, err)
-			} else {
-				fmt.Printf("Registered tool: %s from MCP server: %s\n", tool.Name(), name)
-			}
+	cmd := exec.Command(serverConfig.Command, serverConfig.Args...)
+	if serverConfig.Cwd != "" {
+		cmd.Dir = serverConfig.Cwd
+	}
+	if len(serverConfig.Env) > 0 {
+		cmd.Env = os.Environ() // Start with current environment
+		for k, v := range serverConfig.Env {
+			cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", k, v))
 		}
 	}
+
+	// Start the command in a new goroutine to avoid blocking
+	go func() {
+		fmt.Printf("Starting local MCP server '%s': %s %v\n", name, serverConfig.Command, serverConfig.Args)
+		if err := cmd.Start(); err != nil {
+			fmt.Printf("Error starting local MCP server '%s': %v\n", name, err)
+			return
+		}
+		m.runningServers[name] = cmd
+		fmt.Printf("Local MCP server '%s' started with PID %d\n", name, cmd.Process.Pid)
+
+		// Wait for the command to finish (or be stopped)
+		if err := cmd.Wait(); err != nil {
+			fmt.Printf("Local MCP server '%s' exited with error: %v\n", name, err)
+		} else {
+			fmt.Printf("Local MCP server '%s' exited normally.\n", name)
+		}
+		delete(m.runningServers, name) // Clean up after exit
+	}()
 
 	return nil
-}
-
-// Stop stops all running local MCP servers and closes all client connections.
-func (m *McpClientManager) Stop() error {
-	// For now, we will simulate the stop process.
-	fmt.Println("Simulating stopping MCP clients...")
-
-	// In a real scenario, this would involve:
-	// 1. Iterating through all active McpClient's.
-	// 2. Disconnecting from each client.
-
-	return nil
-}
-
-// ListServers returns a list of configured MCP servers with their status.
-func (m *McpClientManager) ListServers() []types.MCPServerStatus {
-	// For now, return a dummy list.
-	return []types.MCPServerStatus{
-		{
-			Name:   "dummy-server",
-			Status: types.MCPServerStatusDisconnected,
-			Url:    "http://localhost:8080",
-			Description: "A dummy MCP server for testing.",
-		},
-	}
 }
