@@ -138,6 +138,11 @@ func (c *Config) GetTelemetryLogger() telemetry.TelemetryLogger {
 	return c.telemetryLogger
 }
 
+// GetMcpServers returns the configured MCP servers.
+func (c *Config) GetMcpServers() map[string]types.MCPServerConfig {
+	return c.mcpServers
+}
+
 // GetGeminiDir returns the path to the .gemini directory within the target directory.
 func (c *Config) GetGeminiDir() string {
 	return filepath.Join(c.targetDir, ".gemini")

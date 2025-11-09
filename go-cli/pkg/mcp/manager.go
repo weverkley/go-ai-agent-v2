@@ -22,15 +22,41 @@ func NewMcpClientManager(toolRegistry *types.ToolRegistry) *McpClientManager {
 
 // DiscoverAllMcpTools initiates the tool discovery process for all configured MCP servers.
 func (m *McpClientManager) DiscoverAllMcpTools(cliConfig *config.Config) error {
-	// For now, we will simulate the discovery process.
-	fmt.Println("Simulating MCP tool discovery...")
+	fmt.Println("Discovering MCP tools...")
 
-	// In a real scenario, this would involve:
-	// 1. Loading MCP servers from cliConfig.
-	// 2. Creating McpClient for each server.
-	// 3. Connecting to each server.
-	// 4. Discovering tools from each server.
-	// 5. Registering discovered tools with m.toolRegistry.
+	mcpServers := cliConfig.GetMcpServers()
+	if len(mcpServers) == 0 {
+		fmt.Println("No MCP servers configured.")
+		return nil
+	}
+
+	for name, serverConfig := range mcpServers {
+		fmt.Printf("Connecting to MCP server: %s (URL: %s)\n", name, serverConfig.Url)
+		client := NewMcpClient(name, "v1.0", serverConfig) // Pass serverConfig
+		
+		// Simulate connection
+		if err := client.Connect(5*time.Second); err != nil {
+			fmt.Printf("Error connecting to MCP server %s: %v\n", name, err)
+			continue
+		}
+		m.clients[name] = client
+
+		// Simulate tool discovery and registration
+		fmt.Printf("Simulating tool discovery for %s...\n", name)
+		discoveredTools, err := client.GetTools()
+		if err != nil {
+			fmt.Printf("Error getting simulated tools from MCP server %s: %v\n", name, err)
+			continue
+		}
+
+		for _, tool := range discoveredTools {
+			if err := m.toolRegistry.Register(tool); err != nil {
+				fmt.Printf("Error registering tool %s from MCP server %s: %v\n", tool.Name(), name, err)
+			} else {
+				fmt.Printf("Registered tool: %s from MCP server: %s\n", tool.Name(), name)
+			}
+		}
+	}
 
 	return nil
 }
