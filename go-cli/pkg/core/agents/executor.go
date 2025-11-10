@@ -9,6 +9,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/telemetry" // Import telemetry package
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/utils"
 
@@ -176,7 +177,7 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 		startHistory,
 	)
 	if err != nil {
-		ae.RuntimeContext.GetTelemetryLogger().LogErrorf("Failed to create chat object: %v", err)
+		telemetry.GlobalLogger.LogErrorf("Failed to create chat object: %v", err)
 		return nil, fmt.Errorf("failed to create chat object: %w", err)
 	}
 

@@ -74,10 +74,19 @@ func (si *SubagentInvocation) Execute(
 		}
 	}
 
+	toolRegistryVal, found := si.Config.Get("toolRegistry")
+	if !found || toolRegistryVal == nil {
+		return types.ToolResult{}, fmt.Errorf("tool registry not found in config")
+	}
+	toolRegistry, ok := toolRegistryVal.(*types.ToolRegistry)
+	if !ok {
+		return types.ToolResult{}, fmt.Errorf("tool registry in config is not of expected type")
+	}
+
 	executor, err := CreateAgentExecutor(
 		si.Definition,
 		si.Config,
-		si.Config.GetToolRegistry(), // Pass the main tool registry for subagent to discover tools
+		toolRegistry, // Pass the main tool registry for subagent to discover tools
 		"",                          // parentPromptId - SubagentInvocation is top-level for its own execution
 		onActivity,
 	)

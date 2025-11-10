@@ -10,7 +10,7 @@ import (
 // GetRemoteURLTool implements the Tool interface for getting the Git remote URL.
 type GetRemoteURLTool struct {
 	*types.BaseDeclarativeTool
-	gitService *services.GitService
+	gitService services.GitService
 }
 
 // NewGetRemoteURLTool creates a new GetRemoteURLTool.

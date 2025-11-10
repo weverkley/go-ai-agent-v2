@@ -10,7 +10,7 @@ import (
 // PullTool implements the Tool interface for pulling latest changes from a Git remote.
 type PullTool struct {
 	*types.BaseDeclarativeTool
-	gitService *services.GitService
+	gitService services.GitService
 }
 
 // NewPullTool creates a new PullTool.
@@ -46,7 +46,7 @@ func (t *PullTool) Execute(args map[string]any) (types.ToolResult, error) {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")
 	}
 
-	err := t.gitService.Pull(dir)
+	err := t.gitService.Pull(dir, "")
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to pull changes in %s: %w", dir, err)
 	}

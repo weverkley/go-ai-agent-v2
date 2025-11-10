@@ -2,21 +2,23 @@ package mcp
 
 import (
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/config" // Re-add config import
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"os/exec"
+	"sync" // Import sync package
+	"time"
 )
 
 // McpClientManager manages the lifecycle of multiple MCP clients and local servers.
 type McpClientManager struct {
-	clients map[string]*McpClient
-	toolRegistry *types.ToolRegistry
+	mu             sync.RWMutex // Mutex to protect concurrent access
+	clients        map[string]*McpClient
+	toolRegistry   types.ToolRegistryInterface
 	runningServers map[string]*exec.Cmd // Map to store running local server processes
 }
 
 // NewMcpClientManager creates a new instance of McpClientManager.
-func NewMcpClientManager(toolRegistry *types.ToolRegistry) *McpClientManager {
+func NewMcpClientManager(toolRegistry types.ToolRegistryInterface) *McpClientManager {
 	return &McpClientManager{
 		clients: make(map[string]*McpClient),
 		toolRegistry: toolRegistry,
@@ -48,7 +50,9 @@ func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServer
 			fmt.Printf("Error starting local MCP server '%s': %v\n", name, err)
 			return
 		}
+		m.mu.Lock()
 		m.runningServers[name] = cmd
+		m.mu.Unlock()
 		fmt.Printf("Local MCP server '%s' started with PID %d\n", name, cmd.Process.Pid)
 
 		// Wait for the command to finish (or be stopped)
@@ -57,48 +61,69 @@ func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServer
 		} else {
 			fmt.Printf("Local MCP server '%s' exited normally.\n", name)
 		}
+		m.mu.Lock()
 		delete(m.runningServers, name) // Clean up after exit
+		m.mu.Unlock()
 	}()
 
 	return nil
 }
 
-// ListServers returns a list of configured MCP servers with their status.
-func (m *McpClientManager) ListServers(cliConfig *config.Config) []types.MCPServerStatus {
-	var statuses []types.MCPServerStatus
+// DiscoverAllMcpTools initiates the tool discovery process for all configured MCP servers.
+func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
+	fmt.Println("Discovering MCP tools...")
 
-	mcpServers := cliConfig.GetMcpServers()
-	for name, serverConfig := range mcpServers {
-		currentStatus := types.MCPServerStatus{
-			Name:        name,
-			Url:         serverConfig.Url,
-			Description: serverConfig.Description,
-			Status:      types.MCPServerStatusDisconnected, // Default to disconnected
-		}
-
-		// Check if client is connected
-		if _, ok := m.clients[name]; ok {
-			currentStatus.Status = types.MCPServerStatusConnected
-		}
-
-		// Check if local server process is running
-		if cmd, ok := m.runningServers[name]; ok && cmd.Process != nil {
-			if currentStatus.Status == types.MCPServerStatusDisconnected { // Only if not already connected
-				currentStatus.Status = "RUNNING" // Custom status for running local server
-			} else {
-				currentStatus.Status = types.MCPServerStatusConnected // Connected and running
-			}
-		}
-		statuses = append(statuses, currentStatus)
+	mcpServersVal, found := cliConfig.Get("mcpServers")
+	if !found || mcpServersVal == nil {
+		fmt.Println("No MCP servers configured.")
+		return nil
+	}
+	mcpServers, ok := mcpServersVal.(map[string]types.MCPServerConfig)
+	if !ok {
+		return fmt.Errorf("mcpServers in config is not of expected type")
 	}
 
-	return statuses
+	for name, serverConfig := range mcpServers {
+		fmt.Printf("Connecting to MCP server: %s (URL: %s)\n", name, serverConfig.Url)
+		client := NewMcpClient(name, "v1.0", serverConfig) // Pass serverConfig
+		
+		// Simulate connection
+		if err := client.Connect(5*time.Second); err != nil {
+			fmt.Printf("Error connecting to MCP server %s: %v\n", name, err)
+			continue
+		}
+		m.mu.Lock()
+		m.clients[name] = client
+		m.mu.Unlock()
+
+		// Simulate tool discovery and registration
+		fmt.Printf("Simulating tool discovery for %s...\n", name)
+		discoveredTools, err := client.GetTools()
+		if err != nil {
+			fmt.Printf("Error getting simulated tools from MCP server %s: %v\n", name, err)
+			continue
+		}
+
+		for _, tool := range discoveredTools {
+			if err := m.toolRegistry.Register(tool); err != nil {
+				fmt.Printf("Error registering tool %s from MCP server %s: %v\n", tool.Name(), name, err)
+			} else {
+				fmt.Printf("Registered tool: %s from MCP server: %s\n", tool.Name(), name)
+			}
+		}
+	}
+
+	return nil
 }
+
 // Stop stops all running local MCP servers and closes all client connections.
 func (m *McpClientManager) Stop() error {
 	fmt.Println("Stopping MCP clients and local servers...")
 
 	var allErrors []error
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	// Close client connections
 	for name, client := range m.clients {
@@ -127,4 +152,67 @@ func (m *McpClientManager) Stop() error {
 
 	fmt.Println("All MCP clients and local servers stopped.")
 	return nil
+}
+
+// ListServers returns a list of configured MCP servers with their status.
+func (m *McpClientManager) ListServers(cliConfig types.Config) []types.MCPServerStatus {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var statuses []types.MCPServerStatus
+
+	mcpServersVal, found := cliConfig.Get("mcpServers")
+	if !found || mcpServersVal == nil {
+		return statuses
+	}
+	mcpServers, ok := mcpServersVal.(map[string]types.MCPServerConfig)
+	if !ok {
+		return statuses // Return empty if type assertion fails
+	}
+	for name, serverConfig := range mcpServers {
+		currentStatus := types.MCPServerStatus{
+			Name:        name,
+			Url:         serverConfig.Url,
+			Description: serverConfig.Description,
+			Status:      types.MCPServerStatusDisconnected, // Default to disconnected
+		}
+
+		// Check if client is connected
+		if _, ok := m.clients[name]; ok {
+			currentStatus.Status = types.MCPServerStatusConnected
+		}
+
+		// Check if local server process is running
+		if cmd, ok := m.runningServers[name]; ok && cmd.Process != nil {
+			if currentStatus.Status == types.MCPServerStatusDisconnected { // Only if not already connected
+				currentStatus.Status = "RUNNING" // Custom status for running local server
+			} else {
+				currentStatus.Status = types.MCPServerStatusConnected // Connected and running
+			}
+		}
+		statuses = append(statuses, currentStatus)
+	}
+
+	return statuses
+}
+
+// GetClient returns a client by name for testing purposes.
+func (m *McpClientManager) GetClient(name string) *McpClient {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.clients[name]
+}
+
+// AddClient adds a client to the manager for testing purposes.
+func (m *McpClientManager) AddClient(name string, client *McpClient) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.clients[name] = client
+}
+
+// GetRunningServer returns a running server command by name for testing purposes.
+func (m *McpClientManager) GetRunningServer(name string) *exec.Cmd {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.runningServers[name]
 }

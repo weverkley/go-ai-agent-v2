@@ -20,9 +20,11 @@ const (
 	SettingScopeWorkspace SettingScope = "workspace"
 )
 
-// WorkspaceContext defines an interface for accessing workspace-related information.
-type WorkspaceContext interface {
-	GetDirectories() []string
+
+
+// GetWorkspaceContext returns the workspace context.
+func (c *Config) GetWorkspaceContext() types.WorkspaceContext {
+	return c.WorkspaceContext
 }
 
 
@@ -49,7 +51,7 @@ type ConfigParameters struct {
 	ToolCallCommand      string
 }
 
-// Config represents the application configuration.
+// Config represents the application's configuration.
 type Config struct {
 	sessionID      string
 	embeddingModel string
@@ -61,86 +63,32 @@ type Config struct {
 	telemetry      *types.TelemetrySettings
 	output         *OutputSettings
 	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
-	ToolRegistry *types.ToolRegistry // Changed to exported
+	toolRegistry types.ToolRegistryInterface // Changed to interface
 	toolDiscoveryCommand string
 	toolCallCommand      string
 	telemetryLogger telemetry.TelemetryLogger
-	fileService types.FileService // Add FileService to Config struct
+	FileFilteringService types.FileFilteringService // Exported FileFilteringService field
+	WorkspaceContext types.WorkspaceContext // Exported workspaceContext field
 }
 
+// NewConfig creates a new Config instance from ConfigParameters.
 func NewConfig(params *ConfigParameters) *Config {
-	cfg := &Config{
+	return &Config{
 		sessionID:      params.SessionID,
 		embeddingModel: params.EmbeddingModel,
 		targetDir:      params.TargetDir,
 		debugMode:      params.DebugMode,
-		modelName:      params.ModelName,
+		modelName:          params.ModelName,
 		mcpServers:     params.McpServers,
 		approvalMode:   params.ApprovalMode,
 		telemetry:      params.Telemetry,
 		output:         params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
-		ToolRegistry: params.ToolRegistry,
+		toolRegistry:   params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
 		toolDiscoveryCommand: params.ToolDiscoveryCommand,
 		toolCallCommand:      params.ToolCallCommand,
+		// telemetryLogger and fileFilteringService will be set separately
 	}
-	cfg.telemetryLogger = telemetry.NewTelemetryLogger(params.Telemetry) // Initialize here
-	// fileService will be set by SetConfiguredFileService later
-
-	return cfg
-}
-
-// SetConfiguredFileService sets the FileService for the Config.
-func (c *Config) SetConfiguredFileService(fs types.FileService) {
-	c.fileService = fs
-}
-
-// GetToolDiscoveryCommand returns the tool discovery command.
-func (c *Config) GetToolDiscoveryCommand() string {
-	return c.toolDiscoveryCommand
-}
-
-// GetWorkspaceContext returns the workspace context.
-func (c *Config) GetWorkspaceContext() WorkspaceContext {
-	return &realWorkspaceContext{projectRoot: c.targetDir}
-}
-
-// realWorkspaceContext is a real implementation of WorkspaceContext.
-type realWorkspaceContext struct {
-	projectRoot string
-}
-
-func (rwc *realWorkspaceContext) GetDirectories() []string {
-	return []string{rwc.projectRoot}
-}
-// Model returns the configured model name.
-func (c *Config) Model() string {
-	return c.modelName
-}
-
-// GetCodebaseInvestigatorSettings returns the Codebase Investigator settings.
-func (c *Config) GetCodebaseInvestigatorSettings() *types.CodebaseInvestigatorSettings {
-	return c.codebaseInvestigatorSettings
-}
-
-// GetDebugMode returns true if debug mode is enabled.
-func (c *Config) GetDebugMode() bool {
-	return c.debugMode
-}
-
-// GetToolRegistry returns the global tool registry.
-func (c *Config) GetToolRegistry() *types.ToolRegistry {
-	return c.ToolRegistry
-}
-
-// GetTelemetryLogger returns the initialized telemetry logger.
-func (c *Config) GetTelemetryLogger() telemetry.TelemetryLogger {
-	return c.telemetryLogger
-}
-
-// GetMcpServers returns the configured MCP servers.
-func (c *Config) GetMcpServers() map[string]types.MCPServerConfig {
-	return c.mcpServers
 }
 
 // GetGeminiDir returns the path to the .gemini directory within the target directory.
@@ -207,7 +155,7 @@ func (c *Config) GetDirectoryContextString() (string, error) {
 
 	var folderStructures []string
 	for _, dir := range workspaceDirectories {
-		structure, err := c._getFolderStructure(dir, &types.FolderStructureOptions{}, c.fileService)
+		structure, err := c._getFolderStructure(dir, &types.FolderStructureOptions{}, c.FileFilteringService)
 		if err != nil {
 			return "", err
 		}
@@ -232,7 +180,7 @@ func (c *Config) GetDirectoryContextString() (string, error) {
 }
 
 // _getFolderStructure generates a string representation of a directory's structure.
-func (c *Config) _getFolderStructure(directory string, options *types.FolderStructureOptions, fileService types.FileService) (string, error) {
+func (c *Config) _getFolderStructure(directory string, options *types.FolderStructureOptions, fileFilteringService types.FileFilteringService) (string, error) {
 	resolvedPath, err := filepath.Abs(directory)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve path: %w", err)
@@ -276,7 +224,7 @@ func (c *Config) _getFolderStructure(directory string, options *types.FolderStru
 	}
 
 
-	structureRoot, err := c.readFullStructure(resolvedPath, &mergedOptions, fileService)
+	structureRoot, err := c.readFullStructure(resolvedPath, &mergedOptions, fileFilteringService)
 	if err != nil {
 		return "", err
 	}
@@ -303,7 +251,7 @@ func intPtr(i int) *int {
 }
 
 // readFullStructure reads the directory structure using BFS, respecting maxItems.
-func (c *Config) readFullStructure(rootPath string, options *types.FolderStructureOptions, fileService types.FileService) (*types.FullFolderInfo, error) {
+func (c *Config) readFullStructure(rootPath string, options *types.FolderStructureOptions, fileFilteringService types.FileFilteringService) (*types.FullFolderInfo, error) {
 	rootName := filepath.Base(rootPath)
 	rootNode := &types.FullFolderInfo{
 		Name:       rootName,
@@ -367,8 +315,8 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 				
 
 				isIgnored := false
-				if fileService != nil {
-					isIgnored = fileService.ShouldIgnoreFile(filepath.Join(currentPath, fileName), *options.FileFilteringOptions)
+				if fileFilteringService != nil {
+					isIgnored = fileFilteringService.ShouldIgnoreFile(filepath.Join(currentPath, fileName), *options.FileFilteringOptions)
 				}
 
 				if isIgnored {
@@ -400,8 +348,8 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 				if containsString(*options.IgnoredFolders, subFolderName) {
 					isIgnored = true
 				}
-				if fileService != nil {
-					fileServiceIgnored := fileService.ShouldIgnoreFile(subFolderPath, *options.FileFilteringOptions)
+				if fileFilteringService != nil {
+					fileServiceIgnored := fileFilteringService.ShouldIgnoreFile(subFolderPath, *options.FileFilteringOptions)
 					if fileServiceIgnored {
 						isIgnored = true
 					}

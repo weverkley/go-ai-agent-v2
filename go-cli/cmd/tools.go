@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strings" // Import strings package
+	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
 
 	"github.com/spf13/cobra"
 )
@@ -27,9 +28,14 @@ var toolsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all available AI tools",
 	Run: func(cmd *cobra.Command, args []string) {
-		toolRegistry := Cfg.GetToolRegistry()
-		if toolRegistry == nil {
-			fmt.Println("Tool registry not initialized.")
+		toolRegistryVal, found := Cfg.Get("toolRegistry")
+		if !found || toolRegistryVal == nil {
+			fmt.Println("Tool registry not found in config.")
+			return
+		}
+		toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+		if !ok {
+			fmt.Println("Tool registry in config is not of expected type.")
 			return
 		}
 
@@ -57,9 +63,14 @@ var toolsRunCmd = &cobra.Command{
 		toolName := args[0]
 		toolArgs := args[1:]
 
-		toolRegistry := Cfg.GetToolRegistry()
-		if toolRegistry == nil {
-			fmt.Println("Tool registry not initialized.")
+		toolRegistryVal, found := Cfg.Get("toolRegistry")
+		if !found || toolRegistryVal == nil {
+			fmt.Println("Tool registry not found in config.")
+			return
+		}
+		toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+		if !ok {
+			fmt.Println("Tool registry in config is not of expected type.")
 			return
 		}
 

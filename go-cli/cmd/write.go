@@ -24,7 +24,18 @@ var writeCmd = &cobra.Command{
 	Short: "Write content to a file",
 	Long:  `Write content to a specified file.`, 
 	Run: func(cmd *cobra.Command, args []string) {
-		tool, err := Cfg.GetToolRegistry().GetTool(types.WRITE_FILE_TOOL_NAME)
+		toolRegistryVal, found := Cfg.Get("toolRegistry")
+		if !found || toolRegistryVal == nil {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry not found in config.\n")
+			os.Exit(1)
+		}
+		toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry in config is not of expected type.\n")
+			os.Exit(1)
+		}
+
+		tool, err := toolRegistry.GetTool(types.WRITE_FILE_TOOL_NAME)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)

@@ -18,6 +18,8 @@ type FileFilteringService struct {
 	projectRoot string
 	gitIgnorePatterns []glob.Glob
 	geminiIgnorePatterns []glob.Glob
+	gitIgnoreStringPatterns []string // New field
+	geminiIgnoreStringPatterns []string // New field
 	mu sync.RWMutex
 }
 
@@ -41,13 +43,13 @@ func (fs *FileFilteringService) loadIgnorePatterns() error {
 	geminiIgnorePath := filepath.Join(fs.projectRoot, ".geminiignore")
 
 	var err error
-	fs.gitIgnorePatterns, err = fs.parseIgnoreFile(gitIgnorePath)
+	fs.gitIgnorePatterns, fs.gitIgnoreStringPatterns, err = fs.parseIgnoreFile(gitIgnorePath)
 	if err != nil {
 		// Log error but continue, .gitignore is optional
 		fmt.Printf("Warning: failed to load .gitignore: %v\n", err)
 	}
 
-	fs.geminiIgnorePatterns, err = fs.parseIgnoreFile(geminiIgnorePath)
+	fs.geminiIgnorePatterns, fs.geminiIgnoreStringPatterns, err = fs.parseIgnoreFile(geminiIgnorePath)
 	if err != nil {
 		// Log error but continue, .geminiignore is optional
 		fmt.Printf("Warning: failed to load .geminiignore: %v\n", err)
@@ -56,17 +58,18 @@ func (fs *FileFilteringService) loadIgnorePatterns() error {
 }
 
 // parseIgnoreFile reads an ignore file and compiles glob patterns.
-func (fs *FileFilteringService) parseIgnoreFile(filePath string) ([]glob.Glob, error) {
+func (fs *FileFilteringService) parseIgnoreFile(filePath string) ([]glob.Glob, []string, error) { // Modified return signature
 	file, err := os.Open(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil // File does not exist, no patterns
+			return nil, nil, nil // File does not exist, no patterns
 		}
-		return nil, fmt.Errorf("failed to open ignore file %s: %w", filePath, err)
+		return nil, nil, fmt.Errorf("failed to open ignore file %s: %w", filePath, err)
 	}
 	defer file.Close()
 
-	var patterns []glob.Glob
+	var globPatterns []glob.Glob
+	var stringPatterns []string // New slice to store string patterns
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
@@ -84,6 +87,7 @@ func (fs *FileFilteringService) parseIgnoreFile(filePath string) ([]glob.Glob, e
 		// Convert gitignore patterns to glob patterns
 		// A leading slash means the pattern is relative to the root of the git repo
 		// No leading slash means the pattern can match in any directory
+		processedLine := line // Store the processed line for string patterns
 		if !strings.HasPrefix(line, "/") {
 			line = "**/" + line
 		} else {
@@ -100,13 +104,14 @@ func (fs *FileFilteringService) parseIgnoreFile(filePath string) ([]glob.Glob, e
 			// For simplicity, we'll just compile it and handle negation during ShouldIgnoreFile
 			// A more robust solution might store negated patterns in a separate list
 		}
-		patterns = append(patterns, g)
+		globPatterns = append(globPatterns, g)
+		stringPatterns = append(stringPatterns, processedLine) // Store the processed string pattern
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("failed to read ignore file %s: %w", filePath, err)
+		return nil, nil, fmt.Errorf("failed to read ignore file %s: %w", filePath, err)
 	}
-	return patterns, nil
+	return globPatterns, stringPatterns, nil // Modified return
 }
 
 // ShouldIgnoreFile checks if a file should be ignored based on filtering options.
@@ -142,4 +147,15 @@ func (fs *FileFilteringService) ShouldIgnoreFile(filePath string, options types.
 	}
 
 	return false
+}
+
+// GetIgnoredPatterns returns a list of all loaded ignore patterns.
+func (fs *FileFilteringService) GetIgnoredPatterns() []string {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+
+	var patterns []string
+	patterns = append(patterns, fs.gitIgnoreStringPatterns...)
+	patterns = append(patterns, fs.geminiIgnoreStringPatterns...)
+	return patterns
 }

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/config" // Import config package
+	"go-ai-agent-v2/go-cli/pkg/telemetry" // Import telemetry package
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -20,14 +20,10 @@ func TemplateString(template string, inputs map[string]interface{}) string {
 
 // LogAgentStart logs the start of an agent's execution.
 func LogAgentStart(runtimeContext interface{}, event types.AgentStartEvent) {
-	if cfg, ok := runtimeContext.(*config.Config); ok {
-		cfg.GetTelemetryLogger().LogAgentStart(event)
-	}
+	telemetry.GlobalLogger.LogAgentStart(event)
 }
 
 // LogAgentFinish logs the finish of an agent's execution.
 func LogAgentFinish(runtimeContext interface{}, event types.AgentFinishEvent) {
-	if cfg, ok := runtimeContext.(*config.Config); ok {
-		cfg.GetTelemetryLogger().LogAgentFinish(event)
-	}
+	telemetry.GlobalLogger.LogAgentFinish(event)
 }

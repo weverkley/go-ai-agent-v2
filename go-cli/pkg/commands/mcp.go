@@ -5,6 +5,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/extension"
 	"go-ai-agent-v2/go-cli/pkg/mcp"
+	"go-ai-agent-v2/go-cli/pkg/services" // Add services import
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"strings"
@@ -13,38 +14,44 @@ import (
 // McpCommand provides functionalities for managing MCP servers.
 type McpCommand struct {
 	workspaceDir string
-	settings     *config.Settings
+	settingsService *services.SettingsService
 	mcpManager   *mcp.McpClientManager
-	extManager   *extension.ExtensionManager
+	extensionManager *extension.Manager
 	toolRegistry *types.ToolRegistry
 }
 
 // NewMcpCommand creates a new instance of McpCommand.
-func NewMcpCommand(toolRegistry *types.ToolRegistry) *McpCommand {
+func NewMcpCommand(toolRegistry *types.ToolRegistry, settingsService *services.SettingsService, extensionManager *extension.Manager) *McpCommand {
 	workspaceDir, _ := os.Getwd()
-	settings := config.LoadSettings(workspaceDir)
-	extManager := extension.NewExtensionManager(workspaceDir)
 	return &McpCommand{
 		workspaceDir: workspaceDir,
-		settings:     settings,
+		settingsService: settingsService,
 		mcpManager:   mcp.NewMcpClientManager(toolRegistry),
-		extManager:   extManager,
+		extensionManager: extensionManager,
 		toolRegistry: toolRegistry,
 	}
 }
 
 // ListMcpServers lists all configured MCP servers.
 func (c *McpCommand) ListMcpServers() error {
-	servers := c.mcpManager.ListServers()
-	if len(servers) == 0 {
+	mcpServersVal, found := c.settingsService.Get("mcpServers")
+	if !found || mcpServersVal == nil {
+		fmt.Println("No MCP servers configured.")
+		return nil
+	}
+	mcpServers, ok := mcpServersVal.(map[string]types.MCPServerConfig)
+	if !ok {
+		return fmt.Errorf("mcpServers setting is not of expected type")
+	}
+
+	if len(mcpServers) == 0 {
 		fmt.Println("No MCP servers configured.")
 		return nil
 	}
 
 	fmt.Println("Configured MCP Servers:")
-	for _, server := range servers {
-		fmt.Printf("  - Name: %s\n", server.Name)
-		fmt.Printf("    Status: %s\n", server.Status)
+	for name, server := range mcpServers {
+		fmt.Printf("  - Name: %s\n", name)
 		fmt.Printf("    URL: %s\n", server.Url)
 		if server.Description != "" {
 			fmt.Printf("    Description: %s\n", server.Description)
@@ -58,7 +65,7 @@ func (c *McpCommand) ListMcpServers() error {
 func (c *McpCommand) AddMcpServer(
 	name, commandOrUrl string,
 	args []string,
-	scope config.SettingScope,
+	scope config.SettingScope, // This parameter is currently unused, but kept for compatibility
 	transport string,
 	env []string,
 	header []string,
@@ -68,8 +75,18 @@ func (c *McpCommand) AddMcpServer(
 	includeTools []string,
 	excludeTools []string,
 ) error {
-	// Load settings again to ensure we have the latest
-	settings := config.LoadSettings(c.workspaceDir)
+	// Retrieve current MCP servers
+	mcpServersVal, found := c.settingsService.Get("mcpServers")
+	var mcpServers map[string]types.MCPServerConfig
+	if found && mcpServersVal != nil {
+		if ms, ok := mcpServersVal.(map[string]types.MCPServerConfig); ok {
+			mcpServers = ms
+		} else {
+			return fmt.Errorf("mcpServers setting is not of expected type")
+		}
+	} else {
+		mcpServers = make(map[string]types.MCPServerConfig)
+	}
 
 	// Create or update the server config
 	serverConfig := types.MCPServerConfig{
@@ -110,13 +127,15 @@ func (c *McpCommand) AddMcpServer(
 		return fmt.Errorf("unsupported transport type: %s", transport)
 	}
 
-	if settings.McpServers == nil {
-		settings.McpServers = make(map[string]types.MCPServerConfig)
-	}
-	settings.McpServers[name] = serverConfig
+	mcpServers[name] = serverConfig
 
-	// Save updated settings
-	if err := config.SaveSettings(c.workspaceDir, settings); err != nil {
+	// Save updated MCP servers
+	if err := c.settingsService.Set("mcpServers", mcpServers); err != nil {
+		return fmt.Errorf("failed to update mcpServers setting: %w", err)
+	}
+
+	// Persist settings to file
+	if err := c.settingsService.Save(); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 
@@ -126,17 +145,32 @@ func (c *McpCommand) AddMcpServer(
 
 // RemoveMcpItem removes an MCP item.
 func (c *McpCommand) RemoveMcpItem(name string) error {
-	// Load settings again to ensure we have the latest
-	settings := config.LoadSettings(c.workspaceDir)
+	// Retrieve current MCP servers
+	mcpServersVal, found := c.settingsService.Get("mcpServers")
+	var mcpServers map[string]types.MCPServerConfig
+	if found && mcpServersVal != nil {
+		if ms, ok := mcpServersVal.(map[string]types.MCPServerConfig); ok {
+			mcpServers = ms
+		} else {
+			return fmt.Errorf("mcpServers setting is not of expected type")
+		}
+	} else {
+		return fmt.Errorf("no MCP servers configured")
+	}
 
-	if _, exists := settings.McpServers[name]; !exists {
+	if _, exists := mcpServers[name]; !exists {
 		return fmt.Errorf("MCP server \"%s\" not found", name)
 	}
 
-	delete(settings.McpServers, name)
+	delete(mcpServers, name)
 
-	// Save updated settings
-	if err := config.SaveSettings(c.workspaceDir, settings); err != nil {
+	// Save updated MCP servers
+	if err := c.settingsService.Set("mcpServers", mcpServers); err != nil {
+		return fmt.Errorf("failed to update mcpServers setting: %w", err)
+	}
+
+	// Persist settings to file
+	if err := c.settingsService.Save(); err != nil {
 		return fmt.Errorf("failed to save settings: %w", err)
 	}
 

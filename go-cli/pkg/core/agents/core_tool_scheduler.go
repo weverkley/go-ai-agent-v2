@@ -50,7 +50,16 @@ func (s *CoreToolScheduler) Schedule(
 	// For now, a simplified implementation that directly processes the request.
 	// The full queuing and state management will be added later.
 
-	toolInstance, err := s.config.GetToolRegistry().GetTool(request.Name)
+	toolRegistryVal, found := s.config.Get("toolRegistry")
+	if !found || toolRegistryVal == nil {
+		return fmt.Errorf("tool registry not found in config")
+	}
+	toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+	if !ok {
+		return fmt.Errorf("tool registry in config is not of expected type")
+	}
+
+	toolInstance, err := toolRegistry.GetTool(request.Name)
 	if err != nil {
 		return fmt.Errorf("tool \"%s\" not found in registry", request.Name)
 	}

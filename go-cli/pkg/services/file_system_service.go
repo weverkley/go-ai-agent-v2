@@ -22,6 +22,10 @@ type FileSystemService interface {
 	CreateDirectory(path string) error
 	CopyDirectory(src string, dst string) error
 	JoinPaths(elements ...string) string
+	Symlink(oldname, newname string) error
+	RemoveAll(path string) error
+	MkdirAll(path string, perm os.FileMode) error
+	Rename(oldpath, newpath string) error
 }
 
 // fileSystemService implements the FileSystemService interface.
@@ -30,6 +34,22 @@ type fileSystemService struct{}
 // NewFileSystemService creates a new instance of FileSystemService.
 func NewFileSystemService() FileSystemService {
 	return &fileSystemService{}
+}
+
+// RemoveAll removes a path and any children it contains.
+func (s *fileSystemService) RemoveAll(path string) error {
+	return os.RemoveAll(path)
+}
+
+// MkdirAll creates a directory named path, along with any necessary parents, and returns nil,
+// or an error if unable to do so.
+func (s *fileSystemService) MkdirAll(path string, perm os.FileMode) error {
+	return os.MkdirAll(path, perm)
+}
+
+// Rename renames (moves) a file or directory.
+func (s *fileSystemService) Rename(oldpath, newpath string) error {
+	return os.Rename(oldpath, newpath)
 }
 
 // getIgnorePatterns reads .gitignore and .geminiignore files and returns a list of glob patterns.
@@ -276,4 +296,9 @@ func (s *fileSystemService) copyFile(src string, dst string) error {
 		return err
 	}
 	return out.Close()
+}
+
+// Symlink creates a symbolic link.
+func (s *fileSystemService) Symlink(oldname, newname string) error {
+	return os.Symlink(oldname, newname)
 }

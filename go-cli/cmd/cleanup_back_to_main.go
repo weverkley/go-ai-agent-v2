@@ -47,7 +47,7 @@ var cleanupBackToMainCmd = &cobra.Command{
 
 		// 4. Pull Latest
 		fmt.Printf("Pulling latest changes on main branch...\n")
-		err = gitService.Pull(projectRoot)
+		err = gitService.Pull(projectRoot, "")
 		if err != nil {
 			fmt.Printf("Error pulling latest changes: %v\n", err)
 			os.Exit(1)

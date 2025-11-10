@@ -63,13 +63,18 @@ func (m *MockFileSystemService) JoinPaths(elem ...string) string {
 	return args.String(0)
 }
 
+func (m *MockFileSystemService) Symlink(oldname, newname string) error {
+	args := m.Called(oldname, newname)
+	return args.Error(0)
+}
+
 func TestListDirectoryTool_Execute(t *testing.T) {
 	// Setup mock FileSystemService
 	mockFSS := new(MockFileSystemService)
 
 	// Create a ListDirectoryTool with the mock service
 	tool := &ListDirectoryTool{
-		BaseDeclarativeTool: *types.NewBaseDeclarativeTool("list_directory", "", "", types.KindOther, types.JsonSchemaObject{}, false, false, nil),
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool("list_directory", "", "", types.KindOther, types.JsonSchemaObject{}, false, false, nil),
 		fileSystemService:   mockFSS, // Assign the mock directly
 	}
 

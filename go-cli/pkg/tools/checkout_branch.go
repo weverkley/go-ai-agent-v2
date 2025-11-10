@@ -10,7 +10,7 @@ import (
 // CheckoutBranchTool implements the Tool interface for checking out a Git branch.
 type CheckoutBranchTool struct {
 	*types.BaseDeclarativeTool
-	gitService *services.GitService
+	gitService services.GitService
 }
 
 // NewCheckoutBranchTool creates a new CheckoutBranchTool.

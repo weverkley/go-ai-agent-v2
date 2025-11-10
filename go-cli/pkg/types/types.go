@@ -472,17 +472,39 @@ func (bdt *BaseDeclarativeTool) Execute(args map[string]any) (ToolResult, error)
 	return ToolResult{}, fmt.Errorf("Execute method not implemented for BaseDeclarativeTool")
 }
 
+// FileFilteringService defines the interface for filtering files based on various criteria.
+type FileFilteringService interface {
+	ShouldIgnoreFile(filePath string, options FileFilteringOptions) bool
+	GetIgnoredPatterns() []string
+}
+
+// WorkspaceContext defines an interface for accessing workspace-related information.
+type WorkspaceContext interface {
+	GetDirectories() []string
+}
+
+// Config defines the interface for application configuration.
+type Config interface {
+	Get(key string) (interface{}, bool)
+}
+
+// ToolRegistryInterface defines the interface for managing tools.
+type ToolRegistryInterface interface {
+	Register(t Tool) error
+	GetTool(name string) (Tool, error)
+	GetTools() []*genai.Tool
+	GetAllTools() []Tool
+	GetAllToolNames() []string
+	GetFunctionDeclarationsFiltered(toolNames []string) []genai.FunctionDeclaration
+}
+
 // ToolRegistry manages the registration and retrieval of tools.
 type ToolRegistry struct {
 	mu    sync.RWMutex
 	tools map[string]Tool
 }
 
-// FileService defines an interface for file system operations.
-type FileService interface {
-	// ShouldIgnoreFile checks if a file should be ignored based on filtering options.
-	ShouldIgnoreFile(filePath string, options FileFilteringOptions) bool
-}
+
 
 // GeminiDirProvider provides the path to the .gemini directory.
 type GeminiDirProvider interface {
@@ -560,13 +582,7 @@ func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []ge
 	return declarations
 }
 
-// Config is an interface that represents the application configuration.
-type Config interface {
-	GetCodebaseInvestigatorSettings() *CodebaseInvestigatorSettings
-	GetDebugMode() bool
-	GetToolRegistry() *ToolRegistry
-	Model() string
-}
+
 
 // CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
 type CodebaseInvestigatorSettings struct {

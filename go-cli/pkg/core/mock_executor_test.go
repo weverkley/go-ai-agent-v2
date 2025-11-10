@@ -19,21 +19,22 @@ type MockConfig struct {
 	CodebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
 }
 
-func (m *MockConfig) GetCodebaseInvestigatorSettings() *types.CodebaseInvestigatorSettings {
-	return m.CodebaseInvestigatorSettings
+func (m *MockConfig) Get(key string) (interface{}, bool) {
+	switch key {
+	case "modelName":
+		return m.ModelName, true
+	case "toolRegistry":
+		return m.ToolRegistry, true
+	case "debugMode":
+		return m.DebugMode, true
+	case "codebaseInvestigatorSettings":
+		return m.CodebaseInvestigatorSettings, true
+	default:
+		return nil, false
+	}
 }
 
-func (m *MockConfig) GetDebugMode() bool {
-	return m.DebugMode
-}
 
-func (m *MockConfig) GetToolRegistry() *types.ToolRegistry {
-	return m.ToolRegistry
-}
-
-func (m *MockConfig) Model() string {
-	return m.ModelName
-}
 
 func TestNewExecutorFactory(t *testing.T) {
 	t.Run("should return GeminiExecutorFactory for 'gemini' type", func(t *testing.T) {

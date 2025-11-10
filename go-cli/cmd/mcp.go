@@ -2,6 +2,9 @@ package cmd
 
 import (
 	"fmt"
+	"os" // Add os import
+	"go-ai-agent-v2/go-cli/pkg/mcp"
+	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
 
 	"github.com/spf13/cobra"
 )
@@ -27,7 +30,28 @@ var mcpListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List configured MCP servers",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Listing configured MCP servers is not yet implemented. This feature may be available in a future version.")
+		toolRegistryVal, found := Cfg.Get("toolRegistry")
+		if !found || toolRegistryVal == nil {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry not found in config.\n")
+			return
+		}
+		toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry in config is not of expected type.\n")
+			return
+		}
+		manager := mcp.NewMcpClientManager(toolRegistry)
+		servers := manager.ListServers(Cfg)
+
+		if len(servers) == 0 {
+			fmt.Println("No MCP servers configured.")
+			return
+		}
+
+		fmt.Println("Configured MCP Servers:")
+		for _, server := range servers {
+			fmt.Printf("  - Name: %s, Status: %s, URL: %s, Description: %s\n", server.Name, server.Status, server.Url, server.Description)
+		}
 	},
 }
 

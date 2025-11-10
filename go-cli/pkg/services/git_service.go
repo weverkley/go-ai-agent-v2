@@ -8,18 +8,28 @@ import (
 	"github.com/go-git/go-git/v5/plumbing"
 )
 
-// GitService provides functionality to interact with Git repositories.
-type GitService struct {
+// GitService interface defines the methods for interacting with Git repositories.
+type GitService interface {
+	GetCurrentBranch(dir string) (string, error)
+	GetRemoteURL(dir string) (string, error)
+	CheckoutBranch(dir string, branchName string) error
+	Pull(dir string, ref string) error
+	Clone(url string, directory string, ref string) error
+	DeleteBranch(dir string, branchName string) error
+}
+
+// gitService implements the GitService interface.
+type gitService struct {
 	// No longer needs shellService
 }
 
 // NewGitService creates a new instance of GitService.
-func NewGitService() *GitService {
-	return &GitService{}
+func NewGitService() GitService {
+	return &gitService{}
 }
 
 // GetCurrentBranch returns the name of the current Git branch using go-git.
-func (s *GitService) GetCurrentBranch(dir string) (string, error) {
+func (s *gitService) GetCurrentBranch(dir string) (string, error) {
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
 		return "", fmt.Errorf("failed to open git repository at %s: %w", dir, err)
@@ -43,7 +53,7 @@ func (s *GitService) GetCurrentBranch(dir string) (string, error) {
 }
 
 // GetRemoteURL returns the URL of the "origin" remote for the given Git repository.
-func (s *GitService) GetRemoteURL(dir string) (string, error) {
+func (s *gitService) GetRemoteURL(dir string) (string, error) {
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
 		return "", fmt.Errorf("failed to open git repository at %s: %w", dir, err)
@@ -62,7 +72,7 @@ func (s *GitService) GetRemoteURL(dir string) (string, error) {
 }
 
 // CheckoutBranch checks out the specified branch in the given repository.
-func (s *GitService) CheckoutBranch(dir string, branchName string) error {
+func (s *gitService) CheckoutBranch(dir string, branchName string) error {
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
 		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
@@ -83,7 +93,7 @@ func (s *GitService) CheckoutBranch(dir string, branchName string) error {
 }
 
 // Pull pulls the latest changes from the remote for the current branch.
-func (s *GitService) Pull(dir string) error {
+func (s *gitService) Pull(dir string, ref string) error {
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
 		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
@@ -94,15 +104,38 @@ func (s *GitService) Pull(dir string) error {
 		return fmt.Errorf("failed to get worktree for %s: %w", dir, err)
 	}
 
-	err = w.Pull(&git.PullOptions{})
+	pullOptions := &git.PullOptions{}
+	if ref != "" {
+		pullOptions.ReferenceName = plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", ref))
+	}
+
+	err = w.Pull(pullOptions)
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to pull latest changes: %w", err)
 	}
 	return nil
 }
 
+// Clone clones a git repository from a URL into a specified directory and checks out a given reference.
+func (s *gitService) Clone(url string, directory string, ref string) error {
+	cloneOptions := &git.CloneOptions{
+		URL: url,
+	}
+
+	if ref != "" {
+		cloneOptions.ReferenceName = plumbing.ReferenceName(fmt.Sprintf("refs/heads/%s", ref))
+		cloneOptions.SingleBranch = true
+	}
+
+	_, err := git.PlainClone(directory, false, cloneOptions)
+	if err != nil {
+		return fmt.Errorf("failed to clone repository %s: %w", url, err)
+	}
+	return nil
+}
+
 // DeleteBranch deletes the specified branch locally.
-func (s *GitService) DeleteBranch(dir string, branchName string) error {
+func (s *gitService) DeleteBranch(dir string, branchName string) error {
 	repo, err := git.PlainOpen(dir)
 	if err != nil {
 		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)

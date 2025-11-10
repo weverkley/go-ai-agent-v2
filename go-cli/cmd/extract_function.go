@@ -28,7 +28,18 @@ Optionally, a receiver can be specified to create a method instead of a standalo
 			os.Exit(1)
 		}
 
-		tool, err := Cfg.GetToolRegistry().GetTool(types.EXTRACT_FUNCTION_TOOL_NAME)
+		toolRegistryVal, found := Cfg.Get("toolRegistry")
+		if !found || toolRegistryVal == nil {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry not found in config.\n")
+			os.Exit(1)
+		}
+		toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry in config is not of expected type.\n")
+			os.Exit(1)
+		}
+
+		tool, err := toolRegistry.GetTool(types.EXTRACT_FUNCTION_TOOL_NAME)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -60,7 +71,7 @@ Optionally, a receiver can be specified to create a method instead of a standalo
 }
 
 func init() {
-	rootCmd.AddCommand(extractFunctionCmd)
+	RootCmd.AddCommand(extractFunctionCmd)
 
 	extractFunctionCmd.Flags().StringP("file-path", "f", "", "The absolute path to the file to modify.")
 	extractFunctionCmd.Flags().IntP("start-line", "s", 0, "The 1-based starting line number of the code block to extract.")

@@ -23,7 +23,18 @@ to identify functions and methods that are not called or referenced within the p
 			os.Exit(1)
 		}
 
-		tool, err := Cfg.GetToolRegistry().GetTool(types.FIND_UNUSED_CODE_TOOL_NAME)
+		toolRegistryVal, found := Cfg.Get("toolRegistry")
+		if !found || toolRegistryVal == nil {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry not found in config.\n")
+			os.Exit(1)
+		}
+		toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+		if !ok {
+			fmt.Fprintf(os.Stderr, "Error: Tool registry in config is not of expected type.\n")
+			os.Exit(1)
+		}
+
+		tool, err := toolRegistry.GetTool(types.FIND_UNUSED_CODE_TOOL_NAME)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
@@ -49,7 +60,7 @@ to identify functions and methods that are not called or referenced within the p
 }
 
 func init() {
-	rootCmd.AddCommand(findUnusedCodeCmd)
+	RootCmd.AddCommand(findUnusedCodeCmd)
 
 	findUnusedCodeCmd.Flags().StringP("directory", "d", "", "The absolute path to the directory to analyze.")
 }

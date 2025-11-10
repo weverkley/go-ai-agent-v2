@@ -10,7 +10,7 @@ import (
 // GetCurrentBranchTool implements the Tool interface for getting the current Git branch.
 type GetCurrentBranchTool struct {
 	*types.BaseDeclarativeTool
-	gitService *services.GitService
+	gitService services.GitService
 }
 
 // NewGetCurrentBranchTool creates a new GetCurrentBranchTool.

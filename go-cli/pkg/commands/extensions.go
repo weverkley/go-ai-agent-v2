@@ -6,7 +6,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/extension"
 	"go-ai-agent-v2/go-cli/pkg/services"
-	"os"
 	"path/filepath"
 	"strings"
 )
@@ -15,26 +14,21 @@ const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/gemini-cli
 
 // ExtensionsCommand represents the extensions command group.
 type ExtensionsCommand struct {
-	// Dependencies can be added here, e.g., FileSystemService, GitService
+	extensionManager *extension.Manager
+	settingsService *services.SettingsService
 }
 
 // NewExtensionsCommand creates a new instance of ExtensionsCommand.
-func NewExtensionsCommand() *ExtensionsCommand {
-	return &ExtensionsCommand{}
+func NewExtensionsCommand(extensionManager *extension.Manager, settingsService *services.SettingsService) *ExtensionsCommand {
+	return &ExtensionsCommand{
+		extensionManager: extensionManager,
+		settingsService: settingsService,
+	}
 }
 
 // ListExtensions lists installed extensions.
 func (c *ExtensionsCommand) ListExtensions() error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	extensions, err := extensionManager.LoadExtensions()
-	if err != nil {
-		return fmt.Errorf("failed to load extensions: %w", err)
-	}
+	extensions := c.extensionManager.ListExtensions()
 
 	if len(extensions) == 0 {
 		fmt.Println("No extensions installed.")
@@ -43,7 +37,7 @@ func (c *ExtensionsCommand) ListExtensions() error {
 
 	var outputStrings []string
 	for _, ext := range extensions {
-		outputStrings = append(outputStrings, extensionManager.ToOutputString(ext))
+		outputStrings = append(outputStrings, fmt.Sprintf("- %s (Enabled: %t)", ext.Name, ext.Enabled))
 	}
 	fmt.Println(strings.Join(outputStrings, "\n\n"))
 
@@ -72,8 +66,7 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 			return fmt.Errorf("--ref and --auto-update are not applicable for local extensions.")
 		}
 		// Check if local path exists
-		fsService := services.NewFileSystemService()
-		exists, err := fsService.PathExists(args.Source)
+		exists, err := c.extensionManager.FSService.PathExists(args.Source)
 		if err != nil {
 			return fmt.Errorf("failed to check local path existence: %w", err)
 		}
@@ -96,13 +89,7 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 		fmt.Println("Skipping interactive consent for now. Proceeding with installation.")
 	}
 
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	name, err := extensionManager.InstallOrUpdateExtension(installMetadata, args.Force)
+	name, err := c.extensionManager.InstallOrUpdateExtension(installMetadata, args.Force)
 	if err != nil {
 		return fmt.Errorf("failed to install/update extension: %w", err)
 	}
@@ -113,13 +100,8 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 
 // Uninstall uninstalls an extension.
 func (c *ExtensionsCommand) Uninstall(name string) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	err = extensionManager.UninstallExtension(name, false) // false for no interactive consent for now
+	var err error
+	err = c.extensionManager.UninstallExtension(name, false) // false for no interactive consent for now
 	if err != nil {
 		return fmt.Errorf("failed to uninstall extension: %w", err)
 	}
@@ -130,19 +112,17 @@ func (c *ExtensionsCommand) Uninstall(name string) error {
 
 // New creates a new extension.
 func (c *ExtensionsCommand) New(args extension.NewArgs) error {
-	fsService := services.NewFileSystemService()
-
 	if args.Template != "" {
 		// Implement copyDirectory logic here
-		templatePath := fsService.JoinPaths(EXAMPLES_PATH, args.Template)
-		err := fsService.CopyDirectory(templatePath, args.Path)
+		templatePath := c.extensionManager.FSService.JoinPaths(EXAMPLES_PATH, args.Template)
+		err := c.extensionManager.FSService.CopyDirectory(templatePath, args.Path)
 		if err != nil {
 			return fmt.Errorf("failed to create extension from template: %w", err)
 		}
 		fmt.Printf("Successfully created new extension from template \"%s\" at %s.\n", args.Template, args.Path)
 	} else {
 		// Implement createDirectory and gemini-extension.json creation logic here
-		err := fsService.CreateDirectory(args.Path)
+		err := c.extensionManager.FSService.CreateDirectory(args.Path)
 		if err != nil {
 			return fmt.Errorf("failed to create new extension directory: %w", err)
 		}
@@ -156,7 +136,7 @@ func (c *ExtensionsCommand) New(args extension.NewArgs) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal extension manifest: %w", err)
 		}
-		err = fsService.WriteFile(fsService.JoinPaths(args.Path, "gemini-extension.json"), string(manifestBytes))
+		err = c.extensionManager.FSService.WriteFile(c.extensionManager.FSService.JoinPaths(args.Path, "gemini-extension.json"), string(manifestBytes))
 		if err != nil {
 			return fmt.Errorf("failed to write gemini-extension.json: %w", err)
 		}
@@ -169,23 +149,8 @@ func (c *ExtensionsCommand) New(args extension.NewArgs) error {
 
 // Enable enables an extension.
 func (c *ExtensionsCommand) Enable(args extension.ExtensionScopeArgs) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	_, err = extensionManager.LoadExtensions()
-	if err != nil {
-		return fmt.Errorf("failed to load extensions: %w", err)
-	}
-
-	scope := config.SettingScopeUser
-	if strings.ToLower(args.Scope) == "workspace" {
-		scope = config.SettingScopeWorkspace
-	}
-
-	err = extensionManager.EnableExtension(args.Name, scope)
+	var err error
+	err = c.extensionManager.EnableExtension(args.Name)
 	if err != nil {
 		return fmt.Errorf("failed to enable extension: %w", err)
 	}
@@ -199,24 +164,22 @@ func (c *ExtensionsCommand) Enable(args extension.ExtensionScopeArgs) error {
 }
 
 // Disable disables an extension.
-func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
 
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	_, err = extensionManager.LoadExtensions()
-	if err != nil {
-		return fmt.Errorf("failed to load extensions: %w", err)
-	}
+func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
+
+	var err error
 
 	scope := config.SettingScopeUser
+
 	if strings.ToLower(args.Scope) == "workspace" {
+
 		scope = config.SettingScopeWorkspace
+
 	}
 
-	err = extensionManager.DisableExtension(args.Name, scope)
+
+
+	err = c.extensionManager.DisableExtension(args.Name)
 	if err != nil {
 		return fmt.Errorf("failed to disable extension: %w", err)
 	}
@@ -227,27 +190,18 @@ func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
 
 // Update updates an extension or all extensions.
 func (c *ExtensionsCommand) Update(name string, all bool) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-
+	var err error
 	if all {
-		extensions, err := extensionManager.LoadExtensions()
-		if err != nil {
-			return fmt.Errorf("failed to load extensions: %w", err)
-		}
+		extensions := c.extensionManager.ListExtensions()
 		for _, ext := range extensions {
-			err := extensionManager.UpdateExtension(ext.Name)
+			err = c.extensionManager.UpdateExtension(ext.Name)
 			if err != nil {
 				fmt.Printf("Error updating extension %s: %v\n", ext.Name, err)
 			}
 		}
 		fmt.Println("All extensions updated.")
 	} else {
-		err := extensionManager.UpdateExtension(name)
+		err = c.extensionManager.UpdateExtension(name)
 		if err != nil {
 			return fmt.Errorf("failed to update extension: %w", err)
 		}
@@ -258,13 +212,8 @@ func (c *ExtensionsCommand) Update(name string, all bool) error {
 
 // Link links a local extension.
 func (c *ExtensionsCommand) Link(path string) error {
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("failed to get current working directory: %w", err)
-	}
-
-	extensionManager := extension.NewExtensionManager(workspaceDir)
-	err = extensionManager.LinkExtension(path)
+	var err error
+	err = c.extensionManager.LinkExtension(path)
 	if err != nil {
 		return fmt.Errorf("failed to link extension: %w", err)
 	}

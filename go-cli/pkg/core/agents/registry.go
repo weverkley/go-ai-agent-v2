@@ -2,6 +2,7 @@ package agents
 
 import (
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
 )
 
 // AgentRegistry manages the discovery, loading, validation, and registration of AgentDefinitions.
@@ -22,14 +23,23 @@ func NewAgentRegistry(cfg *config.Config) *AgentRegistry {
 func (ar *AgentRegistry) Initialize() {
 	ar.loadBuiltInAgents()
 
-	if ar.config.GetDebugMode() { //nolint:staticcheck
-		// debugLogger.Debug("Debug mode is enabled.")
+	debugModeVal, found := ar.config.Get("debugMode")
+	if found && debugModeVal != nil {
+		if debugMode, ok := debugModeVal.(bool); ok && debugMode {
+			// debugLogger.Debug("Debug mode is enabled.")
+		}
 	}
 }
 
 // loadBuiltInAgents loads built-in agents.
 func (ar *AgentRegistry) loadBuiltInAgents() {
-	investigatorSettings := ar.config.GetCodebaseInvestigatorSettings()
+	investigatorSettingsVal, found := ar.config.Get("codebaseInvestigatorSettings")
+	var investigatorSettings *types.CodebaseInvestigatorSettings
+	if found && investigatorSettingsVal != nil {
+		if is, ok := investigatorSettingsVal.(*types.CodebaseInvestigatorSettings); ok {
+			investigatorSettings = is
+		}
+	}
 
 	// Only register the agent if it's enabled in the settings.
 	if investigatorSettings != nil && investigatorSettings.Enabled {
@@ -63,7 +73,15 @@ func (ar *AgentRegistry) registerAgent(definition AgentDefinition) {
 		return
 	}
 
-	if _, exists := ar.agents[definition.Name]; exists && ar.config.GetDebugMode() { //nolint:staticcheck
+	debugModeVal, found := ar.config.Get("debugMode")
+	debugMode := false
+	if found && debugModeVal != nil {
+		if dm, ok := debugModeVal.(bool); ok {
+			debugMode = dm
+		}
+	}
+
+	if _, exists := ar.agents[definition.Name]; exists && debugMode { //nolint:staticcheck
 		// debugLogger.Debug(fmt.Sprintf("Overriding existing agent: %s", definition.Name))
 	}
 

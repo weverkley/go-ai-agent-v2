@@ -40,24 +40,48 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	model := client.GenerativeModel(cfg.Model())
+	modelVal, found := cfg.Get("modelName")
+	if !found || modelVal == nil {
+		return nil, fmt.Errorf("model name not found in config")
+	}
+	modelName, ok := modelVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("model name in config is not a string")
+	}
+	model := client.GenerativeModel(modelName)
 
 	// Apply generation config
 	model.SetTemperature(generationConfig.Temperature)
 	model.SetTopP(generationConfig.TopP)
 
+	var geminiChatModelName string
+	modelValForName, foundForName := cfg.Get("model")
+	if foundForName && modelValForName != nil {
+		if mn, ok := modelValForName.(string); ok {
+			geminiChatModelName = mn
+		} else {
+			geminiChatModelName = "unknown-model" // Default value if not a string
+		}
+	} else {
+		geminiChatModelName = "unknown-model" // Default value if not found or nil
+	}
+
 	// Set tools for the model
-	if cfg.GetToolRegistry() != nil {
-		model.Tools = cfg.GetToolRegistry().GetTools()
+	toolRegistryVal, ok := cfg.Get("toolRegistry")
+	var geminiChatToolRegistry *types.ToolRegistry
+	if ok && toolRegistryVal != nil {
+		if tr, toolRegistryOk := toolRegistryVal.(*types.ToolRegistry); toolRegistryOk {
+			geminiChatToolRegistry = tr
+		}
 	}
 
 	return &GeminiChat{
 		client:           client,
 		model:            model,
-		Name:             cfg.Model(),
+		Name:             geminiChatModelName,
 		generationConfig: generationConfig,
 		startHistory:     startHistory,
-		toolRegistry:     cfg.GetToolRegistry(), // Store the ToolRegistry
+		toolRegistry:     geminiChatToolRegistry, // Store the ToolRegistry
 	}, nil
 }
 
