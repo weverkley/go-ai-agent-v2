@@ -21,7 +21,7 @@ type MockConfig struct {
 
 func (m *MockConfig) Get(key string) (interface{}, bool) {
 	switch key {
-	case "modelName":
+	case "model": // Changed from "modelName" to "model"
 		return m.ModelName, true
 	case "toolRegistry":
 		return m.ToolRegistry, true

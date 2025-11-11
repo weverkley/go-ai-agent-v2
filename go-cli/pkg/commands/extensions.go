@@ -15,14 +15,14 @@ const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/gemini-cli
 // ExtensionsCommand represents the extensions command group.
 type ExtensionsCommand struct {
 	extensionManager *extension.Manager
-	settingsService *services.SettingsService
+	settingsService  *services.SettingsService
 }
 
 // NewExtensionsCommand creates a new instance of ExtensionsCommand.
 func NewExtensionsCommand(extensionManager *extension.Manager, settingsService *services.SettingsService) *ExtensionsCommand {
 	return &ExtensionsCommand{
 		extensionManager: extensionManager,
-		settingsService: settingsService,
+		settingsService:  settingsService,
 	}
 }
 
@@ -55,10 +55,10 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 		strings.HasPrefix(args.Source, "git@") ||
 		strings.HasPrefix(args.Source, "sso://") {
 		installMetadata = extension.ExtensionInstallMetadata{
-			Source:        args.Source,
-			Type:          "git",
-			Ref:           args.Ref,
-			AutoUpdate:    args.AutoUpdate,
+			Source:          args.Source,
+			Type:            "git",
+			Ref:             args.Ref,
+			AutoUpdate:      args.AutoUpdate,
 			AllowPreRelease: args.AllowPreRelease,
 		}
 	} else {
@@ -177,8 +177,6 @@ func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
 
 	}
 
-
-
 	err = c.extensionManager.DisableExtension(args.Name)
 	if err != nil {
 		return fmt.Errorf("failed to disable extension: %w", err)
@@ -221,4 +219,3 @@ func (c *ExtensionsCommand) Link(path string) error {
 	fmt.Printf("Extension at \"%s\" linked successfully.\n", path)
 	return nil
 }
-

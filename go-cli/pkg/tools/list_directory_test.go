@@ -2,6 +2,7 @@ package tools
 
 import (
 	"fmt"
+	"os" // Added os import
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -65,6 +66,21 @@ func (m *MockFileSystemService) JoinPaths(elem ...string) string {
 
 func (m *MockFileSystemService) Symlink(oldname, newname string) error {
 	args := m.Called(oldname, newname)
+	return args.Error(0)
+}
+
+func (m *MockFileSystemService) RemoveAll(path string) error {
+	args := m.Called(path)
+	return args.Error(0)
+}
+
+func (m *MockFileSystemService) MkdirAll(path string, perm os.FileMode) error {
+	args := m.Called(path, perm)
+	return args.Error(0)
+}
+
+func (m *MockFileSystemService) Rename(oldpath, newpath string) error {
+	args := m.Called(oldpath, newpath)
 	return args.Error(0)
 }
 

@@ -293,7 +293,7 @@ func TestMcpClientManager_ListServers(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // Give it time to start
 
 		// Simulate a connected remote client
-		// manager.AddClient("server2", mcp.NewMcpClient("server2", "v1.0", mockConfig.McpServers["server2"]))
+		manager.AddClient("server2", mcp.NewMcpClient("server2", "v1.0", mockConfig.McpServers["server2"]))
 
 		statuses := manager.ListServers(mockConfig)
 		assert.Len(t, statuses, 2)

@@ -62,6 +62,21 @@ func (m *MockFileSystemService) Symlink(oldname, newname string) error {
 	return args.Error(0)
 }
 
+func (m *MockFileSystemService) RemoveAll(path string) error {
+	args := m.Called(path)
+	return args.Error(0)
+}
+
+func (m *MockFileSystemService) MkdirAll(path string, perm os.FileMode) error {
+	args := m.Called(path, perm)
+	return args.Error(0)
+}
+
+func (m *MockFileSystemService) Rename(oldpath, newpath string) error {
+	args := m.Called(oldpath, newpath)
+	return args.Error(0)
+}
+
 // MockGitService is a mock implementation of services.GitService
 type MockGitService struct {
 	mock.Mock
@@ -111,13 +126,18 @@ func (s *ManagerTestSuite) SetupTest() {
 	s.mockFs = new(MockFileSystemService)
 	s.mockGit = new(MockGitService)
 	var gitService services.GitService = s.mockGit
-	s.manager = NewManager(s.tempDir, s.mockFs, gitService)
 
 	// Mock os.ReadFile and os.WriteFile for settings.json
-	s.mockFs.On("JoinPaths", mock.Anything, mock.Anything).Return(filepath.Join(s.tempDir, ".gemini", "settings.json")).Maybe()
-	s.mockFs.On("CreateDirectory", mock.Anything).Return(nil).Maybe()
-	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe()
-	s.mockFs.On("ReadFile", mock.Anything).Return("{}", nil).Maybe()
+	s.mockFs.On("JoinPaths", mock.AnythingOfType("[]string")).Return("mocked/path/settings.json").Maybe()
+	s.mockFs.On("CreateDirectory", filepath.Join(s.tempDir, ".gemini")).Return(nil).Maybe()
+	s.mockFs.On("WriteFile", filepath.Join(s.tempDir, ".gemini", "settings.json"), mock.Anything).Return(nil).Once()
+	// Mock ReadFile for initial LoadExtensionStatus call and subsequent calls
+	s.mockFs.On("ReadFile", filepath.Join(s.tempDir, ".gemini", "settings.json")).Return("{}", nil).Once() // Specific mock for settings.json
+	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe() // Added this as well, as it's called in SaveExtensionStatus
+	s.mockFs.On("PathExists", filepath.Join(s.tempDir, ".gemini")).Return(true, nil).Once() // Mock PathExists for .gemini directory
+	s.mockFs.On("PathExists", filepath.Join(s.tempDir, ".gemini", "settings.json")).Return(true, nil).Once() // Mock PathExists for settings.json
+
+	s.manager = NewManager(s.tempDir, s.mockFs, gitService)
 }
 
 func (s *ManagerTestSuite) TearDownTest() {
@@ -138,10 +158,14 @@ func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Git() {
 	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
+	tempPath := filepath.Join(s.tempDir, ".gemini", "temp_extensions", filepath.Base(source))
 	s.mockFs.On("PathExists", extensionPath).Return(false, nil).Once()
-	s.mockGit.On("Clone", source, extensionPath, ref).Return(nil).Once()
-	s.mockFs.On("ReadFile", filepath.Join(extensionPath, "gemini-extension.json")).Return(manifestContent, nil).Once()
+	s.mockGit.On("Clone", source, tempPath, ref).Return(nil).Once() // Clone to tempPath
+	s.mockFs.On("ReadFile", filepath.Join(tempPath, "gemini-extension.json")).Return(manifestContent, nil).Once() // Read manifest from tempPath
+	s.mockFs.On("Rename", tempPath, extensionPath).Return(nil).Once() // Rename from tempPath to final path
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // For saving status
+	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Once() // Add PathExists mock for other calls
+	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // Add WriteFile mock for other calls
 
 	metadata := ExtensionInstallMetadata{
 		Source: source,
@@ -166,9 +190,11 @@ func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Local() {
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
 	s.mockFs.On("PathExists", extensionPath).Return(false, nil).Once()
-	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once()
-	s.mockFs.On("ReadFile", filepath.Join(extensionPath, "gemini-extension.json")).Return(manifestContent, nil).Once()
+	s.mockFs.On("ReadFile", filepath.Join(source, "gemini-extension.json")).Return(manifestContent, nil).Once() // Read manifest from source
+	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once() // Symlink from source to final path
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // For saving status
+	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Once() // Add PathExists mock for other calls
+	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // Add WriteFile mock for other calls
 
 	metadata := ExtensionInstallMetadata{
 		Source: source,
@@ -196,6 +222,8 @@ func (s *ManagerTestSuite) TestUninstallExtension() {
 	s.mockFs.On("PathExists", extensionPath).Return(true, nil).Once() // For os.RemoveAll check
 	s.mockFs.On("RemoveAll", extensionPath).Return(nil).Once()
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // For saving status
+	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Once() // Add PathExists mock for other calls
+	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // Add WriteFile mock for other calls
 
 	err := s.manager.UninstallExtension(extName, false)
 	s.NoError(err)
@@ -215,6 +243,8 @@ func (s *ManagerTestSuite) TestUpdateExtension() {
 
 	s.mockGit.On("Pull", extensionPath, "").Return(nil).Once()
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // For saving status
+	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Maybe() // Add PathExists mock for other calls
+	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // Add WriteFile mock for other calls
 
 	err := s.manager.UpdateExtension(extName)
 	s.NoError(err)
@@ -227,9 +257,11 @@ func (s *ManagerTestSuite) TestLinkExtension() {
 	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
-	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once()
-	s.mockFs.On("ReadFile", filepath.Join(extensionPath, "gemini-extension.json")).Return(manifestContent, nil).Once()
+	s.mockFs.On("ReadFile", filepath.Join(source, "gemini-extension.json")).Return(manifestContent, nil).Once() // Read manifest from source
+	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once() // Symlink from source to final path
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // For saving status
+	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Maybe() // Add PathExists mock for other calls
+	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Once() // Add WriteFile mock for other calls
 
 	err := s.manager.LinkExtension(source)
 	s.NoError(err)

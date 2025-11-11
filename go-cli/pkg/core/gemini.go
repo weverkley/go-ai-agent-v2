@@ -40,7 +40,7 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	modelVal, found := cfg.Get("modelName")
+	modelVal, found := cfg.Get("model") // Use "model" key as defined in config.Get
 	if !found || modelVal == nil {
 		return nil, fmt.Errorf("model name not found in config")
 	}

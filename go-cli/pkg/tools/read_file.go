@@ -3,10 +3,6 @@ package tools
 import (
 	"bufio"
 	"fmt"
-	"image" // Add image import
-	_ "image/jpeg" // Register JPEG format
-	_ "image/png"  // Register PNG format
-	_ "image/gif"  // Register GIF format
 	"os"
 	"path/filepath"
 	"strings"
@@ -89,43 +85,17 @@ func (t *ReadFileTool) Execute(args map[string]any) (types.ToolResult, error) {
 
 		switch ext {
 
-		case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
+				case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
 
-			file, err := os.Open(absolutePath)
+					output := fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath)
 
-			if err != nil {
+					return types.ToolResult{
 
-				return types.ToolResult{}, fmt.Errorf("failed to open image file %s: %w", absolutePath, err)
+						LLMContent:    output,
 
-			}
+						ReturnDisplay: output,
 
-			defer file.Close()
-
-	
-
-			config, formatName, err := image.DecodeConfig(file)
-
-			if err != nil {
-
-				return types.ToolResult{
-
-					LLMContent:    fmt.Sprintf("Binary image file (%s), failed to decode config: %v", formatName, err),
-
-					ReturnDisplay: fmt.Sprintf("Binary image file (%s), failed to decode config: %v", formatName, err),
-
-				}, nil
-
-			}
-
-			output := fmt.Sprintf("Image file: %s (Format: %s, Dimensions: %dx%d)", absolutePath, formatName, config.Width, config.Height)
-
-			return types.ToolResult{
-
-				LLMContent:    output,
-
-				ReturnDisplay: output,
-
-			}, nil
+					}, nil
 
 		case ".pdf":
 

@@ -1,7 +1,7 @@
 {
-  "extensionPaths": [
-    "/home/wever-kley/Workspace/go-ai-agent-v2/go-cli/.gemini/extensions"
-  ],
-  "approvalMode": "default",
-  "model": "gemini-pro"
+  "my-test-extension": {
+    "name": "my-test-extension",
+    "description": "",
+    "enabled": true
+  }
 }

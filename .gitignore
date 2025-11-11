@@ -1,3 +1,4 @@
 docs/*
 !docs/privacy_notice.md
 go-cli/vendor
+go-cli/.gemini/extensions/
