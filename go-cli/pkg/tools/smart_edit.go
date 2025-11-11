@@ -5,18 +5,20 @@ import (
 	"os"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // SmartEditTool represents the smart-edit tool.
 type SmartEditTool struct {
 	*types.BaseDeclarativeTool
+	fileSystemService services.FileSystemService
 }
 
 // NewSmartEditTool creates a new instance of SmartEditTool.
-func NewSmartEditTool() *SmartEditTool {
+func NewSmartEditTool(fileSystemService services.FileSystemService) *SmartEditTool {
 	return &SmartEditTool{
-		types.NewBaseDeclarativeTool(
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			"smart_edit",
 			"smart_edit",
 			"Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the read_file tool to examine the file's current content before attempting a text replacement.",
@@ -47,6 +49,7 @@ func NewSmartEditTool() *SmartEditTool {
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
+		fileSystemService: fileSystemService,
 	}
 }
 
@@ -71,11 +74,11 @@ func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 	}
 
 	// Read the file content
-	contentBytes, err := os.ReadFile(filePath)
+	content, err := t.fileSystemService.ReadFile(filePath)
 	if err != nil {
 		// If file doesn't exist and old_string is empty, it's a new file creation
 		if os.IsNotExist(err) && oldString == "" {
-			err = os.WriteFile(filePath, []byte(newString), 0644)
+			err = t.fileSystemService.WriteFile(filePath, newString)
 			if err != nil {
 				return types.ToolResult{}, fmt.Errorf("failed to create new file %s: %w", filePath, err)
 			}
@@ -87,7 +90,6 @@ func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 		}
 		return types.ToolResult{}, fmt.Errorf("failed to read file %s: %w", filePath, err)
 	}
-	content := string(contentBytes)
 
 	// If old_string is empty but file exists, it's an error
 	if oldString == "" {
@@ -102,7 +104,7 @@ func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
 	}
 
 	// Write the new content back to the file
-	err = os.WriteFile(filePath, []byte(newContent), 0644)
+	err = t.fileSystemService.WriteFile(filePath, newContent)
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}

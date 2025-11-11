@@ -20,10 +20,13 @@ func RegisterAllTools(fs services.FileSystemService) *types.ToolRegistry {
 	if err := registry.Register(NewReadFileTool()); err != nil {
 		fmt.Printf("Error registering ReadFileTool: %v\n", err)
 	}
+	if err := registry.Register(NewWriteFileTool(fs)); err != nil {
+		fmt.Printf("Error registering WriteFileTool: %v\n", err)
+	}
 	if err := registry.Register(NewReadManyFilesTool()); err != nil {
 		fmt.Printf("Error registering ReadManyFilesTool: %v\n", err)
 	}
-	if err := registry.Register(NewSmartEditTool()); err != nil {
+	if err := registry.Register(NewSmartEditTool(fs)); err != nil {
 		fmt.Printf("Error registering SmartEditTool: %v\n", err)
 	}
 	if err := registry.Register(NewWebFetchTool()); err != nil {
