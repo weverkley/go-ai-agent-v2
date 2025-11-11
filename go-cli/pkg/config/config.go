@@ -46,7 +46,7 @@ type ConfigParameters struct {
 	Telemetry      *types.TelemetrySettings
 	Output         *OutputSettings
 	CodebaseInvestigator *types.CodebaseInvestigatorSettings
-	ToolRegistry *types.ToolRegistry // Changed to exported
+	ToolRegistry types.ToolRegistryInterface
 	ToolDiscoveryCommand string
 	ToolCallCommand      string
 }
@@ -89,6 +89,13 @@ func NewConfig(params *ConfigParameters) *Config {
 		toolCallCommand:      params.ToolCallCommand,
 		// telemetryLogger and fileFilteringService will be set separately
 	}
+}
+
+// WithModel creates a new Config instance with a different model name.
+func (c *Config) WithModel(modelName string) types.Config {
+	newConfig := *c
+	newConfig.modelName = modelName
+	return &newConfig
 }
 
 // GetGeminiDir returns the path to the .gemini directory within the target directory.
