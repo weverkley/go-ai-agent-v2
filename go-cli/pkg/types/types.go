@@ -486,6 +486,12 @@ type WorkspaceContext interface {
 // Config defines the interface for application configuration.
 type Config interface {
 	Get(key string) (interface{}, bool)
+	WithModel(modelName string) Config
+}
+
+// ToolConfig defines the interface for tool-specific configuration.
+type ToolConfig interface {
+	// Placeholder for now, add methods as needed.
 }
 
 // ToolRegistryInterface defines the interface for managing tools.

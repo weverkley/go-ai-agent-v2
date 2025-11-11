@@ -94,23 +94,49 @@ func (m *MockToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) [
 
 // MockConfig implements types.Config for testing purposes.
 type MockConfig struct {
-	ModelName string
-	ToolRegistry types.ToolRegistryInterface
-	DebugMode bool
-	CodebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
+	ModelValue string
 	McpServers map[string]types.MCPServerConfig
+	GetFunc    func(key string) (interface{}, bool)
+}
+
+func (m *MockConfig) WithModel(modelName string) types.Config {
+	return &MockConfig{ModelValue: modelName}
+}
+
+func (m *MockConfig) GetModel() string {
+	return m.ModelValue
+}
+
+func (m *MockConfig) GetAPIKey() string {
+	return "mock-api-key"
+}
+
+func (m *MockConfig) CreateTempFile(prefix string) (string, error) {
+	return "", nil
+}
+
+func (m *MockConfig) CleanupTempFile(path string) error {
+	return nil
+}
+
+func (m *MockConfig) GetBasePath() string {
+	return ""
+}
+
+func (m *MockConfig) SetBasePath(path string) {
+}
+
+func (m *MockConfig) NewToolConfig() types.ToolConfig {
+	return nil
 }
 
 func (m *MockConfig) Get(key string) (interface{}, bool) {
+	if m.GetFunc != nil {
+		return m.GetFunc(key)
+	}
 	switch key {
 	case "modelName":
-		return m.ModelName, true
-	case "toolRegistry":
-		return m.ToolRegistry, true
-	case "debugMode":
-		return m.DebugMode, true
-	case "codebaseInvestigatorSettings":
-		return m.CodebaseInvestigatorSettings, true
+		return m.ModelValue, true
 	case "mcpServers":
 		return m.McpServers, true
 	default:
@@ -118,24 +144,25 @@ func (m *MockConfig) Get(key string) (interface{}, bool) {
 	}
 }
 
-
-
 func TestMcpClientManager_DiscoverAllMcpTools(t *testing.T) {
 	t.Run("should discover and register tools from configured MCP servers", func(t *testing.T) {
 		mockToolRegistry := NewMockToolRegistry()
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
 
-		mockConfig := &MockConfig{
-			McpServers: map[string]types.MCPServerConfig{
-				"server1": {
-					Url:          "http://localhost:8080",
-					IncludeTools: []string{"toolA", "toolB"},
-				},
-				"server2": {
-					Url:          "http://localhost:8081",
-					IncludeTools: []string{"toolC"},
-				},
+		mcpServers := map[string]types.MCPServerConfig{
+			"server1": {
+				Url:          "http://localhost:8080",
+				IncludeTools: []string{"toolA", "toolB"},
 			},
+			"server2": {
+				Url:          "http://localhost:8081",
+				IncludeTools: []string{"toolC"},
+			},
+		}
+
+		mockConfig := &MockConfig{
+			ModelValue: "gemini-pro",
+			McpServers: mcpServers, // Directly set McpServers
 		}
 
 		err := manager.DiscoverAllMcpTools(mockConfig)
@@ -159,6 +186,7 @@ func TestMcpClientManager_DiscoverAllMcpTools(t *testing.T) {
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
 
 		mockConfig := &MockConfig{
+			ModelValue: "gemini-pro",
 			McpServers: map[string]types.MCPServerConfig{},
 		}
 
@@ -265,17 +293,19 @@ func TestMcpClientManager_ListServers(t *testing.T) {
 		mockToolRegistry := NewMockToolRegistry()
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
 
-		mockConfig := &MockConfig{
-			McpServers: map[string]types.MCPServerConfig{
-				"server1": {
-					Url:         "http://localhost:8080",
-					Description: "Local server",
-				},
-				"server2": {
-					Url:         "http://remote.com",
-					Description: "Remote server",
-				},
+		mcpServers := map[string]types.MCPServerConfig{
+			"server1": {
+				Url:         "http://localhost:8080",
+				Description: "Local server",
 			},
+			"server2": {
+				Url:         "http://remote.com",
+				Description: "Remote server",
+			},
+		}
+		mockConfig := &MockConfig{
+			ModelValue: "gemini-pro",
+			McpServers: mcpServers,
 		}
 
 		// Simulate a running local server
@@ -283,17 +313,17 @@ func TestMcpClientManager_ListServers(t *testing.T) {
 		dummyExecutablePath := filepath.Join(tempDir, "dummy_server")
 		err := os.WriteFile(dummyExecutablePath, []byte("#!/bin/bash\necho 'dummy server running' && sleep 10"), 0755)
 		assert.NoError(t, err)
-		serverConfig1 := mockConfig.McpServers["server1"]
+		serverConfig1 := mcpServers["server1"]
 		serverConfig1.Command = dummyExecutablePath
 		serverConfig1.Cwd = tempDir
-		mockConfig.McpServers["server1"] = serverConfig1 // Update config with command
+		mcpServers["server1"] = serverConfig1 // Update config with command
 		
 		err = manager.StartServer("server1", serverConfig1)
 		assert.NoError(t, err)
 		time.Sleep(100 * time.Millisecond) // Give it time to start
 
 		// Simulate a connected remote client
-		manager.AddClient("server2", mcp.NewMcpClient("server2", "v1.0", mockConfig.McpServers["server2"]))
+		manager.AddClient("server2", mcp.NewMcpClient("server2", "v1.0", mcpServers["server2"]))
 
 		statuses := manager.ListServers(mockConfig)
 		assert.Len(t, statuses, 2)
@@ -319,13 +349,15 @@ func TestMcpClientManager_ListServers(t *testing.T) {
 		mockToolRegistry := NewMockToolRegistry()
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
 
-		mockConfig := &MockConfig{
-			McpServers: map[string]types.MCPServerConfig{
-				"server3": {
-					Url:         "http://disconnected.com",
-					Description: "Disconnected server",
-				},
+		mcpServers := map[string]types.MCPServerConfig{
+			"server3": {
+				Url:         "http://disconnected.com",
+				Description: "Disconnected server",
 			},
+		}
+		mockConfig := &MockConfig{
+			ModelValue: "gemini-pro",
+			McpServers: mcpServers,
 		}
 
 		statuses := manager.ListServers(mockConfig)

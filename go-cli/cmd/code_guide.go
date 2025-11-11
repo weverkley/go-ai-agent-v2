@@ -46,7 +46,7 @@ It provides clear explanations grounded in the actual source code, including ful
 	
 			// Create a config.Config object
 			appConfig := config.NewConfig(params)
-		factory, err := core.NewExecutorFactory(executorType)
+		factory, err := core.NewExecutorFactory(executorType, appConfig)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
 			os.Exit(1)

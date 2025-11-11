@@ -38,7 +38,7 @@ var chatCmd = &cobra.Command{
 		}
 		appConfig := config.NewConfig(params)
 
-		factory, err := core.NewExecutorFactory(executorType)
+		factory, err := core.NewExecutorFactory(executorType, appConfig)
 		if err != nil {
 			fmt.Printf("Error creating executor factory: %v\n", err)
 			os.Exit(1)
