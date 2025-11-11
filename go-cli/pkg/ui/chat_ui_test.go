@@ -8,12 +8,14 @@ import (
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/google/generative-ai-go/genai"
+	"github.com/spf13/cobra" // Add this line
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewChatModel(t *testing.T) {
 	executor := &core.MockExecutor{}
-	model := NewChatModel(executor)
+	dummyRootCmd := &cobra.Command{} // Create a dummy Cobra command
+	model := NewChatModel(executor, dummyRootCmd)
 
 	assert.NotNil(t, model)
 	assert.Equal(t, "Ready", model.status)
@@ -31,7 +33,8 @@ func TestUpdate_UserInput(t *testing.T) {
 			return ch, nil
 		},
 	}
-	model := NewChatModel(executor)
+	dummyRootCmd := &cobra.Command{} // Create a dummy Cobra command
+	model := NewChatModel(executor, dummyRootCmd)
 	model.textarea.SetValue("hello")
 
 	// Execute
@@ -55,7 +58,8 @@ func TestUpdate_UserInput(t *testing.T) {
 func TestUpdate_SlashCommand_Clear(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	model := NewChatModel(executor)
+	dummyRootCmd := &cobra.Command{} // Create a dummy Cobra command
+	model := NewChatModel(executor, dummyRootCmd)
 	model.messages = []Message{UserMessage{Content: "test"}}
 	model.textarea.SetValue("/clear")
 
@@ -73,7 +77,8 @@ func TestUpdate_SlashCommand_Clear(t *testing.T) {
 func TestUpdate_SlashCommand_Quit(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	model := NewChatModel(executor)
+	dummyRootCmd := &cobra.Command{} // Create a dummy Cobra command
+	model := NewChatModel(executor, dummyRootCmd)
 	model.textarea.SetValue("/quit")
 
 	// Execute
@@ -88,7 +93,8 @@ func TestUpdate_SlashCommand_Quit(t *testing.T) {
 func TestUpdate_StreamingEvents(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	model := NewChatModel(executor)
+	dummyRootCmd := &cobra.Command{} // Create a dummy Cobra command
+	model := NewChatModel(executor, dummyRootCmd)
 	ch := make(chan any, 5)
 	ch <- types.StreamingStartedEvent{}
 	ch <- types.ThinkingEvent{}

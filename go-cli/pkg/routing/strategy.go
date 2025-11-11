@@ -2,7 +2,7 @@ package routing
 
 import (
 	"context"
-	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
 )
 
 // RoutingDecision is the output of a routing decision.
@@ -21,7 +21,7 @@ type RoutingContext struct {
 // RoutingStrategy is the interface for all routing strategies.
 type RoutingStrategy interface {
 	Name() string
-	Route(ctx *RoutingContext, cfg *config.Config) (*RoutingDecision, error)
+	Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error)
 }
 
 // TerminalStrategy is a strategy that is guaranteed to return a decision.
@@ -36,7 +36,7 @@ func (s *DefaultStrategy) Name() string {
 	return "default"
 }
 
-func (s *DefaultStrategy) Route(ctx *RoutingContext, cfg *config.Config) (*RoutingDecision, error) {
+func (s *DefaultStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	model, _ := cfg.Get("model")
 	return &RoutingDecision{
 		Model: model.(string),
@@ -54,7 +54,7 @@ func (s *OverrideStrategy) Name() string {
 	return "override"
 }
 
-func (s *OverrideStrategy) Route(ctx *RoutingContext, cfg *config.Config) (*RoutingDecision, error) {
+func (s *OverrideStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	model, ok := cfg.Get("model")
 	if !ok || model.(string) == "auto" {
 		return nil, nil // Pass to the next strategy
@@ -76,7 +76,7 @@ func (s *FallbackStrategy) Name() string {
 	return "fallback"
 }
 
-func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg *config.Config) (*RoutingDecision, error) {
+func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	// TODO: Implement fallback logic. For now, we'll just pass.
 	return nil, nil
 }

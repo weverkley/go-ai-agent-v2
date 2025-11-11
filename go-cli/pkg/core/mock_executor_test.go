@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/routing" // Add this line
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -17,6 +18,10 @@ type MockConfig struct {
 	ToolRegistry *types.ToolRegistry
 	DebugMode bool
 	CodebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
+}
+
+func (m *MockConfig) WithModel(modelName string) types.Config {
+	return &MockConfig{ModelName: modelName}
 }
 
 func (m *MockConfig) Get(key string) (interface{}, bool) {
@@ -37,20 +42,23 @@ func (m *MockConfig) Get(key string) (interface{}, bool) {
 
 
 func TestNewExecutorFactory(t *testing.T) {
+	// Create a dummy config.Config instance for NewExecutorFactory
+	dummyCfg := &MockConfig{}
+
 	t.Run("should return GeminiExecutorFactory for 'gemini' type", func(t *testing.T) {
-		factory, err := core.NewExecutorFactory("gemini")
+		factory, err := core.NewExecutorFactory("gemini", dummyCfg)
 		assert.NoError(t, err)
 		assert.IsType(t, &core.GeminiExecutorFactory{}, factory)
 	})
 
 	t.Run("should return MockExecutorFactory for 'mock' type", func(t *testing.T) {
-		factory, err := core.NewExecutorFactory("mock")
+		factory, err := core.NewExecutorFactory("mock", dummyCfg)
 		assert.NoError(t, err)
 		assert.IsType(t, &core.MockExecutorFactory{}, factory)
 	})
 
 	t.Run("should return error for unknown type", func(t *testing.T) {
-		factory, err := core.NewExecutorFactory("unknown")
+		factory, err := core.NewExecutorFactory("unknown", dummyCfg)
 		assert.Error(t, err)
 		assert.Nil(t, factory)
 		assert.Contains(t, err.Error(), "unknown executor type")
@@ -59,7 +67,9 @@ func TestNewExecutorFactory(t *testing.T) {
 
 func TestGeminiExecutorFactory_NewExecutor(t *testing.T) {
 	t.Run("should create a GeminiChat instance", func(t *testing.T) {
-		factory := &core.GeminiExecutorFactory{}
+		factory := &core.GeminiExecutorFactory{
+			Router: routing.NewModelRouterService(&MockConfig{}), // Pass MockConfig here
+		}
 		mockConfig := &MockConfig{ModelName: "gemini-pro"}
 		
 		// Temporarily set GEMINI_API_KEY for this test
@@ -72,7 +82,9 @@ func TestGeminiExecutorFactory_NewExecutor(t *testing.T) {
 	})
 
 	t.Run("should return error if GEMINI_API_KEY is not set", func(t *testing.T) {
-		factory := &core.GeminiExecutorFactory{}
+		factory := &core.GeminiExecutorFactory{
+			Router: routing.NewModelRouterService(&MockConfig{}), // Pass MockConfig here
+		}
 		mockConfig := &MockConfig{ModelName: "gemini-pro"}
 
 		os.Unsetenv("GEMINI_API_KEY") // Ensure it's unset

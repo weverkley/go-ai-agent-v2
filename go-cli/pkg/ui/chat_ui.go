@@ -2,6 +2,8 @@ package ui
 
 import (
 	"fmt"
+	"io"
+	"os" // Corrected line
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
@@ -12,6 +14,7 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/spf13/cobra" // Add this line
 )
 
 // --- Message Interface and Structs ---
@@ -89,6 +92,7 @@ type ChatModel struct {
 	status          string
 	err             error
 	title           string
+	rootCmd         *cobra.Command // Add this line
 	activeToolCalls map[string]*ToolCallStatus
 
 	// Styles
@@ -100,7 +104,7 @@ type ChatModel struct {
 	titleStyle  lipgloss.Style
 }
 
-func NewChatModel(executor core.Executor) *ChatModel {
+func NewChatModel(executor core.Executor, rootCmd *cobra.Command) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
 	ta.Focus()
@@ -129,6 +133,7 @@ func NewChatModel(executor core.Executor) *ChatModel {
 		isStreaming:     false,
 		status:          "Ready",
 		title:           "Go AI Agent Chat",
+		rootCmd:         rootCmd, // Initialize the new field
 		activeToolCalls: make(map[string]*ToolCallStatus),
 		senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),   // User
 		botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),   // Bot
@@ -287,19 +292,44 @@ func (m *ChatModel) updateViewport() {
 }
 
 func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
-	parts := strings.Fields(input)
-	command := parts[0]
+	// Remove the leading slash for Cobra
+	commandString := strings.TrimPrefix(input, "/")
+	args := strings.Fields(commandString)
 
-	switch command {
-	case "/clear":
-		m.messages = []Message{}
-		m.updateViewport()
-	case "/quit", "/exit":
-		return m, tea.Quit
-	default:
-		m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("unknown command: %s", command)})
-		m.updateViewport()
+	// Create a buffer to capture stdout and stderr
+	oldStdout := os.Stdout
+	oldStderr := os.Stderr
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	os.Stderr = w
+
+	// Execute the Cobra command
+	m.rootCmd.SetArgs(args)
+	err := m.rootCmd.Execute()
+
+	w.Close()
+	out, _ := io.ReadAll(r)
+	os.Stdout = oldStdout
+	os.Stderr = oldStderr
+
+	if err != nil {
+		m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("command execution error: %v", err)})
+	} else {
+		output := strings.TrimSpace(string(out))
+		if output != "" {
+			m.messages = append(m.messages, BotMessage{Content: output})
+		}
 	}
+
+	// Handle specific commands that might require UI changes
+	switch args[0] {
+	case "clear":
+		m.messages = []Message{}
+	case "quit", "exit":
+		return m, tea.Quit
+	}
+
+	m.updateViewport()
 	return m, nil
 }
 

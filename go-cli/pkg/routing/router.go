@@ -2,7 +2,7 @@ package routing
 
 import (
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
 )
 
 // CompositeStrategy attempts a list of child strategies in order.
@@ -20,7 +20,7 @@ func (s *CompositeStrategy) Name() string {
 	return "composite"
 }
 
-func (s *CompositeStrategy) Route(ctx *RoutingContext, cfg *config.Config) (*RoutingDecision, error) {
+func (s *CompositeStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	for _, strategy := range s.strategies {
 		decision, err := strategy.Route(ctx, cfg)
 		if err != nil {
@@ -40,7 +40,7 @@ type ModelRouterService struct {
 	strategy RoutingStrategy
 }
 
-func NewModelRouterService(cfg *config.Config) *ModelRouterService {
+func NewModelRouterService(cfg types.Config) *ModelRouterService {
 	// Initialize the composite strategy with the desired priority order.
 	strategy := NewCompositeStrategy(
 		&FallbackStrategy{},
@@ -54,6 +54,6 @@ func NewModelRouterService(cfg *config.Config) *ModelRouterService {
 }
 
 // Route determines which model to use for a given request context.
-func (s *ModelRouterService) Route(ctx *RoutingContext, cfg *config.Config) (*RoutingDecision, error) {
+func (s *ModelRouterService) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	return s.strategy.Route(ctx, cfg)
 }

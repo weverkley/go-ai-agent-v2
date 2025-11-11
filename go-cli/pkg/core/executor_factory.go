@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -12,7 +11,7 @@ import (
 
 // ExecutorFactory abstracts the creation of different AI executors.
 type ExecutorFactory interface {
-	NewExecutor(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error)
+	NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error)
 }
 
 // GeminiExecutorFactory is an ExecutorFactory that creates GeminiChat instances.
@@ -21,7 +20,7 @@ type GeminiExecutorFactory struct {
 }
 
 // NewExecutor creates a new GeminiChat executor.
-func (f *GeminiExecutorFactory) NewExecutor(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (f *GeminiExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
 	// For now, we'll create a simple context. This will need to be updated
 	// to use the actual chat history and user request.
 	routingCtx := &routing.RoutingContext{
@@ -46,7 +45,7 @@ type MockExecutorFactory struct {
 }
 
 // NewExecutor creates a new MockExecutor.
-func (f *MockExecutorFactory) NewExecutor(cfg *config.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
 	if f.Mock != nil {
 		return f.Mock, nil
 	}
@@ -54,7 +53,7 @@ func (f *MockExecutorFactory) NewExecutor(cfg *config.Config, generationConfig t
 }
 
 // NewExecutorFactory creates an ExecutorFactory based on the provided type.
-func NewExecutorFactory(executorType string, cfg *config.Config) (ExecutorFactory, error) {
+func NewExecutorFactory(executorType string, cfg types.Config) (ExecutorFactory, error) {
 	switch executorType {
 	case "gemini":
 		return &GeminiExecutorFactory{

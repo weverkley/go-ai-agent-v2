@@ -49,7 +49,7 @@ var chatCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		p := tea.NewProgram(ui.NewChatModel(executor))
+		p := tea.NewProgram(ui.NewChatModel(executor, RootCmd)) // Pass RootCmd here
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error running interactive chat: %v\n", err)
 			os.Exit(1)
