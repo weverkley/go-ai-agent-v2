@@ -15,4 +15,5 @@ type Executor interface {
 	GetHistory() ([]*genai.Content, error)
 	SetHistory(history []*genai.Content) error
 	CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error)
+	GenerateStream(contents ...*genai.Content) (<-chan any, error)
 }

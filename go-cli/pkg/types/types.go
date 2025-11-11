@@ -640,3 +640,29 @@ type TelemetrySettings struct {
 	Outfile      string `json:"outfile,omitempty"`
 	UseCollector bool   `json:"useCollector,omitempty"`
 }
+
+// Streaming Event types for the UI
+type StreamingStartedEvent struct{}
+
+type ThinkingEvent struct{}
+
+type ToolCallStartEvent struct {
+	ToolCallID string
+	ToolName   string
+	Args       map[string]interface{}
+}
+
+type ToolCallEndEvent struct {
+	ToolCallID string
+	ToolName   string
+	Result     string
+	Err        error
+}
+
+type FinalResponseEvent struct {
+	Content string
+}
+
+type ErrorEvent struct {
+	Err error
+}

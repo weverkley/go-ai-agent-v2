@@ -25,6 +25,7 @@ type GeminiChat struct {
 	generationConfig types.GenerateContentConfig
 	startHistory     []*genai.Content
 	toolRegistry     *types.ToolRegistry // Add ToolRegistry
+	toolCallCounter  int
 }
 
 // NewGeminiChat creates a new GeminiChat instance.
@@ -82,6 +83,7 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 		generationConfig: generationConfig,
 		startHistory:     startHistory,
 		toolRegistry:     geminiChatToolRegistry, // Store the ToolRegistry
+		toolCallCounter:  0,
 	}, nil
 }
 
@@ -321,4 +323,83 @@ func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatComp
 		NewTokenCount:      int(newTokenCount),      // Cast to int
 		CompressionStatus:  "success",
 	}, nil
+}
+
+// GenerateStream generates content and streams events back to the caller.
+func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, error) {
+	eventChan := make(chan any)
+
+	go func() {
+		defer close(eventChan)
+
+		ctx := context.Background()
+		eventChan <- types.StreamingStartedEvent{}
+
+		cs := gc.model.StartChat()
+		cs.History = gc.startHistory
+
+		if gc.toolRegistry != nil {
+			gc.model.Tools = gc.toolRegistry.GetTools()
+		}
+
+		var parts []genai.Part
+		for _, content := range contents {
+			parts = append(parts, content.Parts...)
+		}
+
+		eventChan <- types.ThinkingEvent{}
+		iter := cs.SendMessageStream(ctx, parts...)
+
+		var accumulatedText string
+		for {
+			resp, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				eventChan <- types.ErrorEvent{Err: err}
+				return
+			}
+
+			if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+				for _, part := range resp.Candidates[0].Content.Parts {
+					switch p := part.(type) {
+					case genai.Text:
+						accumulatedText += string(p)
+					case *genai.FunctionCall:
+						gc.toolCallCounter++
+						toolCallID := fmt.Sprintf("tool-call-%d", gc.toolCallCounter)
+
+						eventChan <- types.ToolCallStartEvent{
+							ToolCallID: toolCallID,
+							ToolName:   p.Name,
+							Args:       p.Args,
+						}
+
+						toolResult, err := gc.ExecuteTool(p)
+
+						eventChan <- types.ToolCallEndEvent{
+							ToolCallID: toolCallID,
+							ToolName:   p.Name,
+							Result:     toolResult.ReturnDisplay,
+							Err:        err,
+						}
+
+						if err != nil {
+							// Optionally, send a tool result error back to the model
+							// For now, we just stop.
+							return
+						}
+
+						// Send the tool result back to the model
+						iter = cs.SendMessageStream(ctx, NewFunctionResponsePart(p.Name, toolResult.LLMContent))
+					}
+				}
+			}
+		}
+
+		eventChan <- types.FinalResponseEvent{Content: accumulatedText}
+	}()
+
+	return eventChan, nil
 }

@@ -218,3 +218,14 @@ The migration will proceed iteratively, focusing on one command or core function
 13. **Implement Restore Functionality**: Develop logic for saving and restoring CLI state, including tool calls and conversation/file history.
 14. **Implement Folder Trust Management**: Develop logic for defining and managing folder trust settings for security.
 15. **Implement MCP Server Management**: Develop logic for listing, adding, and removing MCP server configurations.
+16. **Implement Rich Interactive Chat UI (Go)**: Replicate the sophisticated, component-based, and data-driven architecture of the JavaScript chat UI in the Go application.
+    *   **Create a Structured `Message` Interface**: Instead of a simple `[]string` for history, define a `Message` interface with a `Render(model ChatModel) string` method. This will allow for different message types to have their own rendering logic.
+    *   **Implement Concrete `Message` Types**: Create structs for each message type (e.g., `UserMessage`, `BotMessage`, `ToolCallMessage`, `ToolResultMessage`, `InfoMessage`, `ErrorMessage`) that implement the `Message` interface. Each struct will hold the relevant data and define the specific `lipgloss` styling in its `Render` method. This mirrors the component-based approach of the JavaScript version (e.g., `UserMessage.tsx`, `GeminiMessage.tsx`).
+    *   **Refactor `ChatModel`**:
+        *   Change the `messages` field from `[]string` to `[]Message`.
+        *   Update the `Update` method to create instances of the new message structs and add them to the history.
+        *   Modify the `View` method to iterate over the `[]Message` slice and call the `Render` method for each message, composing the final view from these rendered components.
+    *   **Implement Slash Commands**: Add a simple slash command processor in the `Update` method to handle user commands. Start with essential commands:
+        *   `/clear`: To clear the chat history.
+        *   `/quit` or `/exit`: To exit the application.
+    *   **Enhance `GenerateStream` Integration**: Ensure the `GenerateStream` method in the `Executor` produces events that can be easily mapped to the new `Message` types in the UI.

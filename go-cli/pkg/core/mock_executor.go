@@ -13,13 +13,15 @@ type MockExecutor struct {
 	ExecuteToolFunc       func(fc *genai.FunctionCall) (types.ToolResult, error)
 	SendMessageStreamFunc func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
 	ListModelsFunc        func() ([]string, error)
-	GetHistoryFunc        func() ([]*genai.Content, error)
-	SetHistoryFunc        func(history []*genai.Content) error
-	CompressChatFunc      func(promptId string, force bool) (*types.ChatCompressionResult, error)
-}
-
-// GenerateContent mocks the GenerateContent method.
-func (m *MockExecutor) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+		GetHistoryFunc        func() ([]*genai.Content, error)
+		SetHistoryFunc        func(history []*genai.Content) error
+		CompressChatFunc      func(promptId string, force bool) (*types.ChatCompressionResult, error)
+		GenerateStreamFunc    func(contents ...*genai.Content) (<-chan any, error)
+	}
+	
+	// GenerateContent mocks the GenerateContent method.
+	func (m *MockExecutor) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+	
 	if m.GenerateContentFunc != nil {
 		return m.GenerateContentFunc(contents...)
 	}
@@ -70,8 +72,19 @@ func (m *MockExecutor) SetHistory(history []*genai.Content) error {
 
 // CompressChat mocks the CompressChat method.
 func (m *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	if m.CompressChatFunc != nil {
-		return m.CompressChatFunc(promptId, force)
+		if m.CompressChatFunc != nil {
+			return m.CompressChatFunc(promptId, force)
+		}
+		return nil, fmt.Errorf("CompressChat not implemented in mock")
 	}
-	return nil, fmt.Errorf("CompressChat not implemented in mock")
-}
+	
+	// GenerateStream mocks the GenerateStream method.
+	func (m *MockExecutor) GenerateStream(contents ...*genai.Content) (<-chan any, error) {
+		if m.GenerateStreamFunc != nil {
+			return m.GenerateStreamFunc(contents...)
+		}
+		respChan := make(chan any)
+		close(respChan)
+		return respChan, fmt.Errorf("GenerateStream not implemented in mock")
+	}
+	

@@ -9,7 +9,6 @@ require (
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/gobwas/glob v0.2.3
 	github.com/google/generative-ai-go v0.20.1
-	github.com/manifoldco/promptui v0.9.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.10.0
 	google.golang.org/api v0.254.0
@@ -31,7 +30,6 @@ require (
 	github.com/charmbracelet/x/ansi v0.10.1 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/cyphar/filepath-securejoin v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
