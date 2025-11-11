@@ -228,4 +228,11 @@ The migration will proceed iteratively, focusing on one command or core function
     *   **Implement Slash Commands**: Add a simple slash command processor in the `Update` method to handle user commands. Start with essential commands:
         *   `/clear`: To clear the chat history.
         *   `/quit` or `/exit`: To exit the application.
-    *   **Enhance `GenerateStream` Integration**: Ensure the `GenerateStream` method in the `Executor` produces events that can be easily mapped to the new `Message` types in the UI.
+        *   **Enhance `GenerateStream` Integration**: Ensure the `GenerateStream` method in the `Executor` produces events that can be easily mapped to the new `Message` types in the UI.
+    17. **Implement Model Routing**: Port the JavaScript model routing logic to the Go application to enable dynamic selection of AI models.
+        *   **Create `RoutingStrategy` Interface**: Define a `RoutingStrategy` interface in a new `pkg/routing` directory. This interface will have a `Route` method that takes a context and returns a model name or an error.
+        *   **Implement Concrete Strategies**: Create structs for each routing strategy (`DefaultStrategy`, `OverrideStrategy`, `FallbackStrategy`, `ClassifierStrategy`, `CompositeStrategy`) that implement the `RoutingStrategy` interface.
+        *   **Create `ModelRouterService`**: Develop a `ModelRouterService` that uses a `CompositeStrategy` to execute the strategies in a predefined order of priority.
+        *   **Integrate with `ExecutorFactory`**: Modify the `ExecutorFactory` to use the `ModelRouterService` to determine which model to use when creating a new executor. The factory will call the router to get the model name before initializing the `GeminiChat` executor.
+        *   **Simplify `ClassifierStrategy` (Initial Version)**: For the initial implementation, the `ClassifierStrategy` can use a simple heuristic (e.g., keyword matching, prompt length) instead of making an LLM call. The full LLM-based classification can be added in a future iteration.
+    
