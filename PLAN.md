@@ -74,10 +74,13 @@ The foundational structure for the Go CLI has been established, and several core
   - `pkg/utils/utils.go`: Telemetry logging implemented in `LogAgentStart()` and `LogAgentFinish()`.
   - `pkg/tools/ls.go`: `Execute()` method now lists directory contents.
   - `pkg/tools/write_file.go`: Implements the `write_file` tool functionality.
+  - `pkg/tools/list_directory.go`: Refactored to use `FileSystemService`.
+  - `pkg/tools/smart_edit.go`: Refactored to use `FileSystemService`.
+  - `pkg/tools/write_file.go`: Refactored to use `FileSystemService`.
 
-## 2. Linter-Identified Issues (Prioritized for Next Steps)
+## 2. Linter-Identified Issues
 
-### Resolved Issues:
+All previously identified linter issues have been resolved, including:
 
 - **`pkg/core/agents/types.go`**: Removed redundant `AgentTerminateMode` definition.
 - **`pkg/core/agents/subagent_tool_wrapper.go`**: Corrected access to `MessageBus` and updated references to `types.BaseDeclarativeTool`, `types.NewBaseDeclarativeTool`, `types.KindThink` (replaced with `types.KindOther`), and `types.ToolInvocation`.-
@@ -102,9 +105,25 @@ The foundational structure for the Go CLI has been established, and several core
 - **`cmd/find_docs.go`**: Corrected ToolRegistry initialization.
 - **`cmd/pr_review.go`**: Corrected ToolRegistry initialization and syntax error.
 
-### Remaining Issues:
+## 3. Remaining JavaScript Source Code to be Migrated
 
-## 3. Command Implementation Strategy (Overview)
+Based on a review of the original JavaScript source code, the following files and modules may still need to be migrated:
+
+- **MCP Commands**: The `add`, `list`, and `remove` commands for MCP servers need to be fully implemented. Currently, they only provide informative messages.
+- **Core Functionality**: The following files from `docs/gemini-cli-main/packages/core/src/core` may need to be migrated:
+    - `baseLlmClient.ts`
+    - `client.ts`
+    - `contentGenerator.ts`
+    - `fakeContentGenerator.ts`
+    - `geminiRequest.ts`
+    - `logger.ts`
+    - `loggingContentGenerator.ts`
+    - `recordingContentGenerator.ts`
+    - `tokenLimits.ts`
+    - `turn.ts`
+- **Fallback/Error Handling**: The logic in the `docs/gemini-cli-main/packages/core/src/fallback` directory may need to be migrated.
+
+## 4. Command Implementation Strategy (Overview)
 
 The `extensions` and `mcp` command groups are primary CLI functionalities.
 

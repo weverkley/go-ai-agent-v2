@@ -48,6 +48,9 @@ The foundational structure for the Go CLI is established, with several core serv
 *   **`pkg/utils/utils.go`**: Provides utility functions, now including actual telemetry logging.
 *   **`pkg/tools/ls.go`**: Implements the `ls` tool functionality.
 *   **`pkg/tools/write_file.go`**: Implements the `write_file` tool functionality.
+*   **`pkg/tools/list_directory.go`**: Refactored to use `FileSystemService`.
+*   **`pkg/tools/smart_edit.go`**: Refactored to use `FileSystemService`.
+*   **`pkg/tools/write_file.go`**: Refactored to use `FileSystemService`.
 
 ## Getting Started
 
