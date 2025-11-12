@@ -296,6 +296,9 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	commandString := strings.TrimPrefix(input, "/")
 	args := strings.Fields(commandString)
 
+	// Debug logging
+	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s with args: %v\n", commandString, args)
+
 	// Create a buffer to capture stdout and stderr
 	oldStdout := os.Stdout
 	oldStderr := os.Stderr
@@ -312,6 +315,10 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	os.Stdout = oldStdout
 	os.Stderr = oldStderr
 
+	// Debug logging
+	fmt.Fprintf(os.Stderr, "DEBUG: Command execution error: %v\n", err)
+	fmt.Fprintf(os.Stderr, "DEBUG: Captured output: %s\n", string(out))
+
 	if err != nil {
 		m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("command execution error: %v", err)})
 	} else {
@@ -322,11 +329,13 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	}
 
 	// Handle specific commands that might require UI changes
-	switch args[0] {
-	case "clear":
-		m.messages = []Message{}
-	case "quit", "exit":
-		return m, tea.Quit
+	if len(args) > 0 {
+		switch args[0] {
+		case "clear":
+			m.messages = []Message{}
+		case "quit", "exit":
+			return m, tea.Quit
+		}
 	}
 
 	m.updateViewport()
