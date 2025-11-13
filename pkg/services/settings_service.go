@@ -24,6 +24,7 @@ type Settings struct {
 	ShowMemoryUsage bool                          `json:"showMemoryUsage,omitempty"`
 	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
 	Model          string                         `json:"model,omitempty"`
+	Executor       string                         `json:"executor,omitempty"`
 	Proxy          string                         `json:"proxy,omitempty"`
 	EnabledExtensions map[types.SettingScope][]string `json:"enabledExtensions,omitempty"`
 	ToolDiscoveryCommand string `json:"toolDiscoveryCommand,omitempty"`
@@ -46,6 +47,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			ShowMemoryUsage: false,
 			TelemetryEnabled: false,
 			Model:          "gemini-pro", // Default model
+			Executor:       "gemini",     // Default executor
 			Proxy:          "",
 			EnabledExtensions: make(map[types.SettingScope][]string),
 			ToolDiscoveryCommand: "",
@@ -69,6 +71,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			ShowMemoryUsage: false,
 			TelemetryEnabled: false,
 			Model:          "gemini-pro", // Default model
+			Executor:       "gemini",     // Default executor
 			Proxy:          "",
 			EnabledExtensions: make(map[types.SettingScope][]string),
 			ToolDiscoveryCommand: "",
@@ -91,6 +94,9 @@ func LoadSettings(workspaceDir string) *Settings {
 	}
 	if settings.Model == "" {
 		settings.Model = "gemini-pro"
+	}
+	if settings.Executor == "" {
+		settings.Executor = "gemini"
 	}
 	if settings.EnabledExtensions == nil {
 		settings.EnabledExtensions = make(map[types.SettingScope][]string)
@@ -154,6 +160,8 @@ func (ss *SettingsService) Get(key string) (interface{}, bool) {
 	switch key {
 	case "model":
 		return ss.settings.Model, true
+	case "executor":
+		return ss.settings.Executor, true
 	case "debugMode":
 		return ss.settings.DebugMode, true
 	case "userMemory":
@@ -201,6 +209,12 @@ func (ss *SettingsService) Set(key string, value interface{}) error {
 			ss.settings.Model = v
 		} else {
 			return fmt.Errorf("invalid type for model setting, expected string")
+		}
+	case "executor":
+		if v, ok := value.(string); ok {
+			ss.settings.Executor = v
+		} else {
+			return fmt.Errorf("invalid type for executor setting, expected string")
 		}
 	case "debugMode":
 		if v, ok := value.(bool); ok {
@@ -264,6 +278,7 @@ func (ss *SettingsService) AllSettings() map[string]interface{} {
 
 	all := make(map[string]interface{})
 	all["model"] = ss.settings.Model
+	all["executor"] = ss.settings.Executor
 	all["debugMode"] = ss.settings.DebugMode
 	all["userMemory"] = ss.settings.UserMemory
 	all["approvalMode"] = ss.settings.ApprovalMode

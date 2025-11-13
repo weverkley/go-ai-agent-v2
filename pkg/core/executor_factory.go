@@ -52,6 +52,14 @@ func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig typ
 	return &MockExecutor{}, nil
 }
 
+// QwenExecutorFactory is an ExecutorFactory that creates QwenChat instances.
+type QwenExecutorFactory struct{}
+
+// NewExecutor creates a new QwenChat executor.
+func (f *QwenExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+	return NewQwenChat(cfg, generationConfig, startHistory)
+}
+
 // NewExecutorFactory creates an ExecutorFactory based on the provided type.
 func NewExecutorFactory(executorType string, cfg types.Config) (ExecutorFactory, error) {
 	switch executorType {
@@ -59,6 +67,8 @@ func NewExecutorFactory(executorType string, cfg types.Config) (ExecutorFactory,
 		return &GeminiExecutorFactory{
 			Router: routing.NewModelRouterService(cfg),
 		}, nil
+	case "qwen":
+		return &QwenExecutorFactory{}, nil
 	case "mock":
 		return &MockExecutorFactory{}, nil
 	default:

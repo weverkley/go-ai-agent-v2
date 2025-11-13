@@ -13,15 +13,15 @@ type MockExecutor struct {
 	ExecuteToolFunc       func(fc *genai.FunctionCall) (types.ToolResult, error)
 	SendMessageStreamFunc func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
 	ListModelsFunc        func() ([]string, error)
-		GetHistoryFunc        func() ([]*genai.Content, error)
-		SetHistoryFunc        func(history []*genai.Content) error
-		CompressChatFunc      func(promptId string, force bool) (*types.ChatCompressionResult, error)
-		GenerateStreamFunc    func(contents ...*genai.Content) (<-chan any, error)
-	}
-	
-	// GenerateContent mocks the GenerateContent method.
-	func (m *MockExecutor) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
-	
+	GetHistoryFunc        func() ([]*genai.Content, error)
+	SetHistoryFunc        func(history []*genai.Content) error
+	CompressChatFunc      func(promptId string, force bool) (*types.ChatCompressionResult, error)
+	GenerateStreamFunc    func(contents ...*genai.Content) (<-chan any, error)
+}
+
+// GenerateContent mocks the GenerateContent method.
+func (m *MockExecutor) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+
 	if m.GenerateContentFunc != nil {
 		return m.GenerateContentFunc(contents...)
 	}

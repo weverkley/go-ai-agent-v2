@@ -15,10 +15,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func init() {
-	chatCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
-}
-
 var chatCmd = &cobra.Command{
 	Use:   "chat",
 	Short: "Start an interactive chat session with the AI agent",
@@ -31,6 +27,17 @@ var chatCmd = &cobra.Command{
 		model, ok := modelVal.(string)
 		if !ok {
 			fmt.Printf("Error: 'model' setting is not a string.\n")
+			os.Exit(1)
+		}
+
+		executorVal, ok := SettingsService.Get("executor")
+		if !ok {
+			fmt.Printf("Error: 'executor' setting not found.\n")
+			os.Exit(1)
+		}
+		executorType, ok := executorVal.(string)
+		if !ok {
+			fmt.Printf("Error: 'executor' setting is not a string.\n")
 			os.Exit(1)
 		}
 

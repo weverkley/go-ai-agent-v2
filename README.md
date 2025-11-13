@@ -1,6 +1,6 @@
 # Go AI Agent v2 CLI
 
-This repository contains the Go-based Command Line Interface (CLI) for the AI Agent v2, designed to bring the power of various AI executors (e.g., Gemini, OpenAI) directly into your terminal. This project is a migration from an existing JavaScript-based CLI, focusing on a robust, extensible, and efficient Go implementation.
+This repository contains the Go-based Command Line Interface (CLI) for the AI Agent v2, designed to bring the power of various AI executors (e.g., Gemini, Qwen, OpenAI) directly into your terminal. This project is a migration from an existing JavaScript-based CLI, focusing on a robust, extensible, and efficient Go implementation.
 
 ## Project Status
 
@@ -33,10 +33,16 @@ The foundational structure for the Go CLI is established, with several core serv
 *   **`list-models`**: Lists available Gemini models.
 *   **Informative Commands**: `privacy`, `ide`, `theme`, `auth`, `setup-github`, `profile`, `vim`, `terminal-setup`, `editor`, `stats`, `restore`, `permissions` now provide informative messages about their future implementation.
 *   **`tools run`**: Executes specific AI tools.
+*   **`chat`**: Interactive chat session with AI agents, now featuring:
+    *   **Model Rotation Suggestions**: Automatically suggests alternative models (e.g., `gemini-1.5-flash` from `gemini-1.5-pro`) when API quota errors occur.
+    *   **Improved UI Stability**: Fixed issues with terminal history, duplicated input, and text wrapping for long messages.
+    *   **Enhanced `clear` command**: Correctly clears both UI and executor history.
 
 ### Core Services & Tools:
 
 *   **`pkg/core/gemini.go`**: Integrates with the Gemini API, including tool-calling and actual token counting.
+*   **`pkg/core/qwen.go`**: Implements the Qwen executor using the OpenAI-compatible API, supporting streaming responses.
+*   **`pkg/core/mock_executor.go`**: Mock executor for testing purposes.
 *   **`pkg/services/shell_service.go`**: Provides shell command execution.
 *   **`pkg/services/file_system_service.go`**: Offers file system operations like listing, reading, writing, and directory management.
 *   **`pkg/services/git_service.go`**: Interacts with Git repositories for operations like getting remote URLs, checking out branches, pulling, and deleting branches.
@@ -51,6 +57,9 @@ The foundational structure for the Go CLI is established, with several core serv
 *   **`pkg/tools/list_directory.go`**: Refactored to use `FileSystemService`.
 *   **`pkg/tools/smart_edit.go`**: Refactored to use `FileSystemService`.
 *   **`pkg/tools/write_file.go`**: Refactored to use `FileSystemService`.
+*   **`pkg/routing/strategy.go`**: Implements model routing strategies, including a `FallbackStrategy` for error-based model suggestions.
+*   **`pkg/services/settings_service.go`**: Now includes an `executor` setting to specify the active AI executor.
+*   **`pkg/telemetry/telemetry.go`**: Enhanced with debug logging and file output capabilities.
 
 ## Getting Started
 
@@ -58,46 +67,58 @@ The foundational structure for the Go CLI is established, with several core serv
 
 *   Go (version 1.21 or higher recommended)
 *   `GEMINI_API_KEY` environment variable set with your Gemini API key.
+*   `QWEN_API_KEY` environment variable set with your Qwen API key (if using the Qwen executor).
 
 ### Building the CLI
 
-Navigate to the `go-cli` directory and run:
+Navigate to the project root directory and run:
 
 ```bash
-go build -o gemini-cli .
+go build .
 ```
 
-This will compile the application and create an executable named `gemini-cli` in the current directory.
+This will compile the application and create an executable named `go-ai-agent-v2` in the current directory.
 
 ### Running Commands
 
 You can run the compiled CLI using:
 
 ```bash
-./gemini-cli [command] [flags]
+./go-ai-agent-v2 [command] [flags]
 ```
 
 For example:
 
 ```bash
-./gemini-cli generate "Write a short story about a robot."
-./gemini-cli ls .
-./gemini-cli extensions list
-./gemini-cli extract-function --file-path /path/to/file.go --start-line 10 --end-line 20 --new-function-name MyNewFunction
+./go-ai-agent-v2 chat
+./go-ai-agent-v2 settings set executor qwen
+./go-ai-agent-v2 settings set model qwen-turbo
+./go-ai-agent-v2 generate "Write a short story about a robot."
+./go-ai-agent-v2 ls .
+./go-ai-agent-v2 extensions list
+./go-ai-agent-v2 extract-function --file-path /path/to/file.go --start-line 10 --end-line 20 --new-function-name MyNewFunction
 ```
 
 To see a list of all available commands and their options, run:
 
 ```bash
-./gemini-cli --help
+./go-ai-agent-v2 --help
 ```
 
 ## Next Steps & Future Enhancements
 
 The project is under active development. Future enhancements include:
 
-*   **Mock Executor and Executor Factory**: For comprehensive testing and extensibility to other AI models.
-*   **Improved Error Handling and User Feedback**: More user-friendly messages and consistent feedback for long-running operations.
+*   **Qwen Executor Enhancements:**
+    *   Implement `GenerateContent`, `ExecuteTool`, `SendMessageStream`, `GetHistory`, `CompressChat` for Qwen.
+    *   Implement tool calling for Qwen.
+*   **Model Routing Enhancements:**
+    *   Refactor `getSuggestedModel` to be more generic (e.g., a map of suggesters per executor type).
+    *   Implement `ClassifierStrategy` for more intelligent model routing.
+*   **Error Handling:**
+    *   Improve error messages for API failures (e.g., distinguish between quota errors and other API errors).
+*   **Settings Command:**
+    *   Add validation for `executor` and `model` settings.
 *   **Comprehensive Testing**: Unit and integration tests for all new components.
 *   **Secure API Key Management**: Robust OS-specific storage and clearing of API keys.
 *   **IDE Integration**: Full integration with supported IDEs.
