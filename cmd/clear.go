@@ -14,13 +14,10 @@ var clearCmd = &cobra.Command{
 	Short: "Clear the screen and conversation history",
 	Long:  `The clear command clears the terminal screen and resets the conversation history.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		clearScreen()
-		// Clear conversation history
 		if err := executor.SetHistory(nil); err != nil {
 			fmt.Fprintf(os.Stderr, "Error clearing conversation history: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("Conversation history cleared.")
 	},
 }
 
