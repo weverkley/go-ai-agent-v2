@@ -140,7 +140,49 @@ func (qc *QwenChat) SetHistory(history []*genai.Content) error {
 // The following methods are not yet implemented for QwenChat.
 
 func (qc *QwenChat) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
-	return nil, fmt.Errorf("GenerateContent not implemented for QwenChat")
+	var messages []openai.ChatCompletionMessage
+	messages = append(messages, qc.startHistory...)
+
+	for _, content := range contents {
+		for _, part := range content.Parts {
+			if text, ok := part.(genai.Text); ok {
+				messages = append(messages, openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleUser,
+					Content: string(text),
+				})
+			}
+		}
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model:    qc.modelName,
+		Messages: messages,
+	}
+
+	ctx := context.Background()
+	resp, err := qc.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Qwen chat completion: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from Qwen API")
+	}
+
+	// Convert openai.ChatCompletionResponse to genai.GenerateContentResponse
+	var genaiParts []genai.Part
+	genaiParts = append(genaiParts, genai.Text(resp.Choices[0].Message.Content))
+
+	return &genai.GenerateContentResponse{
+		Candidates: []*genai.Candidate{
+			{
+				Content: &genai.Content{
+					Parts: genaiParts,
+					Role:  "model",
+				},
+			},
+		},
+	}, nil
 }
 
 func (qc *QwenChat) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
@@ -158,10 +200,44 @@ func (qc *QwenChat) ListModels() ([]string, error) {
 }
 
 func (qc *QwenChat) GetHistory() ([]*genai.Content, error) {
-	// This would require converting openai.ChatCompletionMessage back to genai.Content.
-	return nil, fmt.Errorf("GetHistory not implemented for QwenChat")
+	var history []*genai.Content
+	for _, msg := range qc.startHistory {
+		history = append(history, &genai.Content{
+			Role:  msg.Role,
+			Parts: []genai.Part{genai.Text(msg.Content)},
+		})
+	}
+	return history, nil
 }
 
 func (qc *QwenChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	return nil, fmt.Errorf("CompressChat not implemented for QwenChat")
+	if len(qc.startHistory) <= 2 {
+		return nil, fmt.Errorf("no conversation found to compress")
+	}
+
+	var summaryPrompt string
+	for _, msg := range qc.startHistory {
+		summaryPrompt += fmt.Sprintf("%s: %s\n", msg.Role, msg.Content)
+	}
+	summaryPrompt = "Summarize the following conversation:\n\n" + summaryPrompt
+
+	summaryContent := &genai.Content{
+		Parts: []genai.Part{genai.Text(summaryPrompt)},
+	}
+
+	resp, err := qc.GenerateContent(summaryContent)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary for Qwen: %w", err)
+	}
+
+	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
+			qc.startHistory = []openai.ChatCompletionMessage{
+				{Role: "model", Content: string(text)},
+			}
+		}
+	}
+
+	// Token counting is not implemented for Qwen, so we return a nil result.
+	return nil, nil
 }

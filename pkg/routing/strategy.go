@@ -14,10 +14,11 @@ type RoutingDecision struct {
 
 // RoutingContext is the context provided to the router.
 type RoutingContext struct {
-	History    []string
-	Request    string
-	Signal     context.Context
-	IsFallback bool
+	History      []string
+	Request      string
+	Signal       context.Context
+	IsFallback   bool
+	ExecutorType string
 }
 
 // RoutingStrategy is the interface for all routing strategies.
@@ -88,7 +89,12 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 		return nil, nil // Cannot suggest if we don't know the current model.
 	}
 
-	suggestedModel, ok := getSuggestedModel(currentModel.(string))
+	suggester, ok := modelSuggesters[ctx.ExecutorType]
+	if !ok {
+		return nil, nil // No suggester for this executor type.
+	}
+
+	suggestedModel, ok := suggester(currentModel.(string))
 	if !ok {
 		return nil, nil // No suggestion available.
 	}
@@ -102,19 +108,52 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 	}, nil
 }
 
-func getSuggestedModel(currentModel string) (string, bool) {
-	// This logic can be expanded for other executors.
-	// For now, it's focused on Gemini.
-	parts := strings.Split(currentModel, "/")
-	modelName := parts[len(parts)-1]
+var modelSuggesters = map[string]func(string) (string, bool){
+	"gemini": func(currentModel string) (string, bool) {
+		parts := strings.Split(currentModel, "/")
+		modelName := parts[len(parts)-1]
 
-	switch {
-	case strings.Contains(modelName, "pro"):
-		return "gemini-1.5-flash", true
-	case strings.Contains(modelName, "flash"):
-		return "gemini-1.5-flash-latest", true // Or some other lighter model
-	default:
-		return "", false
+		switch {
+		case strings.Contains(modelName, "pro"):
+			return "gemini-1.5-flash", true
+		case strings.Contains(modelName, "flash"):
+			return "gemini-1.5-flash-latest", true
+		default:
+			return "", false
+		}
+	},
+	"qwen": func(currentModel string) (string, bool) {
+		switch {
+		case strings.Contains(currentModel, "max"):
+			return "qwen-plus", true
+		case strings.Contains(currentModel, "plus"):
+			return "qwen-turbo", true
+		default:
+			return "", false
+		}
+	},
+}
+
+// ClassifierStrategy suggests a model based on the content of the request.
+type ClassifierStrategy struct{}
+
+func (s *ClassifierStrategy) Name() string {
+	return "classifier"
+}
+
+func (s *ClassifierStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
+	// Simplified heuristic: if the request contains "code", use a more powerful model.
+	if strings.Contains(strings.ToLower(ctx.Request), "code") {
+		// This could be made more generic, e.g., by getting the "powerful" model from config.
+		return &RoutingDecision{
+			Model: "gemini-1.5-pro",
+			Metadata: map[string]interface{}{
+				"source":    s.Name(),
+				"reasoning": "Request contains 'code', suggesting a more powerful model.",
+			},
+		}, nil
 	}
+
+	return nil, nil // Pass to the next strategy.
 }
 

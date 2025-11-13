@@ -45,7 +45,7 @@ func NewModelRouterService(cfg types.Config) *ModelRouterService {
 	strategy := NewCompositeStrategy(
 		&FallbackStrategy{},
 		&OverrideStrategy{},
-		// &ClassifierStrategy{}, // To be implemented
+		&ClassifierStrategy{},
 		&DefaultStrategy{},
 	)
 	return &ModelRouterService{

@@ -286,10 +286,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case types.FinalResponseEvent:
 			m.messages = append(m.messages, BotMessage{Content: event.Content})
 		case types.ErrorEvent:
+			telemetry.LogDebugf("Received error event: %#v", event.Err)
 			m.messages = append(m.messages, ErrorMessage{Err: event.Err})
 			// Check for a model suggestion
 			routingCtx := &routing.RoutingContext{
-				IsFallback: true,
+				IsFallback:   true,
+				ExecutorType: m.executorType,
 			}
 			decision, err := m.router.Route(routingCtx, m.config)
 			if err == nil && decision != nil {

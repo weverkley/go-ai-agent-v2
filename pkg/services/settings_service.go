@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 
+	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -206,12 +208,62 @@ func (ss *SettingsService) Set(key string, value interface{}) error {
 	switch key {
 	case "model":
 		if v, ok := value.(string); ok {
+			// Validate model against current executor's supported models
+			currentExecutorVal, found := ss.Get("executor")
+			if !found {
+				return fmt.Errorf("cannot validate model: executor setting not found")
+			}
+			currentExecutorType, ok := currentExecutorVal.(string)
+			if !ok {
+				return fmt.Errorf("cannot validate model: executor setting is not a string")
+			}
+
+			// Create a temporary config for the executor factory
+			tempConfigParams := &config.ConfigParameters{
+				ModelName: v, // The model we are trying to set
+			}
+			tempConfig := config.NewConfig(tempConfigParams)
+
+			factory, err := core.NewExecutorFactory(currentExecutorType, tempConfig)
+			if err != nil {
+				return fmt.Errorf("failed to create executor factory for validation: %w", err)
+			}
+			tempExecutor, err := factory.NewExecutor(tempConfig, types.GenerateContentConfig{}, nil)
+			if err != nil {
+				return fmt.Errorf("failed to create temporary executor for model validation: %w", err)
+			}
+
+			supportedModels, err := tempExecutor.ListModels()
+			if err != nil {
+				return fmt.Errorf("failed to list models for validation: %w", err)
+			}
+
+			foundModel := false
+			for _, sm := range supportedModels {
+				if sm == v {
+					foundModel = true
+					break
+				}
+			}
+			if !foundModel {
+				return fmt.Errorf("model '%s' is not supported by the current executor '%s'. Supported models: %v", v, currentExecutorType, supportedModels)
+			}
+
 			ss.settings.Model = v
 		} else {
 			return fmt.Errorf("invalid type for model setting, expected string")
 		}
 	case "executor":
 		if v, ok := value.(string); ok {
+			// Validate executor type
+			supportedExecutors := map[string]bool{
+				"gemini": true,
+				"qwen":   true,
+				"mock":   true,
+			}
+			if !supportedExecutors[v] {
+				return fmt.Errorf("unsupported executor type '%s'. Supported types: gemini, qwen, mock", v)
+			}
 			ss.settings.Executor = v
 		} else {
 			return fmt.Errorf("invalid type for executor setting, expected string")

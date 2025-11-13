@@ -24,9 +24,10 @@ func (f *GeminiExecutorFactory) NewExecutor(cfg types.Config, generationConfig t
 	// For now, we'll create a simple context. This will need to be updated
 	// to use the actual chat history and user request.
 	routingCtx := &routing.RoutingContext{
-		History: []string{},
-		Request: "dummy request",
-		Signal:  context.Background(),
+		History:      []string{},
+		Request:      "dummy request",
+		Signal:       context.Background(),
+		ExecutorType: "gemini",
 	}
 
 	decision, err := f.Router.Route(routingCtx, cfg)
