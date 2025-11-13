@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
+	"strings"
 )
 
 // RoutingDecision is the output of a routing decision.
@@ -16,6 +17,7 @@ type RoutingContext struct {
 	History    []string
 	Request    string
 	Signal     context.Context
+	IsFallback bool
 }
 
 // RoutingStrategy is the interface for all routing strategies.
@@ -77,6 +79,42 @@ func (s *FallbackStrategy) Name() string {
 }
 
 func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
-	// TODO: Implement fallback logic. For now, we'll just pass.
-	return nil, nil
+	if !ctx.IsFallback {
+		return nil, nil // Not a fallback scenario, pass to the next strategy.
+	}
+
+	currentModel, ok := cfg.Get("model")
+	if !ok {
+		return nil, nil // Cannot suggest if we don't know the current model.
+	}
+
+	suggestedModel, ok := getSuggestedModel(currentModel.(string))
+	if !ok {
+		return nil, nil // No suggestion available.
+	}
+
+	return &RoutingDecision{
+		Model: suggestedModel,
+		Metadata: map[string]interface{}{
+			"source":    s.Name(),
+			"reasoning": "Suggesting a fallback model due to an error.",
+		},
+	}, nil
 }
+
+func getSuggestedModel(currentModel string) (string, bool) {
+	// This logic can be expanded for other executors.
+	// For now, it's focused on Gemini.
+	parts := strings.Split(currentModel, "/")
+	modelName := parts[len(parts)-1]
+
+	switch {
+	case strings.Contains(modelName, "pro"):
+		return "gemini-1.5-flash", true
+	case strings.Contains(modelName, "flash"):
+		return "gemini-1.5-flash-latest", true // Or some other lighter model
+	default:
+		return "", false
+	}
+}
+

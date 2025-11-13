@@ -1,12 +1,12 @@
 package ui
 
 import (
+	"bytes"
 	"fmt"
-	"io"
-	"os" // Corrected line
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -76,6 +76,14 @@ func (msg ErrorMessage) Render(m *ChatModel) string {
 	return m.errorStyle.Render(fmt.Sprintf("Error: %v", msg.Err))
 }
 
+type SuggestionMessage struct {
+	Content string
+}
+
+func (msg SuggestionMessage) Render(m *ChatModel) string {
+	return m.suggestionStyle.Render(msg.Content)
+}
+
 // --- Bubble Tea Message types ---
 type streamChannelMsg struct{ ch <-chan any }
 type streamEventMsg struct{ event any }
@@ -83,68 +91,100 @@ type streamErrorMsg struct{ err error }
 type streamFinishMsg struct{}
 
 type ChatModel struct {
+
 	viewport        viewport.Model
+
 	textarea        textarea.Model
+
 	spinner         spinner.Model
+
 	messages        []Message
+
 	executor        core.Executor
+
+	executorType    string
+
+	config          types.Config
+
+	router          *routing.ModelRouterService
+
 	streamCh        <-chan any
+
 	isStreaming     bool
+
 	status          string
+
 	err             error
+
 	title           string
+
 	rootCmd         *cobra.Command // Add this line
+
 	activeToolCalls map[string]*ToolCallStatus
 
+
+
 	// Styles
-	senderStyle lipgloss.Style
-	botStyle    lipgloss.Style
-	toolStyle   lipgloss.Style
-	errorStyle  lipgloss.Style
-	statusStyle lipgloss.Style
-	titleStyle  lipgloss.Style
+
+	senderStyle     lipgloss.Style
+
+	botStyle        lipgloss.Style
+
+	toolStyle       lipgloss.Style
+
+	errorStyle      lipgloss.Style
+
+	statusStyle     lipgloss.Style
+
+	titleStyle      lipgloss.Style
+
+	suggestionStyle lipgloss.Style
+
 }
-
-func NewChatModel(executor core.Executor, rootCmd *cobra.Command) *ChatModel {
-	ta := textarea.New()
-	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
-	ta.Focus()
-	ta.Prompt = "┃ "
-	ta.CharLimit = 0 // No limit
-	ta.SetWidth(80)
-	ta.SetHeight(3)
-	ta.ShowLineNumbers = false
-	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-
-	vp := viewport.New(80, 20)
-	vp.Style = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62"))
-
-	s := spinner.New()
-	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-
-	return &ChatModel{
-		viewport:        vp,
-		textarea:        ta,
-		spinner:         s,
-		messages:        []Message{},
-		executor:        executor,
-		isStreaming:     false,
-		status:          "Ready",
-		title:           "Go AI Agent Chat",
-		rootCmd:         rootCmd, // Initialize the new field
-		activeToolCalls: make(map[string]*ToolCallStatus),
-		senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),   // User
-		botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),   // Bot
-		toolStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
-		errorStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
-		statusStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		titleStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
+	
+	func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, rootCmd *cobra.Command) *ChatModel {
+		ta := textarea.New()
+		ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
+		ta.Focus()
+		ta.Prompt = "┃ "
+		ta.CharLimit = 0 // No limit
+		ta.SetWidth(80)
+		ta.SetHeight(3)
+		ta.ShowLineNumbers = false
+		ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+	
+		vp := viewport.New(80, 20)
+		vp.Style = lipgloss.NewStyle().
+			BorderStyle(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("62"))
+	
+		s := spinner.New()
+		s.Spinner = spinner.Dot
+		s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	
+		return &ChatModel{
+			viewport:        vp,
+			textarea:        ta,
+			spinner:         s,
+			messages:        []Message{},
+			executor:        executor,
+			executorType:    executorType,
+			config:          config,
+			router:          router,
+			isStreaming:     false,
+			status:          "Ready",
+			title:           "Go AI Agent Chat",
+			rootCmd:         rootCmd, // Initialize the new field
+			activeToolCalls: make(map[string]*ToolCallStatus),
+			senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),   // User
+			botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),   // Bot
+			toolStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
+			errorStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+			statusStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+			titleStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
+			suggestionStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		}
 	}
-}
-
 func (m *ChatModel) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.spinner.Tick)
 }
@@ -189,6 +229,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if strings.HasPrefix(userInput, "/") {
+				m.messages = append(m.messages, UserMessage{Content: userInput})
+				m.updateViewport()
 				return m.handleSlashCommand(userInput)
 			}
 
@@ -245,6 +287,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messages = append(m.messages, BotMessage{Content: event.Content})
 		case types.ErrorEvent:
 			m.messages = append(m.messages, ErrorMessage{Err: event.Err})
+			// Check for a model suggestion
+			routingCtx := &routing.RoutingContext{
+				IsFallback: true,
+			}
+			decision, err := m.router.Route(routingCtx, m.config)
+			if err == nil && decision != nil {
+				suggestion := fmt.Sprintf("Model error. Suggestion: switch to '%s'. Use '/settings set model %s' to switch.", decision.Model, decision.Model)
+				m.messages = append(m.messages, SuggestionMessage{Content: suggestion})
+			}
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
@@ -301,37 +352,36 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	commandString := strings.TrimPrefix(input, "/")
 	args := strings.Fields(commandString)
 
-	// Debug logging
-	fmt.Fprintf(os.Stderr, "DEBUG: Executing command: %s with args: %v\n", commandString, args)
+	telemetry.LogDebugf("Executing command: %s with args: %v", commandString, args)
 
 	// Create a buffer to capture stdout and stderr
-	oldStdout := os.Stdout
-	oldStderr := os.Stderr
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-	os.Stderr = w
+	var buffer bytes.Buffer
+	m.rootCmd.SetOut(&buffer)
+	m.rootCmd.SetErr(&buffer)
 
 	// Execute the Cobra command
 	m.rootCmd.SetArgs(args)
 	err := m.rootCmd.Execute()
 
-	w.Close()
-	out, _ := io.ReadAll(r)
-	os.Stdout = oldStdout
-	os.Stderr = oldStderr
+	// Restore default output
+	m.rootCmd.SetOut(nil)
+	m.rootCmd.SetErr(nil)
 
-	// Debug logging
-	fmt.Fprintf(os.Stderr, "DEBUG: Command execution error: %v\n", err)
-	fmt.Fprintf(os.Stderr, "DEBUG: Captured output: %s\n", string(out))
+	telemetry.LogDebugf("Command execution error: %v", err)
+	telemetry.LogDebugf("Captured output: %s", buffer.String())
 
 	if err != nil {
-		m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("command execution error: %v", err)})
-	} else {
-		output := strings.TrimSpace(string(out))
-		if output != "" {
-			m.messages = append(m.messages, BotMessage{Content: output})
-		}
+		// The error is already in the buffer, but we can add a more specific message if we want.
+		// For now, we'll just display the buffer's content.
 	}
+
+	output := strings.TrimSpace(buffer.String())
+	if output != "" {
+		m.messages = append(m.messages, BotMessage{Content: output})
+	} else if err == nil {
+		m.messages = append(m.messages, BotMessage{Content: "Command executed successfully."})
+	}
+
 
 	// Handle specific commands that might require UI changes
 	if len(args) > 0 {
@@ -340,9 +390,12 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 			m.messages = []Message{}
 		case "quit", "exit":
 			return m, tea.Quit
+		case "settings":
+			m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
 		}
 	}
 
+	m.textarea.Reset()
 	m.updateViewport()
 	return m, nil
 }

@@ -6,6 +6,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
 
@@ -49,7 +50,8 @@ var chatCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		p := tea.NewProgram(ui.NewChatModel(executor, RootCmd)) // Pass RootCmd here
+		router := routing.NewModelRouterService(appConfig)
+		p := tea.NewProgram(ui.NewChatModel(executor, executorType, appConfig, router, RootCmd), tea.WithAltScreen()) // Pass RootCmd here
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error running interactive chat: %v\n", err)
 			os.Exit(1)

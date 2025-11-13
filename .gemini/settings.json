@@ -1,4 +1,9 @@
 {
+  "extensionPaths": [
+    "/home/wever-kley/Workspace/go-ai-agent-v2/.gemini/extensions"
+  ],
+  "approvalMode": "DEFAULT",
+  "model": "gemini-flash",
   "telemetry": {
     "enabled": true,
     "outfile": ".gemini/tmp/gemini-debug.log",
