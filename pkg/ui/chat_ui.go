@@ -29,7 +29,7 @@ type UserMessage struct {
 }
 
 func (msg UserMessage) Render(m *ChatModel) string {
-	return m.senderStyle.Render("You: ") + msg.Content
+	return m.senderStyle.Render("You: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
 }
 
 type BotMessage struct {
@@ -37,7 +37,7 @@ type BotMessage struct {
 }
 
 func (msg BotMessage) Render(m *ChatModel) string {
-	return m.botStyle.Render("Bot: ") + msg.Content
+	return m.botStyle.Render("Bot: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
 }
 
 type ToolCallStatus struct {
@@ -73,7 +73,7 @@ type ErrorMessage struct {
 }
 
 func (msg ErrorMessage) Render(m *ChatModel) string {
-	return m.errorStyle.Render(fmt.Sprintf("Error: %v", msg.Err))
+	return m.errorStyle.Width(m.viewport.Width - 10).Render(fmt.Sprintf("Error: %v", msg.Err))
 }
 
 type SuggestionMessage struct {
@@ -81,7 +81,7 @@ type SuggestionMessage struct {
 }
 
 func (msg SuggestionMessage) Render(m *ChatModel) string {
-	return m.suggestionStyle.Render(msg.Content)
+	return m.suggestionStyle.Width(m.viewport.Width - 10).Render(msg.Content)
 }
 
 // --- Bubble Tea Message types ---
