@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -195,6 +196,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateViewport()
 			m.isStreaming = true
 			m.status = "Sending..."
+			telemetry.LogDebugf("Sending user input to executor: %s", userInput)
 			return m, startStreaming(m.executor, userInput)
 		}
 
@@ -204,6 +206,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForEvent(m.streamCh)
 
 	case streamEventMsg:
+		telemetry.LogDebugf("Received stream event: %T", msg.event)
 		switch event := msg.event.(type) {
 		case types.StreamingStartedEvent:
 			m.status = "Stream started..."
@@ -240,6 +243,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case types.FinalResponseEvent:
 			m.messages = append(m.messages, BotMessage{Content: event.Content})
+		case types.ErrorEvent:
+			m.messages = append(m.messages, ErrorMessage{Err: event.Err})
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events

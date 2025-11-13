@@ -20,3 +20,8 @@ func LogAgentStart(event types.AgentStartEvent) {
 func LogAgentFinish(event types.AgentFinishEvent) {
 	GlobalLogger.LogAgentFinish(event)
 }
+
+// LogDebugf logs a debug message.
+func LogDebugf(format string, args ...interface{}) {
+	GlobalLogger.LogDebugf(format, args...)
+}

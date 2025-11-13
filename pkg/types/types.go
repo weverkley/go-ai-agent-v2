@@ -645,6 +645,7 @@ type TelemetrySettings struct {
 	LogPrompts   bool   `json:"logPrompts,omitempty"`
 	Outfile      string `json:"outfile,omitempty"`
 	UseCollector bool   `json:"useCollector,omitempty"`
+	LogLevel     string `json:"logLevel,omitempty"`
 }
 
 // Streaming Event types for the UI

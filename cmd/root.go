@@ -92,6 +92,9 @@ func init() {
 	// Initialize settingsService here
 	SettingsService = services.NewSettingsService(projectRoot)
 
+	// Get telemetry settings
+	telemetrySettings := SettingsService.GetTelemetrySettings()
+
 	// Initialize extensionsCliCommand here
 	extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
 	// Register all tools
@@ -108,6 +111,11 @@ func init() {
 		},
 		// Add other parameters as needed
 		ToolRegistry: toolRegistry, // Pass the populated toolRegistry
+	}
+
+	// Merge loaded settings
+	if telemetrySettings != nil {
+		params.Telemetry = telemetrySettings
 	}
 
 	// Create the final Config instance

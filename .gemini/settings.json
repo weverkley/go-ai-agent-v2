@@ -1,7 +1,7 @@
 {
-  "my-test-extension": {
-    "name": "my-test-extension",
-    "description": "",
-    "enabled": true
+  "telemetry": {
+    "enabled": true,
+    "outfile": ".gemini/tmp/gemini-debug.log",
+    "logLevel": "debug"
   }
 }

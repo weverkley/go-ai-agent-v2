@@ -28,6 +28,7 @@ type Settings struct {
 	EnabledExtensions map[types.SettingScope][]string `json:"enabledExtensions,omitempty"`
 	ToolDiscoveryCommand string `json:"toolDiscoveryCommand,omitempty"`
 	ToolCallCommand      string `json:"toolCallCommand,omitempty"`
+	Telemetry      *types.TelemetrySettings       `json:"telemetry,omitempty"`
 }
 
 // LoadSettings loads the application settings from various sources.
@@ -49,6 +50,9 @@ func LoadSettings(workspaceDir string) *Settings {
 			EnabledExtensions: make(map[types.SettingScope][]string),
 			ToolDiscoveryCommand: "",
 			ToolCallCommand:      "",
+			Telemetry: &types.TelemetrySettings{
+				Enabled: false,
+			},
 		}
 	}
 
@@ -69,6 +73,9 @@ func LoadSettings(workspaceDir string) *Settings {
 			EnabledExtensions: make(map[types.SettingScope][]string),
 			ToolDiscoveryCommand: "",
 			ToolCallCommand:      "",
+			Telemetry: &types.TelemetrySettings{
+				Enabled: false,
+			},
 		}
 	}
 
@@ -93,6 +100,11 @@ func LoadSettings(workspaceDir string) *Settings {
 	}
 	if settings.ToolCallCommand == "" {
 		settings.ToolCallCommand = ""
+	}
+	if settings.Telemetry == nil {
+		settings.Telemetry = &types.TelemetrySettings{
+			Enabled: false,
+		}
 	}
 
 	return &settings
@@ -168,6 +180,13 @@ func (ss *SettingsService) Get(key string) (interface{}, bool) {
 	default:
 		return nil, false
 	}
+}
+
+// GetTelemetrySettings returns the telemetry settings.
+func (ss *SettingsService) GetTelemetrySettings() *types.TelemetrySettings {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.Telemetry
 }
 
 // Set sets the value of a specific setting.

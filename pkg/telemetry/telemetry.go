@@ -15,6 +15,7 @@ type TelemetryLogger interface {
 	LogAgentStart(event types.AgentStartEvent)
 	LogAgentFinish(event types.AgentFinishEvent)
 	LogErrorf(format string, args ...interface{})
+	LogDebugf(format string, args ...interface{})
 }
 
 // noopTelemetryLogger is a no-operation implementation of TelemetryLogger.
@@ -22,20 +23,23 @@ type noopTelemetryLogger struct{}
 
 func (l *noopTelemetryLogger) LogAgentStart(event types.AgentStartEvent) {}
 func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent) {}
-func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{}) {}
+func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{})    {}
+func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{})    {}
 
 // fileTelemetryLogger logs telemetry events to a specified file.
 type fileTelemetryLogger struct {
 	mu       sync.Mutex
 	filePath string
 	enabled  bool
+	logLevel string
 }
 
 // NewFileTelemetryLogger creates a new fileTelemetryLogger.
-func NewFileTelemetryLogger(filePath string, enabled bool) *fileTelemetryLogger {
+func NewFileTelemetryLogger(filePath string, enabled bool, logLevel string) *fileTelemetryLogger {
 	return &fileTelemetryLogger{
 		filePath: filePath,
 		enabled:  enabled,
+		logLevel: logLevel,
 	}
 }
 
@@ -122,6 +126,26 @@ func (l *fileTelemetryLogger) LogErrorf(format string, args ...interface{}) {
 	l.writeLog(data)
 }
 
+func (l *fileTelemetryLogger) LogDebugf(format string, args ...interface{}) {
+	if !l.enabled || l.logLevel != "debug" {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	logEntry := map[string]interface{}{
+		"type":      "Debug",
+		"message":   fmt.Sprintf(format, args...),
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling debug log entry: %v\n", err)
+		return
+	}
+	l.writeLog(data)
+}
+
 // NewTelemetryLogger creates a TelemetryLogger based on the provided telemetry settings.
 func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
 	if settings == nil || !settings.Enabled {
@@ -129,7 +153,7 @@ func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
 	}
 
 	if settings.Outfile != "" {
-		return NewFileTelemetryLogger(settings.Outfile, true)
+		return NewFileTelemetryLogger(settings.Outfile, true, settings.LogLevel)
 	}
 
 	// Default to no-op logger if no specific logger is configured

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -327,12 +328,14 @@ func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatComp
 
 // GenerateStream generates content and streams events back to the caller.
 func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, error) {
+	telemetry.LogDebugf("GenerateStream called")
 	eventChan := make(chan any)
 
 	go func() {
 		defer close(eventChan)
 
 		ctx := context.Background()
+		telemetry.LogDebugf("Sending StreamingStartedEvent")
 		eventChan <- types.StreamingStartedEvent{}
 
 		cs := gc.model.StartChat()
@@ -347,6 +350,7 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 			parts = append(parts, content.Parts...)
 		}
 
+		telemetry.LogDebugf("Sending ThinkingEvent")
 		eventChan <- types.ThinkingEvent{}
 		iter := cs.SendMessageStream(ctx, parts...)
 
@@ -357,6 +361,7 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 				break
 			}
 			if err != nil {
+				telemetry.LogDebugf("Sending ErrorEvent: %v", err)
 				eventChan <- types.ErrorEvent{Err: err}
 				return
 			}
@@ -370,6 +375,7 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 						gc.toolCallCounter++
 						toolCallID := fmt.Sprintf("tool-call-%d", gc.toolCallCounter)
 
+						telemetry.LogDebugf("Sending ToolCallStartEvent: %s", p.Name)
 						eventChan <- types.ToolCallStartEvent{
 							ToolCallID: toolCallID,
 							ToolName:   p.Name,
@@ -378,6 +384,7 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 
 						toolResult, err := gc.ExecuteTool(p)
 
+						telemetry.LogDebugf("Sending ToolCallEndEvent: %s", p.Name)
 						eventChan <- types.ToolCallEndEvent{
 							ToolCallID: toolCallID,
 							ToolName:   p.Name,
@@ -398,6 +405,7 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 			}
 		}
 
+		telemetry.LogDebugf("Sending FinalResponseEvent")
 		eventChan <- types.FinalResponseEvent{Content: accumulatedText}
 	}()
 
