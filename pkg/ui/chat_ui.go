@@ -17,7 +17,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra" // Add this line
 )
@@ -66,27 +66,73 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 	}
 	sort.Strings(ids)
 
-	for _, id := range ids {
+	for i, id := range ids {
 		tc := msg.ToolCalls[id]
-		var status string
+		var boxContent strings.Builder
+
+		// --- Legend Line ---
+		iconColor := lipgloss.Color("208") // Default/Executing color (Orange)
+		var statusIcon string
 		switch tc.Status {
 		case "Executing":
-			status = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Render("Executing...")
+			statusIcon = "⏳"
 		case "Completed":
 			if tc.Err != nil {
-				status = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("❌ Error")
+				statusIcon = "❌"
+				iconColor = lipgloss.Color("9") // Red
 			} else {
-				status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✅ Done")
+				statusIcon = "✅"
+				iconColor = lipgloss.Color("10") // Green
 			}
 		default:
-			status = tc.Status
+			statusIcon = "•"
 		}
 
+		actionWordStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6")) // Blue
+		argumentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15"))  // White
+
+		var actionWord, argument string
+		switch tc.ToolName {
+		case "execute_command":
+			actionWord = "Running:"
+			if cmd, ok := tc.Args["command"].(string); ok {
+				argument = cmd
+			}
+		case "write_file":
+			actionWord = "Writing to:"
+			if path, ok := tc.Args["file_path"].(string); ok {
+				argument = path
+			}
+		case "read_file":
+			actionWord = "Reading:"
+			if path, ok := tc.Args["file_path"].(string); ok {
+				argument = path
+			}
+		case "web_search":
+			actionWord = "Searching:"
+			if query, ok := tc.Args["query"].(string); ok {
+				argument = query
+			}
+		default:
+			actionWord = tc.ToolName + ":"
+			argument = fmt.Sprintf("%v", tc.Args)
+			if len(argument) > 60 {
+				argument = argument[:57] + "..."
+			}
+		}
+
+		legend := fmt.Sprintf("%s %s %s",
+			lipgloss.NewStyle().Foreground(iconColor).Render(statusIcon),
+			actionWordStyle.Render(actionWord),
+			argumentStyle.Render(argument),
+		)
+		boxContent.WriteString(legend)
+
+		// --- Special Content (for write_file) ---
 		if tc.ToolName == "write_file" && tc.Args != nil {
 			content, _ := tc.Args["content"].(string)
 			filePath, _ := tc.Args["file_path"].(string)
 
-			// Truncate content to 6 lines
 			lines := strings.Split(content, "\n")
 			if len(lines) > 6 {
 				lines = lines[:6]
@@ -94,7 +140,6 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 			}
 			truncatedContent := strings.Join(lines, "\n")
 
-			// Syntax highlighting
 			lexer := lexers.Match(filePath)
 			if lexer == nil {
 				lexer = lexers.Analyse(truncatedContent)
@@ -108,42 +153,27 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 			}
 			formatter := formatters.Get("terminal256")
 			iterator, err := lexer.Tokenise(nil, truncatedContent)
-			if err != nil {
-				// Fallback to plain text on error
-				builder.WriteString(fmt.Sprintf("- [%s] %s(%s)\n", status, tc.ToolName, filePath))
-				continue
+			if err == nil {
+				var highlightedContent strings.Builder
+				if formatter.Format(&highlightedContent, style, iterator) == nil {
+					boxContent.WriteString("\n\n") // Add a newline to separate legend from code
+					boxContent.WriteString(highlightedContent.String())
+				}
 			}
+		}
 
-			var highlightedContent strings.Builder
-			err = formatter.Format(&highlightedContent, style, iterator)
-			if err != nil {
-				// Fallback to plain text on error
-				builder.WriteString(fmt.Sprintf("- [%s] %s(%s)\n", status, tc.ToolName, filePath))
-				continue
-			}
+		// --- Box Rendering ---
+		contentWidth := m.viewport.Width - 6
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			Padding(0, 1).
+			Width(contentWidth).
+			Render(boxContent.String())
 
-			// Calculate the width for the content inside the box
-			contentWidth := m.viewport.Width - 6 // 2 for viewport border, 2 for box border, 2 for box padding
-
-			// Render highlighted content with the calculated width
-			renderedHighlightedContent := lipgloss.NewStyle().Width(contentWidth).Render(highlightedContent.String())
-
-			// Boxed view
-			box := lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("240")).
-				Padding(0, 1).
-				Render(renderedHighlightedContent) // Render the box around the width-constrained content
-
-			builder.WriteString(fmt.Sprintf("- [%s] %s(%s):\n%s\n", status, tc.ToolName, filePath, box))
-
-		} else {
-			argsStr := fmt.Sprintf("%v", tc.Args)
-			if len(argsStr) > 60 {
-				argsStr = argsStr[:57] + "..."
-			}
-			indentedLine := fmt.Sprintf("- [%s] %s(%s)", status, tc.ToolName, argsStr)
-			builder.WriteString(indentedLine + "\n")
+		builder.WriteString(box)
+		if i < len(ids)-1 {
+			builder.WriteString("\n")
 		}
 	}
 	return builder.String()
@@ -172,100 +202,96 @@ type streamErrorMsg struct{ err error }
 type streamFinishMsg struct{}
 
 type ChatModel struct {
+	viewport viewport.Model
 
-	viewport        viewport.Model
+	textarea textarea.Model
 
-	textarea        textarea.Model
+	spinner spinner.Model
 
-	spinner         spinner.Model
+	messages []Message
 
-	messages        []Message
+	executor core.Executor
 
-	executor        core.Executor
+	executorType string
 
-	executorType    string
+	config types.Config
 
-	config          types.Config
+	router *routing.ModelRouterService
 
-	router          *routing.ModelRouterService
+	streamCh <-chan any
 
-	streamCh        <-chan any
+	isStreaming bool
 
-	isStreaming     bool
+	status string
 
-	status          string
+	err error
 
-	err             error
+	title string
 
-	title           string
-
-	rootCmd         *cobra.Command // Add this line
+	rootCmd *cobra.Command // Add this line
 
 	activeToolCalls map[string]*ToolCallStatus
 
-
-
 	// Styles
 
-	senderStyle     lipgloss.Style
+	senderStyle lipgloss.Style
 
-	botStyle        lipgloss.Style
+	botStyle lipgloss.Style
 
-	toolStyle       lipgloss.Style
+	toolStyle lipgloss.Style
 
-	errorStyle      lipgloss.Style
+	errorStyle lipgloss.Style
 
-	statusStyle     lipgloss.Style
+	statusStyle lipgloss.Style
 
-	titleStyle      lipgloss.Style
+	titleStyle lipgloss.Style
 
 	suggestionStyle lipgloss.Style
-
 }
-	
-	func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, rootCmd *cobra.Command) *ChatModel {
-		ta := textarea.New()
-		ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
-		ta.Focus()
-		ta.Prompt = "┃ "
-		ta.CharLimit = 0 // No limit
-		ta.SetWidth(80)
-		ta.SetHeight(3)
-		ta.ShowLineNumbers = false
-		ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
-	
-		vp := viewport.New(80, 20)
-		vp.Style = lipgloss.NewStyle().
-			BorderStyle(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("62"))
-	
-		s := spinner.New()
-		s.Spinner = spinner.Dot
-		s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	
-		return &ChatModel{
-			viewport:        vp,
-			textarea:        ta,
-			spinner:         s,
-			messages:        []Message{},
-			executor:        executor,
-			executorType:    executorType,
-			config:          config,
-			router:          router,
-			isStreaming:     false,
-			status:          "Ready",
-			title:           "Go AI Agent Chat",
-			rootCmd:         rootCmd, // Initialize the new field
-			activeToolCalls: make(map[string]*ToolCallStatus),
-			senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),   // User
-			botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),   // Bot
-			toolStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
-			errorStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
-			statusStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-			titleStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
-			suggestionStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
-		}
+
+func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, rootCmd *cobra.Command) *ChatModel {
+	ta := textarea.New()
+	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
+	ta.Focus()
+	ta.Prompt = "┃ "
+	ta.CharLimit = 0 // No limit
+	ta.SetWidth(80)
+	ta.SetHeight(3)
+	ta.ShowLineNumbers = false
+	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+
+	vp := viewport.New(80, 20)
+	vp.Style = lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color("62"))
+
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
+	return &ChatModel{
+		viewport:        vp,
+		textarea:        ta,
+		spinner:         s,
+		messages:        []Message{},
+		executor:        executor,
+		executorType:    executorType,
+		config:          config,
+		router:          router,
+		isStreaming:     false,
+		status:          "Ready",
+		title:           "Go AI Agent Chat",
+		rootCmd:         rootCmd, // Initialize the new field
+		activeToolCalls: make(map[string]*ToolCallStatus),
+		senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),              // User
+		botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),              // Bot
+		toolStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
+		errorStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+		statusStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		titleStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
+		suggestionStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
 	}
+}
 func (m *ChatModel) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.spinner.Tick)
 }
