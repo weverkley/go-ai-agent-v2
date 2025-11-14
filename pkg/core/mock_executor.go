@@ -119,27 +119,40 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 			}
 
 			for _, step := range steps {
-				eventChan <- types.ThinkingEvent{}
-				time.Sleep(1 * time.Second) // Simulate model thinking time
+				select {
+				case <-ctx.Done():
+					// Context was cancelled, stop streaming
+					eventChan <- types.ErrorEvent{Err: ctx.Err()}
+					return
+				default:
+					eventChan <- types.ThinkingEvent{}
+					time.Sleep(1 * time.Second) // Simulate model thinking time
 
-				eventChan <- step // Emit ToolCallStartEvent
+					eventChan <- step // Emit ToolCallStartEvent
 
-				toolResult, err := mock.ExecuteTool(ctx, &genai.FunctionCall{Name: step.ToolName, Args: step.Args})
+					toolResult, err := mock.ExecuteTool(ctx, &genai.FunctionCall{Name: step.ToolName, Args: step.Args})
 
-				time.Sleep(500 * time.Millisecond) // Simulate tool execution time
+					time.Sleep(500 * time.Millisecond) // Simulate tool execution time
 
-				eventChan <- types.ToolCallEndEvent{
-					ToolCallID: step.ToolCallID,
-					ToolName:   step.ToolName,
-					Result:     toolResult.ReturnDisplay,
-					Err:        err,
+					eventChan <- types.ToolCallEndEvent{
+						ToolCallID: step.ToolCallID,
+						ToolName:   step.ToolName,
+						Result:     toolResult.ReturnDisplay,
+						Err:        err,
+					}
 				}
 			}
 
 			// Final Response
-			eventChan <- types.ThinkingEvent{}
-			time.Sleep(1 * time.Second)
-			eventChan <- types.FinalResponseEvent{Content: "I have created the Express API in `my-express-app/index.js` and verified the contents of the files."}
+			select {
+			case <-ctx.Done():
+				eventChan <- types.ErrorEvent{Err: ctx.Err()}
+				return
+			default:
+				eventChan <- types.ThinkingEvent{}
+				time.Sleep(1 * time.Second)
+				eventChan <- types.FinalResponseEvent{Content: "I have created the Express API in `my-express-app/index.js` and verified the contents of the files."}
+			}
 		}()
 
 		return eventChan, nil
