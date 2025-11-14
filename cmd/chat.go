@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -41,10 +40,8 @@ var chatCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		params := &config.ConfigParameters{
-			ModelName: model,
-		}
-		appConfig := config.NewConfig(params)
+		// Use the global Cfg and override the model
+		appConfig := Cfg.WithModel(model)
 
 		factory, err := core.NewExecutorFactory(executorType, appConfig)
 		if err != nil {

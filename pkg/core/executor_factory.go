@@ -47,7 +47,15 @@ type MockExecutorFactory struct {
 
 // NewExecutor creates a new MockExecutor.
 func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
-	return NewExpressAPIMockExecutor(), nil
+	toolRegistryVal, ok := cfg.Get("toolRegistry")
+	if !ok {
+		return nil, fmt.Errorf("tool registry not found in config for mock executor")
+	}
+	toolRegistry, ok := toolRegistryVal.(types.ToolRegistryInterface)
+	if !ok {
+		return nil, fmt.Errorf("tool registry in config is not of expected type")
+	}
+	return NewRealisticMockExecutor(toolRegistry), nil
 }
 
 // QwenExecutorFactory is an ExecutorFactory that creates QwenChat instances.

@@ -127,6 +127,8 @@ func (c *Config) Get(key string) (interface{}, bool) {
 			return c.telemetry.Enabled, true
 		}
 		return false, true // Default to false if telemetry settings are nil
+	case "toolRegistry":
+		return c.toolRegistry, true
 	// Add more cases for other settings as needed
 	default:
 		return nil, false

@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"time"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -19,53 +20,63 @@ type MockExecutor struct {
 	SetHistoryFunc             func(history []*genai.Content) error
 	CompressChatFunc           func(promptId string, force bool) (*types.ChatCompressionResult, error)
 	GenerateStreamFunc         func(contents ...*genai.Content) (<-chan any, error)
+	toolRegistry               types.ToolRegistryInterface
 }
 
-// NewExpressAPIMockExecutor creates a mock executor that simulates creating an Express API.
-func NewExpressAPIMockExecutor() *MockExecutor {
-	mock := &MockExecutor{}
-
-	// This mock doesn't need to execute tools, as the GenerateStream mock will
-	// simulate the full lifecycle of tool calls.
-	mock.ExecuteToolFunc = func(fc *genai.FunctionCall) (types.ToolResult, error) {
-		return types.ToolResult{
-			LLMContent:    fmt.Sprintf("Successfully executed %s", fc.Name),
-			ReturnDisplay: fmt.Sprintf("Tool %s executed.", fc.Name),
-		}, nil
+// NewRealisticMockExecutor creates a mock executor that simulates a realistic workflow.
+func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExecutor {
+	mock := &MockExecutor{
+		toolRegistry: toolRegistry,
 	}
 
-	// Mock GenerateStream to follow a script of events.
+	// Implement the real ExecuteTool method
+	mock.ExecuteToolFunc = func(fc *genai.FunctionCall) (types.ToolResult, error) {
+		tool, err := mock.toolRegistry.GetTool(fc.Name)
+		if err != nil {
+			return types.ToolResult{}, err
+		}
+		return tool.Execute(fc.Args)
+	}
+
+	// Mock GenerateStream to follow a realistic script of events and execute real tools.
 	mock.GenerateStreamFunc = func(contents ...*genai.Content) (<-chan any, error) {
 		eventChan := make(chan any)
 
 		go func() {
 			defer close(eventChan)
 			eventChan <- types.StreamingStartedEvent{}
-			
-			// Step 1: mkdir
-			eventChan <- types.ThinkingEvent{}
-			eventChan <- types.ToolCallStartEvent{ToolCallID: "mock-1", ToolName: "execute_command", Args: map[string]interface{}{"command": "mkdir my-express-app"}}
-			eventChan <- types.ToolCallEndEvent{ToolCallID: "mock-1", ToolName: "execute_command", Result: "Created directory my-express-app"}
 
-			// Step 2: npm init
-			eventChan <- types.ThinkingEvent{}
-			eventChan <- types.ToolCallStartEvent{ToolCallID: "mock-2", ToolName: "execute_command", Args: map[string]interface{}{"command": "npm init -y", "path": "my-express-app"}}
-			eventChan <- types.ToolCallEndEvent{ToolCallID: "mock-2", ToolName: "execute_command", Result: "Initialized package.json"}
+			steps := []types.ToolCallStartEvent{
+				{ToolCallID: "mock-1", ToolName: "execute_command", Args: map[string]interface{}{"command": "mkdir my-express-app"}},
+				{ToolCallID: "mock-2", ToolName: "execute_command", Args: map[string]interface{}{"command": "npm init -y", "dir": "my-express-app"}},
+				{ToolCallID: "mock-3", ToolName: "read_file", Args: map[string]interface{}{"file_path": "my-express-app/package.json"}},
+				{ToolCallID: "mock-4", ToolName: "execute_command", Args: map[string]interface{}{"command": "npm install express", "dir": "my-express-app"}},
+				{ToolCallID: "mock-5", ToolName: "write_file", Args: map[string]interface{}{"file_path": "my-express-app/index.js", "content": "const express = require('express');\nconst app = express();\nconst port = 3000;\n\napp.get('/', (req, res) => {\n  res.send('Hello World!');\n});\n\napp.listen(port, () => {\n  console.log(`Example app listening on port ${port}`);\n});"}},
+				{ToolCallID: "mock-6", ToolName: "read_file", Args: map[string]interface{}{"file_path": "my-express-app/index.js"}},
+			}
 
-			// Step 3: npm install
-			eventChan <- types.ThinkingEvent{}
-			eventChan <- types.ToolCallStartEvent{ToolCallID: "mock-3", ToolName: "execute_command", Args: map[string]interface{}{"command": "npm install express", "path": "my-express-app"}}
-			eventChan <- types.ToolCallEndEvent{ToolCallID: "mock-3", ToolName: "execute_command", Result: "Installed express"}
+			for _, step := range steps {
+				eventChan <- types.ThinkingEvent{}
+				time.Sleep(1 * time.Second) // Simulate model thinking time
 
-			// Step 4: write_file
-			eventChan <- types.ThinkingEvent{}
-			serverCode := "const express = require('express');\nconst app = express();\nconst port = 3000;\n\napp.get('/', (req, res) => {\n  res.send('Hello World!');\n});\n\napp.listen(port, () => {\n  console.log(`Example app listening on port ${port}`);\n});"
-			eventChan <- types.ToolCallStartEvent{ToolCallID: "mock-4", ToolName: "write_file", Args: map[string]interface{}{"file_path": "my-express-app/index.js", "content": serverCode}}
-			eventChan <- types.ToolCallEndEvent{ToolCallID: "mock-4", ToolName: "write_file", Result: "Wrote index.js"}
+				eventChan <- step // Emit ToolCallStartEvent
 
-			// Step 5: Final Response
+				toolResult, err := mock.ExecuteTool(&genai.FunctionCall{Name: step.ToolName, Args: step.Args})
+
+				time.Sleep(500 * time.Millisecond) // Simulate tool execution time
+
+				eventChan <- types.ToolCallEndEvent{
+					ToolCallID: step.ToolCallID,
+					ToolName:   step.ToolName,
+					Result:     toolResult.ReturnDisplay,
+					Err:        err,
+				}
+			}
+
+			// Final Response
 			eventChan <- types.ThinkingEvent{}
-			eventChan <- types.FinalResponseEvent{Content: "I have created the Express API in `my-express-app/index.js`."}
+			time.Sleep(1 * time.Second)
+			eventChan <- types.FinalResponseEvent{Content: "I have created the Express API in `my-express-app/index.js` and verified the contents of the files."}
 		}()
 
 		return eventChan, nil
@@ -150,4 +161,3 @@ func (m *MockExecutor) GenerateStream(contents ...*genai.Content) (<-chan any, e
 	close(respChan)
 	return respChan, fmt.Errorf("GenerateStream not implemented in mock")
 }
-

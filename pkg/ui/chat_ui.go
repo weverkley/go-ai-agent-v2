@@ -3,6 +3,7 @@ package ui
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
@@ -10,6 +11,9 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
+	"github.com/alecthomas/chroma/v2/formatters"
+	"github.com/alecthomas/chroma/v2/lexers"
+	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
@@ -54,16 +58,93 @@ type ToolCallGroupMessage struct {
 
 func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 	var builder strings.Builder
-	builder.WriteString(m.toolStyle.Render("Tool Calls:\n"))
-	for id, tc := range msg.ToolCalls {
-		status := "Executing..."
-		if tc.Status == "Completed" {
-			status = "Done"
+
+	// Sort the keys for a stable order
+	ids := make([]string, 0, len(msg.ToolCalls))
+	for id := range msg.ToolCalls {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	for _, id := range ids {
+		tc := msg.ToolCalls[id]
+		var status string
+		switch tc.Status {
+		case "Executing":
+			status = lipgloss.NewStyle().Foreground(lipgloss.Color("208")).Render("Executing...")
+		case "Completed":
 			if tc.Err != nil {
-				status = "Error"
+				status = lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render("❌ Error")
+			} else {
+				status = lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Render("✅ Done")
 			}
+		default:
+			status = tc.Status
 		}
-		builder.WriteString(fmt.Sprintf("  - [%s] %s: %s\n", status, tc.ToolName, id))
+
+		if tc.ToolName == "write_file" && tc.Args != nil {
+			content, _ := tc.Args["content"].(string)
+			filePath, _ := tc.Args["file_path"].(string)
+
+			// Truncate content to 6 lines
+			lines := strings.Split(content, "\n")
+			if len(lines) > 6 {
+				lines = lines[:6]
+				lines = append(lines, "...")
+			}
+			truncatedContent := strings.Join(lines, "\n")
+
+			// Syntax highlighting
+			lexer := lexers.Match(filePath)
+			if lexer == nil {
+				lexer = lexers.Analyse(truncatedContent)
+			}
+			if lexer == nil {
+				lexer = lexers.Fallback
+			}
+			style := styles.Get("monokai")
+			if style == nil {
+				style = styles.Fallback
+			}
+			formatter := formatters.Get("terminal256")
+			iterator, err := lexer.Tokenise(nil, truncatedContent)
+			if err != nil {
+				// Fallback to plain text on error
+				builder.WriteString(fmt.Sprintf("- [%s] %s(%s)\n", status, tc.ToolName, filePath))
+				continue
+			}
+
+			var highlightedContent strings.Builder
+			err = formatter.Format(&highlightedContent, style, iterator)
+			if err != nil {
+				// Fallback to plain text on error
+				builder.WriteString(fmt.Sprintf("- [%s] %s(%s)\n", status, tc.ToolName, filePath))
+				continue
+			}
+
+			// Calculate the width for the content inside the box
+			contentWidth := m.viewport.Width - 6 // 2 for viewport border, 2 for box border, 2 for box padding
+
+			// Render highlighted content with the calculated width
+			renderedHighlightedContent := lipgloss.NewStyle().Width(contentWidth).Render(highlightedContent.String())
+
+			// Boxed view
+			box := lipgloss.NewStyle().
+				Border(lipgloss.RoundedBorder()).
+				BorderForeground(lipgloss.Color("240")).
+				Padding(0, 1).
+				Render(renderedHighlightedContent) // Render the box around the width-constrained content
+
+			builder.WriteString(fmt.Sprintf("- [%s] %s(%s):\n%s\n", status, tc.ToolName, filePath, box))
+
+		} else {
+			argsStr := fmt.Sprintf("%v", tc.Args)
+			if len(argsStr) > 60 {
+				argsStr = argsStr[:57] + "..."
+			}
+			indentedLine := fmt.Sprintf("- [%s] %s(%s)", status, tc.ToolName, argsStr)
+			builder.WriteString(indentedLine + "\n")
+		}
 	}
 	return builder.String()
 }
