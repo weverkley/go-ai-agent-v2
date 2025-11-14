@@ -113,6 +113,11 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 			if query, ok := tc.Args["query"].(string); ok {
 				argument = query
 			}
+		case "smart_edit": // New case for smart_edit
+			actionWord = "Smart Editing:"
+			if filePath, ok := tc.Args["file_path"].(string); ok {
+				argument = filePath
+			}
 		default:
 			actionWord = tc.ToolName + ":"
 			argument = fmt.Sprintf("%v", tc.Args)
@@ -128,19 +133,31 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 		)
 		boxContent.WriteString(legend)
 
-		// --- Special Content (for write_file) ---
-		if tc.ToolName == "write_file" && tc.Args != nil {
-			content, _ := tc.Args["content"].(string)
-			filePath, _ := tc.Args["file_path"].(string)
+		// --- Special Content (for write_file and smart_edit) ---
+		if (tc.ToolName == "write_file" || tc.ToolName == "smart_edit") && tc.Args != nil {
+			var contentToDisplay string
+			var filePathForLexer string
 
-			lines := strings.Split(content, "\n")
+			if tc.ToolName == "write_file" {
+				contentToDisplay, _ = tc.Args["content"].(string)
+				filePathForLexer, _ = tc.Args["file_path"].(string)
+			} else if tc.ToolName == "smart_edit" {
+				// For smart_edit, display the new_string and the instruction
+				instruction, _ := tc.Args["instruction"].(string)
+				newString, _ := tc.Args["new_string"].(string)
+				filePathForLexer, _ = tc.Args["file_path"].(string)
+
+				contentToDisplay = fmt.Sprintf("Instruction: %s\n\n--- NEW CONTENT ---\n%s", instruction, newString)
+			}
+
+			lines := strings.Split(contentToDisplay, "\n")
 			if len(lines) > 6 {
 				lines = lines[:6]
 				lines = append(lines, "...")
 			}
 			truncatedContent := strings.Join(lines, "\n")
 
-			lexer := lexers.Match(filePath)
+			lexer := lexers.Match(filePathForLexer)
 			if lexer == nil {
 				lexer = lexers.Analyse(truncatedContent)
 			}
