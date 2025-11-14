@@ -4,5 +4,5 @@
     "outfile": ".gemini/tmp/gemini-debug.log",
     "logLevel": "debug"
   },
-  "executor": "gemini"
+  "executor": "qwen"
 }
