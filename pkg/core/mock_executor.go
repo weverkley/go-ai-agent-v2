@@ -57,6 +57,19 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				{ToolCallID: "mock-8", ToolName: "glob", Args: map[string]interface{}{"pattern": "*.go", "path": "pkg/tools"}},
 				{ToolCallID: "mock-9", ToolName: "list_directory", Args: map[string]interface{}{"path": "pkg/tools"}},
 				{ToolCallID: "mock-10", ToolName: "smart_edit", Args: map[string]interface{}{"file_path": "testdata/temp.txt", "old_string": "old content", "new_string": "new content"}},
+				// Added missing tools
+				{ToolCallID: "mock-11", ToolName: "checkout_branch", Args: map[string]interface{}{"branch_name": "feature/test"}},
+				{ToolCallID: "mock-12", ToolName: "extract_function", Args: map[string]interface{}{"file_path": "main.go", "start_line": 10, "end_line": 20, "new_function_name": "testFunction"}},
+				{ToolCallID: "mock-13", ToolName: "find_unused_code", Args: map[string]interface{}{"path": "./..."}},
+				{ToolCallID: "mock-14", ToolName: "get_current_branch", Args: map[string]interface{}{}},
+				{ToolCallID: "mock-15", ToolName: "get_remote_url", Args: map[string]interface{}{}},
+				{ToolCallID: "mock-16", ToolName: "ls", Args: map[string]interface{}{"path": "."}},
+				{ToolCallID: "mock-17", ToolName: "memory_tool", Args: map[string]interface{}{"fact": "test fact"}},
+				{ToolCallID: "mock-18", ToolName: "pull", Args: map[string]interface{}{}},
+				{ToolCallID: "mock-19", ToolName: "read_many_files", Args: map[string]interface{}{"include": []string{"*.go"}}},
+				{ToolCallID: "mock-20", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "summarize https://example.com"}},
+				{ToolCallID: "mock-21", ToolName: "web_search", Args: map[string]interface{}{"query": "golang best practices"}},
+				{ToolCallID: "mock-22", ToolName: "write_todos", Args: map[string]interface{}{"todos": []map[string]interface{}{{"description": "Implement feature X", "status": "pending"}}}},
 			}
 
 			for _, step := range steps {
