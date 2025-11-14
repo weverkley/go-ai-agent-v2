@@ -11,11 +11,11 @@ import (
 type Executor interface {
 	GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error)
 	GenerateContentWithTools(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error)
-	ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error)
+	ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error)
 	SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
 	ListModels() ([]string, error)
 	GetHistory() ([]*genai.Content, error)
 	SetHistory(history []*genai.Content) error
 	CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error)
-	GenerateStream(contents ...*genai.Content) (<-chan any, error)
+	GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error)
 }

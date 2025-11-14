@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
@@ -48,7 +49,7 @@ func NewWriteFileTool(fileSystemService services.FileSystemService) *WriteFileTo
 }
 
 // Execute implements the Tool interface.
-func (t *WriteFileTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *WriteFileTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	filePath, ok := args["file_path"].(string)
 	if !ok || filePath == "" {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'file_path' argument")

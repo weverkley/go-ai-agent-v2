@@ -193,42 +193,36 @@ The migration will proceed iteratively, focusing on one command or core function
 2. **Commit messages**: use short, clear and concise commit messages to document your changes
 3. **Commit your changes**: use `git add .` to stage all changes, and then `git commit -m "Your commit message"` to commit your changes
 
+15. **Implement Rich Interactive Chat UI (Go)**: **Complete**. The sophisticated, component-based, and data-driven architecture of the JavaScript chat UI has been replicated in the Go application.
+    *   **Create a Structured `Message` Interface**: **Done**.
+    *   **Implement Concrete `Message` Types**: **Done**.
+    *   **Refactor `ChatModel`**: **Done**.
+    *   **Implement Slash Commands**: **Done** (`/clear`, `/quit`, `/exit`).
+    *   **`GenerateStream` Integration**: **Done**.
+    *   **Advanced Tool Call Rendering**: **Done**. Tool calls are now rendered in a full-width, boxed layout with color-coded legends, icons, and syntax highlighting for code content.
+
 ## 9. Next Steps
 
-1.  **Qwen Executor Enhancements:**
+1.  **UI Enhancements:**
+    *   Implement scrolling and text selection/copying in the chat view.
+    *   Allow resizing of the tool call code view.
+    *   Implement theme customization and persistence.
+2.  **Qwen Executor Enhancements:**
     *   Implement `GenerateContent`, `ExecuteTool`, `SendMessageStream`, `GetHistory`, `CompressChat` for Qwen.
     *   Implement tool calling for Qwen.
-2.  **Model Routing Enhancements:**
+3.  **Model Routing Enhancements:**
     *   Refactor `getSuggestedModel` to be more generic (e.g., a map of suggesters per executor type).
     *   Implement `ClassifierStrategy` for more intelligent model routing.
-3.  **Error Handling:**
+4.  **Error Handling:**
     *   Improve error messages for API failures (e.g., distinguish between quota errors and other API errors).
-4.  **Settings Command:**
+5.  **Settings Command:**
     *   Add validation for `executor` and `model` settings.
-5.  **Comprehensive Testing**: Unit and integration tests for all new components.
-6.  **Secure API Key Management**: Robust OS-specific storage and clearing of API keys.
-7.  **IDE Integration**: Full integration with supported IDEs.
-8.  **Theme Customization**: Ability to change and persist CLI visual themes.
+6.  **Comprehensive Testing**: Unit and integration tests for all new components.
+7.  **Secure API Key Management**: Robust OS-specific storage and clearing of API keys.
+8.  **IDE Integration**: Full integration with supported IDEs.
 9.  **Terminal Keybinding Configuration**: For enhanced multiline input.
 10. **Implement External Editor Preference**: Setting and using a preferred external editor.
 11. **Implement Usage Statistics**: Develop logic for collecting and displaying detailed model and tool-specific usage statistics.
 12. **Implement Restore Functionality**: Saving and restoring CLI state, including tool calls and conversation/file history.
 13. **Implement Folder Trust Management**: Security features for managing trusted folders.
 14. **Implement MCP Server Management**: Full CRUD operations for MCP servers.
-15. **Implement Rich Interactive Chat UI (Go)**: Replicate the sophisticated, component-based, and data-driven architecture of the JavaScript chat UI in the Go application.
-    *   **Create a Structured `Message` Interface**: Instead of a simple `[]string` for history, define a `Message` interface with a `Render(model ChatModel) string` method. This will allow for different message types to have their own rendering logic.
-    *   **Implement Concrete `Message` Types**: Create structs for each message type (e.g., `UserMessage`, `BotMessage`, `ToolCallMessage`, `ToolResultMessage`, `InfoMessage`, `ErrorMessage`) that implement the `Message` interface. Each struct will hold the relevant data and define the specific `lipgloss` styling in its `Render` method. This mirrors the component-based approach of the JavaScript version (e.g., `UserMessage.tsx`, `GeminiMessage.tsx`).
-    *   **Refactor `ChatModel`**:
-        *   Change the `messages` field from `[]string` to `[]Message`.
-        *   Update the `Update` method to create instances of the new message structs and add them to the history.
-        *   Modify the `View` method to iterate over the `[]Message` slice and call the `Render` method for each message, composing the final view from these rendered components.
-    *   **Implement Slash Commands**: Add a simple slash command processor in the `Update` method to handle user commands. Start with essential commands:
-        *   `/clear`: To clear the chat history.
-        *   `/quit` or `/exit`: To exit the application.
-        *   **Enhance `GenerateStream` Integration**: Ensure the `GenerateStream` method in the `Executor` produces events that can be easily mapped to the new `Message` types in the UI.
-    16. **Implement Model Routing**: Port the JavaScript model routing logic to the Go application to enable dynamic selection of AI models.
-        *   **Create `RoutingStrategy` Interface**: Define a `RoutingStrategy` interface in a new `pkg/routing` directory. This interface will have a `Route` method that takes a context and returns a model name or an error.
-        *   **Implement Concrete Strategies**: Create structs for each routing strategy (`DefaultStrategy`, `OverrideStrategy`, `FallbackStrategy`, `ClassifierStrategy`, `CompositeStrategy`) that implement the `RoutingStrategy` interface.
-        *   **Create `ModelRouterService`**: Develop a `ModelRouterService` that uses a `CompositeStrategy` to execute the strategies in a predefined order of priority.
-        *   **Integrate with `ExecutorFactory`**: Modify the `ExecutorFactory` to use the `ModelRouterService` to determine which model to use when creating a new executor. The factory will call the router to get the model name before initializing the `GeminiChat` executor.
-        *   **Simplify `ClassifierStrategy` (Initial Version)**: For the initial implementation, the `ClassifierStrategy` can use a simple heuristic (e.g., keyword matching, prompt length) instead of making an LLM call. The full LLM-based classification can be added in a future iteration.

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // New import
 	"fmt"
 	"os"
 
@@ -24,10 +25,10 @@ func init() {
 var readFileCmd = &cobra.Command{
 	Use:   "read-file",
 	Short: "Reads and returns the content of a specified file.",
-	Long:  `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`, 
+	Long:  `Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		readFileTool := tools.NewReadFileTool()
-		result, err := readFileTool.Execute(map[string]any{
+		result, err := readFileTool.Execute(context.Background(), map[string]any{
 			"absolute_path": readFileAbsolutePath,
 			"offset":        readFileOffset,
 			"limit":         readFileLimit,

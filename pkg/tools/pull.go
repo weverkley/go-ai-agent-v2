@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
@@ -40,7 +41,7 @@ func NewPullTool() *PullTool {
 }
 
 // Execute performs the pull operation.
-func (t *PullTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *PullTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	dir, ok := args["dir"].(string)
 	if !ok || dir == "" {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")

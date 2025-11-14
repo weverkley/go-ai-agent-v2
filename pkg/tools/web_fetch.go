@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -48,7 +49,7 @@ func extractUrls(text string) []string {
 }
 
 // Execute performs a web fetch operation.
-func (t *WebFetchTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	prompt, ok := args["prompt"].(string)
 	if !ok || prompt == "" {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'prompt' argument")

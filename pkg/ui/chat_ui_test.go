@@ -1,25 +1,30 @@
 package ui
 
 import (
+	"context" // New import
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
+	"go-ai-agent-v2/go-cli/pkg/services" // New import
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/google/generative-ai-go/genai"
-	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewChatModel(t *testing.T) {
 	executor := &core.MockExecutor{}
-	dummyRootCmd := &cobra.Command{}
+	// Define a dummy commandExecutor for testing
+	dummyCommandExecutor := func(args []string) (string, error) {
+		return "command executed", nil
+	}
+	dummyShellService := &services.ShellExecutionService{} // Create a dummy shell service
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyRootCmd)
+	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
 
 	assert.NotNil(t, model)
 	assert.Equal(t, "Ready", model.status)
@@ -31,16 +36,19 @@ func TestNewChatModel(t *testing.T) {
 func TestUpdate_UserInput(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{
-		GenerateStreamFunc: func(contents ...*genai.Content) (<-chan any, error) {
+		GenerateStreamFunc: func(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
 			ch := make(chan any)
 			close(ch)
 			return ch, nil
 		},
 	}
-	dummyRootCmd := &cobra.Command{}
+	dummyCommandExecutor := func(args []string) (string, error) {
+		return "command executed", nil
+	}
+	dummyShellService := &services.ShellExecutionService{}
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyRootCmd)
+	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
 	model.textarea.SetValue("hello")
 
 	// Execute
@@ -64,10 +72,13 @@ func TestUpdate_UserInput(t *testing.T) {
 func TestUpdate_SlashCommand_Clear(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	dummyRootCmd := &cobra.Command{}
+	dummyCommandExecutor := func(args []string) (string, error) {
+		return "command executed", nil
+	}
+	dummyShellService := &services.ShellExecutionService{}
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyRootCmd)
+	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
 	model.messages = []Message{UserMessage{Content: "test"}}
 	model.textarea.SetValue("/clear")
 
@@ -85,10 +96,13 @@ func TestUpdate_SlashCommand_Clear(t *testing.T) {
 func TestUpdate_SlashCommand_Quit(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	dummyRootCmd := &cobra.Command{}
+	dummyCommandExecutor := func(args []string) (string, error) {
+		return "command executed", nil
+	}
+	dummyShellService := &services.ShellExecutionService{}
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyRootCmd)
+	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
 	model.textarea.SetValue("/quit")
 
 	// Execute
@@ -103,10 +117,13 @@ func TestUpdate_SlashCommand_Quit(t *testing.T) {
 func TestUpdate_StreamingEvents(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	dummyRootCmd := &cobra.Command{}
+	dummyCommandExecutor := func(args []string) (string, error) {
+		return "command executed", nil
+	}
+	dummyShellService := &services.ShellExecutionService{}
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyRootCmd)
+	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
 	ch := make(chan any, 5)
 	ch <- types.StreamingStartedEvent{}
 	ch <- types.ThinkingEvent{}

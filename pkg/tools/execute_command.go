@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -15,7 +16,7 @@ type ExecuteCommandTool struct {
 }
 
 // NewExecuteCommandTool creates a new ExecuteCommandTool.
-func NewExecuteCommandTool() *ExecuteCommandTool {
+func NewExecuteCommandTool(shellService *services.ShellExecutionService) *ExecuteCommandTool {
 	return &ExecuteCommandTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			"execute_command",
@@ -33,6 +34,10 @@ func NewExecuteCommandTool() *ExecuteCommandTool {
 						Type:        "string",
 						Description: "Optional: The absolute path of the directory to run the command in. If not provided, the current working directory is used.",
 					},
+					"background": {
+						Type:        "boolean",
+						Description: "Optional: If true, the command will be executed in the background. The tool will return immediately with the process ID. Default is false.",
+					},
 				},
 				Required: []string{"command"},
 			},
@@ -40,12 +45,12 @@ func NewExecuteCommandTool() *ExecuteCommandTool {
 			false,
 			nil,
 		),
-		shellService: services.NewShellExecutionService(),
+		shellService: shellService,
 	}
 }
 
 // Execute performs the execute_command operation.
-func (t *ExecuteCommandTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *ExecuteCommandTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	command, ok := args["command"].(string)
 	if !ok || command == "" {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'command' argument")
@@ -56,7 +61,23 @@ func (t *ExecuteCommandTool) Execute(args map[string]any) (types.ToolResult, err
 		dir = d
 	}
 
-	stdout, stderr, err := t.shellService.ExecuteCommand(command, dir)
+	background := false
+	if b, ok := args["background"].(bool); ok {
+		background = b
+	}
+
+	if background {
+		pid, err := t.shellService.ExecuteCommandInBackground(command, dir)
+		if err != nil {
+			return types.ToolResult{}, fmt.Errorf("failed to execute command in background: %w", err)
+		}
+		return types.ToolResult{
+			LLMContent:    fmt.Sprintf("Command '%s' started in background with PID %d", command, pid),
+			ReturnDisplay: fmt.Sprintf("Command '%s' started in background with PID %d", command, pid),
+		}, nil
+	}
+
+	stdout, stderr, err := t.shellService.ExecuteCommand(ctx, command, dir)
 	
 	output := strings.Builder{}
 	if stdout != "" {

@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -57,7 +58,7 @@ type GrepMatch struct {
 }
 
 // Execute performs a grep search.
-func (t *GrepTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	// Extract arguments
 	pattern, ok := args["pattern"].(string)
 	if !ok {

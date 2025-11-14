@@ -47,6 +47,10 @@ type MockExecutorFactory struct {
 
 // NewExecutor creates a new MockExecutor.
 func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+	if f.Mock != nil {
+		return f.Mock, nil
+	}
+
 	toolRegistryVal, ok := cfg.Get("toolRegistry")
 	if !ok {
 		return nil, fmt.Errorf("tool registry not found in config for mock executor")

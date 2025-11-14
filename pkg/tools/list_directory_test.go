@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context" // New import
 	"fmt"
 	"testing"
 
@@ -95,7 +96,7 @@ func TestListDirectoryTool_Execute(t *testing.T) {
 			})
 			tt.setupMock()
 
-			result, err := tool.Execute(tt.args)
+			result, err := tool.Execute(context.Background(), tt.args)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)

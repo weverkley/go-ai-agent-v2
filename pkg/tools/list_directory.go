@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -60,7 +61,7 @@ func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 }
 
 // Execute performs the list_directory operation.
-func (t *ListDirectoryTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *ListDirectoryTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	path, ok := args["path"].(string)
 	if !ok || path == "" {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'path' argument")

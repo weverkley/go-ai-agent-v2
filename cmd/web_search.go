@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // Add context import
 	"fmt"
 	"os"
 
@@ -23,7 +24,7 @@ var webSearchCmd = &cobra.Command{
 	Long:  `Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.`, 
 	Run: func(cmd *cobra.Command, args []string) {
 		webSearchTool := tools.NewWebSearchTool()
-		result, err := webSearchTool.Execute(map[string]any{
+		result, err := webSearchTool.Execute(context.Background(), map[string]any{
 			"query": webSearchQuery,
 		})
 		if err != nil {

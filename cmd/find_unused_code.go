@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // New import
 	"fmt"
 	"os"
 
@@ -44,7 +45,7 @@ to identify functions and methods that are not called or referenced within the p
 			"directory": directory,
 		}
 
-		result, err := tool.Execute(toolArgs)
+		result, err := tool.Execute(context.Background(), toolArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error executing find-unused-code tool: %v\n", err)
 			os.Exit(1)

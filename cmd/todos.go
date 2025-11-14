@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // Add context import
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 	"os"
@@ -42,7 +43,7 @@ var todosCmd = &cobra.Command{
 		}
 
 		writeTodosTool := tools.NewWriteTodosTool()
-		result, err := writeTodosTool.Execute(map[string]any{
+		result, err := writeTodosTool.Execute(context.Background(), map[string]any{
 			"todos": todosForExecute,
 		})
 		if err != nil {

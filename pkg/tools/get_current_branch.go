@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
@@ -40,7 +41,7 @@ func NewGetCurrentBranchTool() *GetCurrentBranchTool {
 }
 
 // Execute performs the get_current_branch operation.
-func (t *GetCurrentBranchTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *GetCurrentBranchTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	dir, ok := args["dir"].(string)
 	if !ok || dir == "" {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")

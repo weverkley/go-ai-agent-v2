@@ -490,7 +490,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 				return
 			}
 
-			result, err := tool.Execute(fc.Args)
+			result, err := tool.Execute(ctx, fc.Args)
 			if err != nil {
 				// Handle tool execution error
 				return

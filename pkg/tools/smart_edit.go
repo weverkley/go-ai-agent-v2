@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -54,7 +55,7 @@ func NewSmartEditTool(fileSystemService services.FileSystemService) *SmartEditTo
 }
 
 // Execute performs a smart edit operation.
-func (t *SmartEditTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *SmartEditTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	filePath, ok := args["file_path"].(string)
 	if !ok || filePath == "" {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'file_path' argument")

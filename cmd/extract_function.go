@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // New import
 	"fmt"
 	"os"
 
@@ -46,16 +47,16 @@ Optionally, a receiver can be specified to create a method instead of a standalo
 		}
 
 		toolArgs := map[string]any{
-			"file_path":         filePath,
-			"start_line":        float64(startLine),
-			"end_line":          float64(endLine),
-			"new_function_name": newFunctionName,
+			"filePath":          filePath,
+			"startLine":         float64(startLine),
+			"endLine":           float64(endLine),
+			"newFunctionName": newFunctionName,
 		}
 		if receiver != "" {
 			toolArgs["receiver"] = receiver
 		}
 
-		result, err := tool.Execute(toolArgs)
+		result, err := tool.Execute(context.Background(), toolArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error executing extract-function tool: %v\n", err)
 			os.Exit(1)

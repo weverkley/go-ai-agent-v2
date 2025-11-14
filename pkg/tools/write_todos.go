@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -62,7 +63,7 @@ func getTodosFilePath() (string, error) {
 }
 
 // Execute writes the todos to a file.
-func (t *WriteTodosTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	todosData, ok := args["todos"].([]any)
 	if !ok {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'todos' argument")

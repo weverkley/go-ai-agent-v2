@@ -341,7 +341,7 @@ type Tool interface {
 	Description() string
 	ServerName() string // Add ServerName to the interface
 	Definition() *genai.Tool
-	Execute(args map[string]any) (ToolResult, error)
+	Execute(ctx context.Context, args map[string]any) (ToolResult, error)
 }
 
 // ToolInvocation represents an executable instance of a tool.
@@ -468,7 +468,7 @@ func (bdt *BaseDeclarativeTool) Definition() *genai.Tool {
 }
 
 // Execute is a placeholder and should be implemented by concrete tool types.
-func (bdt *BaseDeclarativeTool) Execute(args map[string]any) (ToolResult, error) {
+func (bdt *BaseDeclarativeTool) Execute(ctx context.Context, args map[string]any) (ToolResult, error) {
 	return ToolResult{}, fmt.Errorf("Execute method not implemented for BaseDeclarativeTool")
 }
 

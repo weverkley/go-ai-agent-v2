@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // Add context import
 	"fmt"
 	"os"
 	"strings"
@@ -40,7 +41,7 @@ var webFetchCmd = &cobra.Command{
 		}
 
 		webFetchTool := tools.NewWebFetchTool()
-		result, err := webFetchTool.Execute(map[string]any{
+		result, err := webFetchTool.Execute(context.Background(), map[string]any{
 			"prompt": promptBuilder.String(),
 		})
 		if err != nil {

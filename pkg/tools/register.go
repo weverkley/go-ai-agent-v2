@@ -8,7 +8,7 @@ import (
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(fs services.FileSystemService) *types.ToolRegistry {
+func RegisterAllTools(fs services.FileSystemService, shellService *services.ShellExecutionService) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
@@ -51,12 +51,12 @@ func RegisterAllTools(fs services.FileSystemService) *types.ToolRegistry {
 		fmt.Printf("Error registering GetRemoteURLTool: %v\n", err)
 	}
 	if err := registry.Register(NewCheckoutBranchTool()); err != nil {
-		fmt.Printf("Error registering CheckoutBranchTool: %v\n", err)
+		fmt.Printf("Error registering NewCheckoutBranchTool: %v\n", err)
 	}
 	if err := registry.Register(NewPullTool()); err != nil {
 		fmt.Printf("Error registering PullTool: %v\n", err)
 	}
-	if err := registry.Register(NewExecuteCommandTool()); err != nil {
+	if err := registry.Register(NewExecuteCommandTool(shellService)); err != nil {
 		fmt.Printf("Error registering ExecuteCommandTool: %v\n", err)
 	}
 	if err := registry.Register(NewFindUnusedCodeTool()); err != nil {

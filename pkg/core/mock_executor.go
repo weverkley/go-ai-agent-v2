@@ -13,13 +13,13 @@ import (
 type MockExecutor struct {
 	GenerateContentFunc        func(contents ...*genai.Content) (*genai.GenerateContentResponse, error)
 	GenerateContentWithToolsFunc func(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error)
-	ExecuteToolFunc            func(fc *genai.FunctionCall) (types.ToolResult, error)
+	ExecuteToolFunc            func(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error)
 	SendMessageStreamFunc      func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
 	ListModelsFunc             func() ([]string, error)
 	GetHistoryFunc             func() ([]*genai.Content, error)
 	SetHistoryFunc             func(history []*genai.Content) error
 	CompressChatFunc           func(promptId string, force bool) (*types.ChatCompressionResult, error)
-	GenerateStreamFunc         func(contents ...*genai.Content) (<-chan any, error)
+	GenerateStreamFunc         func(ctx context.Context, contents ...*genai.Content) (<-chan any, error)
 	toolRegistry               types.ToolRegistryInterface
 }
 
@@ -30,16 +30,16 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 	}
 
 	// Implement the real ExecuteTool method
-	mock.ExecuteToolFunc = func(fc *genai.FunctionCall) (types.ToolResult, error) {
+	mock.ExecuteToolFunc = func(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
 		tool, err := mock.toolRegistry.GetTool(fc.Name)
 		if err != nil {
 			return types.ToolResult{}, err
 		}
-		return tool.Execute(fc.Args)
+		return tool.Execute(ctx, fc.Args)
 	}
 
 	// Mock GenerateStream to follow a realistic script of events and execute real tools.
-	mock.GenerateStreamFunc = func(contents ...*genai.Content) (<-chan any, error) {
+	mock.GenerateStreamFunc = func(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
 		eventChan := make(chan any)
 
 		go func() {
@@ -53,6 +53,10 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				{ToolCallID: "mock-4", ToolName: "execute_command", Args: map[string]interface{}{"command": "npm install express", "dir": "my-express-app"}},
 				{ToolCallID: "mock-5", ToolName: "write_file", Args: map[string]interface{}{"file_path": "my-express-app/index.js", "content": "const express = require('express');\nconst app = express();\nconst port = 3000;\n\napp.get('/', (req, res) => {\n  res.send('Hello World!');\n});\n\napp.listen(port, () => {\n  console.log(`Example app listening on port ${port}`);\n});"}},
 				{ToolCallID: "mock-6", ToolName: "read_file", Args: map[string]interface{}{"file_path": "my-express-app/index.js"}},
+				{ToolCallID: "mock-7", ToolName: "grep", Args: map[string]interface{}{"pattern": "func", "path": "pkg/tools", "include": "*.go"}},
+				{ToolCallID: "mock-8", ToolName: "glob", Args: map[string]interface{}{"pattern": "*.go", "path": "pkg/tools"}},
+				{ToolCallID: "mock-9", ToolName: "list_directory", Args: map[string]interface{}{"path": "pkg/tools"}},
+				{ToolCallID: "mock-10", ToolName: "smart_edit", Args: map[string]interface{}{"file_path": "testdata/temp.txt", "old_string": "old content", "new_string": "new content"}},
 			}
 
 			for _, step := range steps {
@@ -61,7 +65,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 
 				eventChan <- step // Emit ToolCallStartEvent
 
-				toolResult, err := mock.ExecuteTool(&genai.FunctionCall{Name: step.ToolName, Args: step.Args})
+				toolResult, err := mock.ExecuteTool(ctx, &genai.FunctionCall{Name: step.ToolName, Args: step.Args})
 
 				time.Sleep(500 * time.Millisecond) // Simulate tool execution time
 
@@ -103,9 +107,9 @@ func (m *MockExecutor) GenerateContentWithTools(ctx context.Context, history []*
 }
 
 // ExecuteTool mocks the ExecuteTool method.
-func (m *MockExecutor) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
+func (m *MockExecutor) ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
 	if m.ExecuteToolFunc != nil {
-		return m.ExecuteToolFunc(fc)
+		return m.ExecuteToolFunc(ctx, fc)
 	}
 	return types.ToolResult{}, fmt.Errorf("ExecuteTool not implemented in mock")
 }
@@ -153,9 +157,9 @@ func (m *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCom
 	}
 	
 // GenerateStream mocks the GenerateStream method.
-func (m *MockExecutor) GenerateStream(contents ...*genai.Content) (<-chan any, error) {
+func (m *MockExecutor) GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
 	if m.GenerateStreamFunc != nil {
-		return m.GenerateStreamFunc(contents...)
+		return m.GenerateStreamFunc(ctx, contents...)
 	}
 	respChan := make(chan any)
 	close(respChan)

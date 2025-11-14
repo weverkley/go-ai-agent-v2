@@ -62,7 +62,7 @@ func (s *CoreToolScheduler) Schedule(
 	}
 
 	startTime := time.Now()
-	result, err := toolInstance.Execute(request.Args)
+	result, err := toolInstance.Execute(ctx, request.Args)
 	durationMs := time.Since(startTime).Milliseconds()
 
 	var completedCall CompletedToolCall

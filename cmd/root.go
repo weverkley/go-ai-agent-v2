@@ -26,20 +26,6 @@ var RootCmd = &cobra.Command{
 	Use:   "go-cli",
 	Short: "A Go-based CLI for Gemini",
 	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		if len(args) == 0 {
-			chatCmd, _, err := cmd.Find([]string{"chat"})
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Could not find chat command: %v\n", err)
-				os.Exit(1)
-			}
-			chatCmd.Run(chatCmd, args)
-			os.Exit(0)
-		}
-		// If arguments are passed, show help.
-		_ = cmd.Help()
-		os.Exit(0)
-	},
 }
 
 var Cfg *config.Config
@@ -53,6 +39,7 @@ var SessionStartTime time.Time                  // Declare sessionStartTime
 var SettingsService *services.SettingsService   // Declare package-level settingsService
 
 var FSService services.FileSystemService // Declare package-level FileSystemService
+var ShellService *services.ShellExecutionService   // Declare package-level ShellExecutionService
 
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
@@ -62,6 +49,10 @@ func Execute() {
 }
 
 func init() {
+	RootCmd.Run = func(cmd *cobra.Command, args []string) {
+		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+	}
+
 	// Initialize sessionStartTime
 	SessionStartTime = time.Now()
 
@@ -76,6 +67,9 @@ func init() {
 	// Initialize FileSystemService
 	FSService = services.NewFileSystemService()
 
+	// Initialize ShellService
+	ShellService = services.NewShellExecutionService()
+
 	// Initialize extensionManager here
 	ExtensionManager = extension.NewManager(projectRoot, FSService, services.NewGitService())
 	// Initialize settingsService here
@@ -87,7 +81,7 @@ func init() {
 	// Initialize extensionsCliCommand here
 	extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
 	// Register all tools
-	toolRegistry := tools.RegisterAllTools(FSService)
+	toolRegistry := tools.RegisterAllTools(FSService, ShellService)
 
 	// Initialize ConfigParameters
 	params := &config.ConfigParameters{
@@ -126,6 +120,9 @@ func init() {
 	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(params.Telemetry)
 
 	RootCmd.AddCommand(todosCmd)
+	chatCmd.Run = func(cmd *cobra.Command, args []string) {
+		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+	}
 	RootCmd.AddCommand(chatCmd)
 	RootCmd.AddCommand(authCmd)
 	RootCmd.AddCommand(modelCmd)
@@ -318,8 +315,14 @@ Example:
 	RootCmd.AddCommand(webSearchCmd)
 	RootCmd.AddCommand(webFetchCmd)
 	RootCmd.AddCommand(readCmd)
+	generateCmd.Run = func(cmd *cobra.Command, args []string) {
+		runGenerateCmd(cmd, args, SettingsService, ShellService)
+	}
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(smartEditCmd)
+	grepCodeCmd.Run = func(cmd *cobra.Command, args []string) {
+		runGrepCodeCmd(cmd, args, SettingsService, ShellService)
+	}
 	RootCmd.AddCommand(grepCodeCmd)
 	RootCmd.AddCommand(readManyFilesCmd)
 	RootCmd.AddCommand(writeCmd)

@@ -1,6 +1,7 @@
 package core_test
 
 import (
+	"context" // New import
 	"os"
 	"testing"
 
@@ -145,18 +146,18 @@ func TestMockExecutor(t *testing.T) {
 	t.Run("ExecuteTool should call the provided function", func(t *testing.T) {
 		expectedResult := types.ToolResult{ReturnDisplay: "mocked tool result"}
 		mockExecutor := &core.MockExecutor{
-			ExecuteToolFunc: func(fc *genai.FunctionCall) (types.ToolResult, error) {
+			ExecuteToolFunc: func(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
 				return expectedResult, nil
 			},
 		}
-		result, err := mockExecutor.ExecuteTool(&genai.FunctionCall{})
+		result, err := mockExecutor.ExecuteTool(context.Background(), &genai.FunctionCall{})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedResult, result)
 	})
 
 	t.Run("ExecuteTool should return error if function not provided", func(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
-		result, err := mockExecutor.ExecuteTool(&genai.FunctionCall{})
+		result, err := mockExecutor.ExecuteTool(context.Background(), &genai.FunctionCall{})
 		assert.Error(t, err)
 		assert.Equal(t, types.ToolResult{}, result)
 		assert.Contains(t, err.Error(), "ExecuteTool not implemented in mock")

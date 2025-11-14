@@ -1,13 +1,14 @@
 package ui
 
 import (
-	"bytes"
+	"context" // New import
 	"fmt"
 	"sort"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
+	"go-ai-agent-v2/go-cli/pkg/services" // New import
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/spf13/cobra" // Add this line
 )
 
 // --- Message Interface and Structs ---
@@ -216,11 +216,19 @@ type ChatModel struct {
 
 	config types.Config
 
-	router *routing.ModelRouterService
+		router     *routing.ModelRouterService
 
-	streamCh <-chan any
+		shellService *services.ShellExecutionService // New field
 
-	isStreaming bool
+	
+
+		streamCh    <-chan any
+
+		isStreaming bool
+
+		cancelCtx   context.Context    // New field
+
+		cancelFunc  context.CancelFunc // New field
 
 	status string
 
@@ -228,7 +236,7 @@ type ChatModel struct {
 
 	title string
 
-	rootCmd *cobra.Command // Add this line
+	commandExecutor func(args []string) (string, error) // New field for executing commands
 
 	activeToolCalls map[string]*ToolCallStatus
 
@@ -249,7 +257,7 @@ type ChatModel struct {
 	suggestionStyle lipgloss.Style
 }
 
-func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, rootCmd *cobra.Command) *ChatModel {
+func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService *services.ShellExecutionService) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
 	ta.Focus()
@@ -278,10 +286,11 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 		executorType:    executorType,
 		config:          config,
 		router:          router,
+		shellService:    shellService, // Initialize new field
 		isStreaming:     false,
 		status:          "Ready",
 		title:           "Go AI Agent Chat",
-		rootCmd:         rootCmd, // Initialize the new field
+		commandExecutor: commandExecutor, // Initialize the new field
 		activeToolCalls: make(map[string]*ToolCallStatus),
 		senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),              // User
 		botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),              // Bot
@@ -322,7 +331,17 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
+		case tea.KeyEsc: // Handle ESC for cancellation
+			if m.isStreaming && m.cancelFunc != nil {
+				m.cancelFunc() // Signal cancellation
+				m.shellService.KillAllProcesses() // Kill any background shell processes
+				m.status = "Cancelling..."
+				m.isStreaming = false // Stop streaming immediately in UI
+				m.streamCh = nil      // Clear stream channel
+				m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
+				return m, nil
+			}
+			// If not streaming or no cancelFunc, then quit
 			return m, tea.Quit
 		case tea.KeyEnter:
 			if m.isStreaming {
@@ -346,7 +365,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.isStreaming = true
 			m.status = "Sending..."
 			telemetry.LogDebugf("Sending user input to executor: %s", userInput)
-			return m, startStreaming(m.executor, userInput)
+			return m, m.startStreaming(userInput) // Call updated startStreaming method
 		}
 
 	// --- Streaming messages ---
@@ -423,6 +442,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Ready"
 		m.streamCh = nil
 		m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
+		m.cancelFunc = nil // Clear cancel function
+		m.cancelCtx = nil  // Clear context
 		return m, nil
 	}
 
@@ -441,10 +462,13 @@ func (m *ChatModel) View() string {
 }
 
 func (m *ChatModel) renderStatus() string {
+	statusLine := m.statusStyle.Render(m.status)
 	if m.isStreaming {
-		return m.spinner.View() + " " + m.statusStyle.Render(m.status)
+		// Add "Press ESC to stop" instruction for executing / streaming processes
+		instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
+		return m.spinner.View() + " " + statusLine + instruction
 	}
-	return m.statusStyle.Render(m.status)
+	return statusLine
 }
 
 func (m *ChatModel) updateViewport() {
@@ -474,36 +498,15 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 
 	telemetry.LogDebugf("Executing command: %s with args: %v", commandString, args)
 
-	// Create a buffer to capture stdout and stderr
-	var buffer bytes.Buffer
-	m.rootCmd.SetOut(&buffer)
-	m.rootCmd.SetErr(&buffer)
-
-	// Find the command
-	cmd, _, err := m.rootCmd.Find(args)
-	if err != nil {
-		m.messages = append(m.messages, ErrorMessage{Err: err})
-		m.updateViewport()
-		return m, nil
-	}
-
-	// Execute the Cobra command
-	m.rootCmd.SetArgs(args)
-	err = cmd.Execute()
-
-	// Restore default output
-	m.rootCmd.SetOut(nil)
-	m.rootCmd.SetErr(nil)
+	output, err := m.commandExecutor(args)
 
 	telemetry.LogDebugf("Command execution error: %v", err)
-	telemetry.LogDebugf("Captured output: %s", buffer.String())
+	telemetry.LogDebugf("Captured output: %s", output)
 
 	if err != nil {
-		// The error is already in the buffer, but we can add a more specific message if we want.
-		// For now, we'll just display the buffer's content.
+		m.messages = append(m.messages, ErrorMessage{Err: err})
 	}
 
-	output := strings.TrimSpace(buffer.String())
 	if output != "" {
 		m.messages = append(m.messages, BotMessage{Content: output})
 	} else if err == nil {
@@ -534,9 +537,11 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 // --- Commands ---
 
 // startStreaming initiates the stream and returns a message with the channel.
-func startStreaming(executor core.Executor, userInput string) tea.Cmd {
+func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 	return func() tea.Msg {
-		stream, err := executor.GenerateStream(core.NewUserContent(userInput))
+		// Create a new context for this streaming session
+		m.cancelCtx, m.cancelFunc = context.WithCancel(context.Background())
+		stream, err := m.executor.GenerateStream(m.cancelCtx, core.NewUserContent(userInput))
 		if err != nil {
 			return streamErrorMsg{err}
 		}

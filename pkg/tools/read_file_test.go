@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context" // New import
 	"os"
 	"path/filepath"
 	"strings"
@@ -136,7 +137,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 				}
 			}
 
-			result, err := tool.Execute(tt.args)
+			result, err := tool.Execute(context.Background(), tt.args)
 
 			if tt.expectedError != "" {
 				assert.Error(t, err)

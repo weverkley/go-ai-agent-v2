@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -59,7 +60,7 @@ func NewExtractFunctionTool() *ExtractFunctionTool {
 }
 
 // Execute implements the Tool interface.
-func (t *ExtractFunctionTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	filePath, ok := args["filePath"].(string)
 	if !ok {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'filePath' argument")

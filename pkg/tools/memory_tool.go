@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -115,7 +116,7 @@ func computeNewContent(currentContent, fact string) string {
 }
 
 // Execute saves a fact to long-term memory.
-func (t *MemoryTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *MemoryTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	fact, ok := args["fact"].(string)
 	if !ok || fact == "" {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'fact' argument")

@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"bytes" // New import for bytes.Buffer
 	"fmt"
 	"os"
+	"strings" // New import for strings.TrimSpace
 
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
 
@@ -14,51 +17,85 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// CommandExecutor is a function type that executes a command and returns its output and an error.
+type CommandExecutor func(args []string) (string, error)
+
 var chatCmd = &cobra.Command{
 	Use:   "chat",
 	Short: "Start an interactive chat session with the AI agent",
 	Run: func(cmd *cobra.Command, args []string) {
-		modelVal, ok := SettingsService.Get("model")
-		if !ok {
-			fmt.Printf("Error: 'model' setting not found.\n")
-			os.Exit(1)
-		}
-		model, ok := modelVal.(string)
-		if !ok {
-			fmt.Printf("Error: 'model' setting is not a string.\n")
-			os.Exit(1)
-		}
-
-		executorVal, ok := SettingsService.Get("executor")
-		if !ok {
-			fmt.Printf("Error: 'executor' setting not found.\n")
-			os.Exit(1)
-		}
-		executorType, ok := executorVal.(string)
-		if !ok {
-			fmt.Printf("Error: 'executor' setting is not a string.\n")
-			os.Exit(1)
-		}
-
-		// Use the global Cfg and override the model
-		appConfig := Cfg.WithModel(model)
-
-		factory, err := core.NewExecutorFactory(executorType, appConfig)
-		if err != nil {
-			fmt.Printf("Error creating executor factory: %v\n", err)
-			os.Exit(1)
-		}
-		executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			fmt.Printf("Error creating executor: %v\n", err)
-			os.Exit(1)
-		}
-
-		router := routing.NewModelRouterService(appConfig)
-		p := tea.NewProgram(ui.NewChatModel(executor, executorType, appConfig, router, RootCmd), tea.WithAltScreen()) // Pass RootCmd here
-		if _, err := p.Run(); err != nil {
-			fmt.Printf("Error running interactive chat: %v\n", err)
-			os.Exit(1)
-		}
+		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
 	},
+}
+
+// runChatCmd contains the logic for the chat command, accepting necessary services.
+func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService *services.ShellExecutionService) {
+	modelVal, ok := settingsService.Get("model")
+	if !ok {
+		fmt.Printf("Error: 'model' setting not found.\n")
+		os.Exit(1)
+	}
+	model, ok := modelVal.(string)
+	if !ok {
+		fmt.Printf("Error: 'model' setting is not a string.\n")
+		os.Exit(1)
+	}
+
+	executorVal, ok := settingsService.Get("executor")
+	if !ok {
+		fmt.Printf("Error: 'executor' setting not found.\n")
+		os.Exit(1)
+	}
+	executorType, ok := executorVal.(string)
+	if !ok {
+		fmt.Printf("Error: 'executor' setting is not a string.\n")
+		os.Exit(1)
+	}
+
+	// Use the global Cfg and override the model
+	appConfig := Cfg.WithModel(model)
+
+	factory, err := core.NewExecutorFactory(executorType, appConfig)
+	if err != nil {
+		fmt.Printf("Error creating executor factory: %v\n", err)
+		os.Exit(1)
+	}
+	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+	if err != nil {
+		fmt.Printf("Error creating executor: %v\n", err)
+		os.Exit(1)
+	}
+
+	router := routing.NewModelRouterService(appConfig)
+
+	// Create a CommandExecutor function that wraps the Cobra command execution
+	commandExecutor := func(cmdArgs []string) (string, error) {
+		// Create a buffer to capture stdout and stderr
+		var buffer bytes.Buffer
+		rootCmd.SetOut(&buffer)
+		rootCmd.SetErr(&buffer)
+
+		// Find the command
+		cmd, _, err := rootCmd.Find(cmdArgs)
+		if err != nil {
+			return "", err
+		}
+
+		// Execute the Cobra command
+		rootCmd.SetArgs(cmdArgs)
+		err = cmd.Execute()
+
+		// Restore default output
+		rootCmd.SetOut(nil)
+		rootCmd.SetErr(nil)
+
+		output := strings.TrimSpace(buffer.String())
+		return output, err
+	}
+
+	p := tea.NewProgram(ui.NewChatModel(executor, executorType, appConfig, router, commandExecutor, shellService), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
+		fmt.Printf("Error running interactive chat: %v\n", err)
+		os.Exit(1)
+	}
 }

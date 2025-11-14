@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context" // New import
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -49,10 +50,10 @@ func TestGenerateStream(t *testing.T) {
 
 	qwenChat := &QwenChat{
 		client:    client,
-		modelName: "qwen-turbo",
+		modelName: "qwen-turbo", // Added missing field
 	}
 
-	eventChan, err := qwenChat.GenerateStream(&genai.Content{Parts: []genai.Part{genai.Text("test")}})
+	eventChan, err := qwenChat.GenerateStream(context.Background(), &genai.Content{Parts: []genai.Part{genai.Text("test")}})
 	assert.NoError(t, err)
 
 	var events []any
@@ -71,7 +72,7 @@ type TestTool struct {
 	*types.BaseDeclarativeTool
 }
 
-func (t *TestTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *TestTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	return types.ToolResult{ReturnDisplay: "tool result"}, nil
 }
 
@@ -128,7 +129,7 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 		toolRegistry: toolRegistry,
 	}
 
-	eventChan, err := qwenChat.GenerateStream(&genai.Content{Parts: []genai.Part{genai.Text("test")}})
+	eventChan, err := qwenChat.GenerateStream(context.Background(), &genai.Content{Parts: []genai.Part{genai.Text("test")}})
 	assert.NoError(t, err)
 
 	var events []any

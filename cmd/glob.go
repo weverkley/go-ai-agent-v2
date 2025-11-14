@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // New import
 	"fmt"
 	"os"
 
@@ -28,10 +29,10 @@ func init() {
 var globCmd = &cobra.Command{
 	Use:   "glob",
 	Short: "Efficiently finds files matching specific glob patterns",
-	Long:  `Efficiently finds files matching specific glob patterns (e.g., src/**/*.ts, **/*.md), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.`, 
+	Long:  `Efficiently finds files matching specific glob patterns (e.g., src/**/*.ts, **/*.md), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		globTool := tools.NewGlobTool()
-		result, err := globTool.Execute(map[string]any{
+		result, err := globTool.Execute(context.Background(), map[string]any{
 			"pattern":               globPattern,
 			"path":                  globPath,
 			"case_sensitive":        globCaseSensitive,

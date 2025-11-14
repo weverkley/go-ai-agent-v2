@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // Add context import
 	"fmt"
 	"strings" // Import strings package
 	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
@@ -90,7 +91,7 @@ var toolsRunCmd = &cobra.Command{
 			}
 		}
 
-		result, err := tool.Execute(parsedArgs)
+		result, err := tool.Execute(context.Background(), parsedArgs)
 		if err != nil {
 			fmt.Printf("Error executing tool '%s': %v\n", toolName, err)
 			return

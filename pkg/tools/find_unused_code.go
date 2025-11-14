@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 
@@ -43,7 +44,7 @@ func NewFindUnusedCodeTool() *FindUnusedCodeTool {
 }
 
 // Execute implements the Tool interface.
-func (t *FindUnusedCodeTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *FindUnusedCodeTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	directory, ok := args["directory"].(string)
 	if !ok {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'directory' argument")

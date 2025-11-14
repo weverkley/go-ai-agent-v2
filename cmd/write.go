@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // Add context import
 	"fmt"
 	"os"
 
@@ -46,7 +47,7 @@ var writeCmd = &cobra.Command{
 			"content":   writeContent,
 		}
 
-		result, err := tool.Execute(toolArgs)
+		result, err := tool.Execute(context.Background(), toolArgs)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error executing write_file tool: %v\n", err)
 			os.Exit(1)

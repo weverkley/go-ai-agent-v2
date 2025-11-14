@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +50,7 @@ func NewReadFileTool() *ReadFileTool {
 }
 
 // Execute performs a read-file operation.
-func (t *ReadFileTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	absolutePath, ok := args["absolute_path"].(string)
 	if !ok || absolutePath == "" {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'absolute_path' argument")

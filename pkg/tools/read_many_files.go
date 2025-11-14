@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -80,7 +81,7 @@ type SkippedFile struct {
 }
 
 // Execute performs a read-many-files operation.
-func (t *ReadManyFilesTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *ReadManyFilesTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	patterns, ok := args["paths"].([]any)
 	if !ok || len(patterns) == 0 {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'paths' argument")

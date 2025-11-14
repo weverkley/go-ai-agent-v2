@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // New import
 	"fmt"
 	"os"
 
@@ -23,7 +24,7 @@ var execCmd = &cobra.Command{
 	Long:  `Execute a shell command in a specified working directory.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		shellService := services.NewShellExecutionService()
-		stdout, stderr, err := shellService.ExecuteCommand(execCommand, execWorkingDir)
+		stdout, stderr, err := shellService.ExecuteCommand(context.Background(), execCommand, execWorkingDir)
 		if err != nil {
 			fmt.Printf("Error executing command: %v\n", err)
 			if stdout != "" {

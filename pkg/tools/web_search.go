@@ -43,7 +43,7 @@ func NewWebSearchTool() *WebSearchTool {
 }
 
 // Execute performs a web search operation.
-func (t *WebSearchTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	query, ok := args["query"].(string)
 	if !ok || query == "" {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'query' argument")
@@ -56,7 +56,6 @@ func (t *WebSearchTool) Execute(args map[string]any) (types.ToolResult, error) {
 		return types.ToolResult{}, fmt.Errorf("GOOGLE_API_KEY and GOOGLE_CUSTOM_SEARCH_CX environment variables must be set for web search")
 	}
 
-	ctx := context.Background()
 	svc, err := customsearch.NewService(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to create customsearch service: %w", err)

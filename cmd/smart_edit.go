@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // Add context import
 	"fmt"
 	"os"
 
@@ -34,7 +35,7 @@ var smartEditCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fileSystemService := services.NewFileSystemService()
 		smartEditTool := tools.NewSmartEditTool(fileSystemService)
-		result, err := smartEditTool.Execute(map[string]any{
+		result, err := smartEditTool.Execute(context.Background(), map[string]any{
 			"file_path":   smartEditFilePath,
 			"instruction": smartEditInstruction,
 			"old_string":  smartEditOldString,

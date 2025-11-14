@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context" // New import
 	"fmt"
 	"os"
 
@@ -40,10 +41,10 @@ func stringSliceToAnySlice(s []string) []any {
 var readManyFilesCmd = &cobra.Command{
 	Use:   "read-many-files",
 	Short: "Reads content from multiple files",
-	Long:  `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string.`, 
+	Long:  `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		readManyFilesTool := tools.NewReadManyFilesTool()
-		result, err := readManyFilesTool.Execute(map[string]any{
+		result, err := readManyFilesTool.Execute(context.Background(), map[string]any{
 			"paths":                stringSliceToAnySlice(readManyFilesPaths),
 			"include":              stringSliceToAnySlice(readManyFilesInclude),
 			"exclude":              stringSliceToAnySlice(readManyFilesExclude),

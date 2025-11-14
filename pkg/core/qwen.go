@@ -72,7 +72,7 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 }
 
 // GenerateStream implements the streaming generation for QwenChat.
-func (qc *QwenChat) GenerateStream(contents ...*genai.Content) (<-chan any, error) {
+func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
 	eventChan := make(chan any)
 
 	go func() {
@@ -120,7 +120,6 @@ func (qc *QwenChat) GenerateStream(contents ...*genai.Content) (<-chan any, erro
 			Tools:    tools,
 		}
 
-		ctx := context.Background()
 		stream, err := qc.client.CreateChatCompletionStream(ctx, req)
 		if err != nil {
 			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create Qwen stream: %w", err)}
@@ -170,7 +169,7 @@ func (qc *QwenChat) GenerateStream(contents ...*genai.Content) (<-chan any, erro
 					Args: args,
 				}
 
-				toolResult, err := qc.ExecuteTool(genaiFuncCall)
+				toolResult, err := qc.ExecuteTool(ctx, genaiFuncCall)
 				if err != nil {
 					eventChan <- types.ErrorEvent{Err: fmt.Errorf("error executing tool %s: %w", tc.Function.Name, err)}
 					return
@@ -291,7 +290,7 @@ func (qc *QwenChat) GenerateContent(contents ...*genai.Content) (*genai.Generate
 	}, nil
 }
 
-func (qc *QwenChat) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
+func (qc *QwenChat) ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
 	if qc.toolRegistry == nil {
 		return types.ToolResult{}, fmt.Errorf("tool registry not initialized")
 	}
@@ -307,7 +306,7 @@ func (qc *QwenChat) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error
 		args[k] = v
 	}
 
-	return tool.Execute(args)
+	return tool.Execute(ctx, args)
 }
 
 func (qc *QwenChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {

@@ -1,139 +1,61 @@
-# Go AI Agent v2 CLI
+# Go AI Agent v2
 
-This repository contains the Go-based Command Line Interface (CLI) for the AI Agent v2, designed to bring the power of various AI executors (e.g., Gemini, Qwen, OpenAI) directly into your terminal. This project is a migration from an existing JavaScript-based CLI, focusing on a robust, extensible, and efficient Go implementation.
+Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built with Go, designed to bring the power of various AI models directly into your terminal.
 
-## Project Status
+## Key Features
 
-The foundational structure for the Go CLI is established, with several core services and commands implemented. Many original JavaScript functionalities have been translated, including tool-calling capabilities. All identified type-checking and unused import errors have been addressed.
-
-### Key Features & Implemented Commands:
-
-*   **`generate`**: Fully functional with tool-calling capabilities and an interactive UI (using `charmbracelet/bubbletea`) for generating content via the Gemini API.
-*   **`read`**: Reads file content.
-*   **`write`**: Writes content to a file, now utilizing the `write_file` tool.
-*   **`exec`**: Executes shell commands.
-*   **`ls`**: Lists directory contents.
-*   **`git-branch`**: Gets the current Git branch name.
-*   **`extract-function`**: Extracts a code block into a new function or method.
-*   **`find-unused-code`**: Finds unused functions and methods in Go files.
-*   **`extensions`**: Command group for managing extensions:
-    *   `list`: Lists discovered extensions.
-    *   `install`: Installs extensions (supports git clone/pull and local copy).
-    *   `uninstall`: Uninstalls extensions.
-    *   `new`: Creates new extensions.
-    *   `enable`: Enables extensions.
-    *   `disable`: Disables extensions.
-*   **`mcp`**: Command group for managing Model Context Protocol (MCP) servers (currently provides informative messages about future implementation).
-*   **AI-Powered Commands (migrated from JavaScript .toml files)**:
-    *   `code-guide`: Answers codebase questions using AI.
-    *   `find-docs`: Finds relevant documentation and outputs GitHub URLs using AI.
-    *   `cleanup-back-to-main`: Automates Git branch cleanup.
-    *   `pr-review`: Conducts comprehensive AI-driven pull request reviews.
-    *   `grep-code`: Summarizes code findings for a given pattern using grep and AI.
-*   **`list-models`**: Lists available Gemini models.
-*   **Informative Commands**: `privacy`, `ide`, `theme`, `auth`, `setup-github`, `profile`, `vim`, `terminal-setup`, `editor`, `stats`, `restore`, `permissions` now provide informative messages about their future implementation.
-*   **`tools run`**: Executes specific AI tools.
-*   **`chat`**: Interactive chat session with AI agents, now featuring:
-    *   **Model Rotation Suggestions**: Automatically suggests alternative models (e.g., `gemini-1.5-flash` from `gemini-1.5-pro`) when API quota errors occur.
-    *   **Improved UI Stability**: Fixed issues with terminal history, duplicated input, and text wrapping for long messages.
-    *   **Enhanced `clear` command**: Correctly clears both UI and executor history.
-
-### Core Services & Tools:
-
-*   **`pkg/core/gemini.go`**: Integrates with the Gemini API, including tool-calling and actual token counting.
-*   **`pkg/core/qwen.go`**: Implements the Qwen executor using the OpenAI-compatible API, supporting streaming responses.
-*   **`pkg/core/mock_executor.go`**: Mock executor for testing purposes.
-*   **`pkg/services/shell_service.go`**: Provides shell command execution.
-*   **`pkg/services/file_system_service.go`**: Offers file system operations like listing, reading, writing, and directory management.
-*   **`pkg/services/git_service.go`**: Interacts with Git repositories for operations like getting remote URLs, checking out branches, pulling, and deleting branches.
-*   **`pkg/extension/manager.go`**: Handles discovery, loading, installation, and management of extensions.
-*   **`pkg/config/config.go`**: Manages application settings and configuration, including the `.gemini` directory path.
-*   **`pkg/mcp/client.go`**: Simulates MCP connection.
-*   **`pkg/types/types.go`**: Centralized definitions for various application types and interfaces.
-*   **`pkg/utils/folder_structure.go`**: Implements logic for generating folder structures, including file ignoring.
-*   **`pkg/utils/utils.go`**: Provides utility functions, now including actual telemetry logging.
-*   **`pkg/tools/ls.go`**: Implements the `ls` tool functionality.
-*   **`pkg/tools/write_file.go`**: Implements the `write_file` tool functionality.
-*   **`pkg/tools/list_directory.go`**: Refactored to use `FileSystemService`.
-*   **`pkg/tools/smart_edit.go`**: Refactored to use `FileSystemService`.
-*   **`pkg/tools/write_file.go`**: Refactored to use `FileSystemService`.
-*   **`pkg/routing/strategy.go`**: Implements model routing strategies, including a `FallbackStrategy` for error-based model suggestions.
-*   **`pkg/services/settings_service.go`**: Now includes an `executor` setting to specify the active AI executor.
-*   **`pkg/telemetry/telemetry.go`**: Enhanced with debug logging and file output capabilities.
+- **Interactive Chat Mode**: A rich, interactive chat UI powered by Bubble Tea, featuring:
+    - Real-time streaming of AI responses.
+    - Advanced, color-coded rendering for tool calls in a clean, boxed layout.
+    - Syntax highlighting for code within tool calls like `write_file`.
+    - Automatic model fallback suggestions on API errors.
+- **Multi-Executor Support**: Easily switch between different AI backends, with initial support for Google's Gemini and Qwen models.
+- **Extensible Tool System**: A robust system for adding new tools and capabilities to the agent.
+- **AI-Powered Commands**: A suite of commands for common development tasks like code analysis, documentation search, and PR reviews.
 
 ## Getting Started
 
 ### Prerequisites
 
-*   Go (version 1.21 or higher recommended)
-*   `GEMINI_API_KEY` environment variable set with your Gemini API key.
-*   `QWEN_API_KEY` environment variable set with your Qwen API key (if using the Qwen executor).
+- Go (version 1.21 or higher recommended)
+- API Keys for your desired AI models (e.g., `GEMINI_API_KEY`, `QWEN_API_KEY`) set as environment variables.
 
-### Building the CLI
+### Build & Run
 
-Navigate to the project root directory and run:
+1.  **Build the CLI:**
+    ```bash
+    go build .
+    ```
+    This will create the `go-ai-agent-v2` executable.
 
-```bash
-go build .
-```
+2.  **Start the Interactive Chat:**
+    ```bash
+    ./go-ai-agent-v2 chat
+    ```
 
-This will compile the application and create an executable named `go-ai-agent-v2` in the current directory.
+3.  **Explore other commands:**
+    ```bash
+    # See all commands
+    ./go-ai-agent-v2 --help
 
-### Running Commands
+    # List available AI models
+    ./go-ai-agent-v2 list-models
 
-You can run the compiled CLI using:
+    # Run a one-shot generation
+    ./go-ai-agent-v2 generate "Tell me a joke about Go."
+    ```
 
-```bash
-./go-ai-agent-v2 [command] [flags]
-```
+## Project Structure
 
-For example:
-
-```bash
-./go-ai-agent-v2 chat
-./go-ai-agent-v2 settings set executor qwen
-./go-ai-agent-v2 settings set model qwen-turbo
-./go-ai-agent-v2 generate "Write a short story about a robot."
-./go-ai-agent-v2 ls .
-./go-ai-agent-v2 extensions list
-./go-ai-agent-v2 extract-function --file-path /path/to/file.go --start-line 10 --end-line 20 --new-function-name MyNewFunction
-```
-
-To see a list of all available commands and their options, run:
-
-```bash
-./go-ai-agent-v2 --help
-```
-
-## Next Steps & Future Enhancements
-
-The project is under active development. Future enhancements include:
-
-*   **Qwen Executor Enhancements:**
-    *   Implement `GenerateContent`, `ExecuteTool`, `SendMessageStream`, `GetHistory`, `CompressChat` for Qwen.
-    *   Implement tool calling for Qwen.
-*   **Model Routing Enhancements:**
-    *   Refactor `getSuggestedModel` to be more generic (e.g., a map of suggesters per executor type).
-    *   Implement `ClassifierStrategy` for more intelligent model routing.
-*   **Error Handling:**
-    *   Improve error messages for API failures (e.g., distinguish between quota errors and other API errors).
-*   **Settings Command:**
-    *   Add validation for `executor` and `model` settings.
-*   **Comprehensive Testing**: Unit and integration tests for all new components.
-*   **Secure API Key Management**: Robust OS-specific storage and clearing of API keys.
-*   **IDE Integration**: Full integration with supported IDEs.
-*   **Theme Customization**: Ability to change and persist CLI visual themes.
-*   **Terminal Keybinding Configuration**: For enhanced multiline input.
-*   **External Editor Preference**: Setting and using a preferred external editor.
-*   **Detailed Usage Statistics**: Model and tool-specific metrics.
-*   **Restore Functionality**: Saving and restoring CLI state.
-*   **Folder Trust Management**: Security features for managing trusted folders.
-*   **MCP Server Management**: Full CRUD operations for MCP servers.
+- **`cmd/`**: Contains the entry points for all CLI commands, powered by Cobra.
+- **`pkg/`**: Contains the core logic, organized by feature:
+    - **`core/`**: AI model executors (Gemini, Qwen) and core agent logic.
+    - **`ui/`**: The Bubble Tea-based interactive chat interface.
+    - **`tools/`**: Definitions for all available agent tools.
+    - **`services/`**: Shared services for file system, Git, shell, etc.
+    - **`config/`**: Application configuration and settings management.
+    - **`routing/`**: Logic for dynamically routing requests to different AI models.
 
 ## Contributing
 
-Contributions are welcome! Please refer to the `PLAN.md` for the development strategy and `docs/gemini-cli-main/GEMINI.md` for coding conventions and guidelines.
-
-## License
-
-[Specify your project's license here]
+Contributions are welcome! Please see `PLAN.md` for the development roadmap and `docs/gemini-cli-main/GEMINI.md` for coding conventions and guidelines.

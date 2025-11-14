@@ -2,6 +2,7 @@ package tools
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -126,7 +127,7 @@ func (t *GlobTool) readIgnoreFile(filePath string) ([]glob.Glob, error) {
 }
 
 // Execute performs a glob search.
-func (t *GlobTool) Execute(args map[string]any) (types.ToolResult, error) {
+func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	pattern, ok := args["pattern"].(string)
 	if !ok {
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")

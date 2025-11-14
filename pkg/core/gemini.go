@@ -150,7 +150,7 @@ func (gc *GeminiChat) GenerateContent(contents ...*genai.Content) (*genai.Genera
 }
 
 // ExecuteTool executes a tool call.
-func (gc *GeminiChat) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, error) {
+func (gc *GeminiChat) ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
 	if gc.toolRegistry == nil {
 		return types.ToolResult{}, fmt.Errorf("tool registry not initialized")
 	}
@@ -166,7 +166,7 @@ func (gc *GeminiChat) ExecuteTool(fc *genai.FunctionCall) (types.ToolResult, err
 		args[k] = v
 	}
 
-	return tool.Execute(args)
+	return tool.Execute(ctx, args)
 }
 
 // SendMessageStream generates content using the Gemini API and streams responses.
@@ -327,14 +327,13 @@ func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatComp
 }
 
 // GenerateStream generates content and streams events back to the caller.
-func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, error) {
+func (gc *GeminiChat) GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
 	telemetry.LogDebugf("GenerateStream called")
 	eventChan := make(chan any)
 
 	go func() {
 		defer close(eventChan)
 
-		ctx := context.Background()
 		telemetry.LogDebugf("Sending StreamingStartedEvent")
 		eventChan <- types.StreamingStartedEvent{}
 
@@ -382,7 +381,7 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 							Args:       p.Args,
 						}
 
-						toolResult, err := gc.ExecuteTool(p)
+						toolResult, err := gc.ExecuteTool(ctx, p)
 
 						telemetry.LogDebugf("Sending ToolCallEndEvent: %s", p.Name)
 						eventChan <- types.ToolCallEndEvent{
