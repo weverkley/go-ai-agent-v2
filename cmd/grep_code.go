@@ -7,21 +7,19 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/services" // Keep this import for shellService
+	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/types"
-	"go-ai-agent-v2/go-cli/pkg/ui"
-	"go-ai-agent-v2/go-cli/pkg/tools" // Add back the import
 
 	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
-	"github.com/charmbracelet/bubbletea"
 )
 
 var grepCodeCmd = &cobra.Command{
 	Use:   "grep-code [pattern]",
 	Short: "Summarize findings for a given code pattern.",
-	Long: `This command uses grep to search for a code pattern and then uses AI to summarize the findings.`, 
-	Args: cobra.MinimumNArgs(0), // Allow 0 arguments for interactive mode
+	Long:  `This command uses grep to search for a code pattern and then uses AI to summarize the findings.`,
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		// Initialize the ToolRegistry
 		toolRegistry := tools.RegisterAllTools(FSService)
@@ -38,7 +36,7 @@ var grepCodeCmd = &cobra.Command{
 		}
 
 		params := &config.ConfigParameters{
-			ModelName: model,
+			ModelName:    model,
 			ToolRegistry: toolRegistry, // Use the initialized tool registry
 		}
 
@@ -53,16 +51,6 @@ var grepCodeCmd = &cobra.Command{
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 			os.Exit(1)
-		}
-
-		// If no question is provided, launch interactive UI
-		if len(args) == 0 {
-			p := tea.NewProgram(ui.NewGrepCodeModel(executor))
-			if _, err := p.Run(); err != nil {
-				fmt.Printf("Error running interactive grep-code: %v\n", err)
-				os.Exit(1)
-			}
-			return
 		}
 
 		pattern := strings.Join(args, " ")

@@ -361,9 +361,17 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	m.rootCmd.SetOut(&buffer)
 	m.rootCmd.SetErr(&buffer)
 
+	// Find the command
+	cmd, _, err := m.rootCmd.Find(args)
+	if err != nil {
+		m.messages = append(m.messages, ErrorMessage{Err: err})
+		m.updateViewport()
+		return m, nil
+	}
+
 	// Execute the Cobra command
 	m.rootCmd.SetArgs(args)
-	err := m.rootCmd.Execute()
+	err = cmd.Execute()
 
 	// Restore default output
 	m.rootCmd.SetOut(nil)
@@ -384,7 +392,6 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 		m.messages = append(m.messages, BotMessage{Content: "Command executed successfully."})
 	}
 
-
 	// Handle specific commands that might require UI changes
 	if len(args) > 0 {
 		switch args[0] {
@@ -394,6 +401,8 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 			return m, tea.Quit
 		case "settings":
 			m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
+		case "generate", "code-guide", "find-docs":
+			// The output is already captured and displayed
 		}
 	}
 
