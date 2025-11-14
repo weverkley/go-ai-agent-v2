@@ -47,9 +47,6 @@ func (s *CoreToolScheduler) Schedule(
 	request types.ToolCallRequestInfo,
 	ctx context.Context,
 ) error {
-	// For now, a simplified implementation that directly processes the request.
-	// The full queuing and state management will be added later.
-
 	toolRegistryVal, found := s.config.Get("toolRegistry")
 	if !found || toolRegistryVal == nil {
 		return fmt.Errorf("tool registry not found in config")
@@ -64,36 +61,66 @@ func (s *CoreToolScheduler) Schedule(
 		return fmt.Errorf("tool \"%s\" not found in registry", request.Name)
 	}
 
-	// Assuming AnyDeclarativeTool has a Build method that returns AnyToolInvocation
-	invocation, err := toolInstance.(AnyDeclarativeTool).Build(request.Args)
-	if err != nil {
-		return fmt.Errorf("failed to build tool invocation: %w", err)
-	}
-
-	// Simulate execution and completion
 	startTime := time.Now()
-	// In a real scenario, this would involve calling invocation.Execute()
-	// and handling its output and potential errors.
-	// For now, we'll create a dummy successful completion.
-	
-
+	result, err := toolInstance.Execute(request.Args)
 	durationMs := time.Since(startTime).Milliseconds()
 
-	completedCall := &SuccessfulToolCall{
-		BaseToolCall: BaseToolCall{
-			Request:    request,
-			Tool:       toolInstance.(AnyDeclarativeTool),
-			Invocation: invocation,
-			StartTime:  &startTime,
-			Outcome:    types.ToolConfirmationOutcomeProceedAlways,
-		},
-		Response: types.ToolCallResponseInfo{
-			CallID:        request.CallID,
-			ResponseParts: []types.Part{{Text: "Tool executed successfully (dummy)."}},
-			ResultDisplay: &types.ToolResultDisplay{FileDiff: "dummy"},
-			ContentLength: len("Tool executed successfully (dummy)."),
-		},
-		DurationMs: &durationMs,
+	var completedCall CompletedToolCall
+
+	if err != nil {
+		// Even with an error, there might be partial results to display.
+		// We create an ErroredToolCall.
+		erroredCall := &ErroredToolCall{
+			BaseToolCall: BaseToolCall{
+				Request:    request,
+				Tool:       nil, // Simplified, as we don't have AnyDeclarativeTool here
+				Invocation: nil, // Simplified
+				StartTime:  &startTime,
+				Outcome:    types.ToolConfirmationOutcomeProceedAlways,
+			},
+			Response: types.ToolCallResponseInfo{
+				CallID: request.CallID,
+				Error:  err,
+			},
+			DurationMs: &durationMs,
+		}
+		if result.Error != nil {
+			erroredCall.Response.ErrorType = result.Error.Type
+		}
+		if result.LLMContent != nil {
+			if parts, ok := result.LLMContent.([]types.Part); ok {
+				erroredCall.Response.ResponseParts = parts
+			} else if text, ok := result.LLMContent.(string); ok {
+				erroredCall.Response.ResponseParts = []types.Part{{Text: text}}
+			}
+		}
+		completedCall = erroredCall
+	} else {
+		// Successful execution
+		successfulCall := &SuccessfulToolCall{
+			BaseToolCall: BaseToolCall{
+				Request:    request,
+				Tool:       nil, // Simplified
+				Invocation: nil, // Simplified
+				StartTime:  &startTime,
+				Outcome:    types.ToolConfirmationOutcomeProceedAlways,
+			},
+			DurationMs: &durationMs,
+		}
+		if result.LLMContent != nil {
+			if parts, ok := result.LLMContent.([]types.Part); ok {
+				successfulCall.Response.ResponseParts = parts
+			} else if text, ok := result.LLMContent.(string); ok {
+				successfulCall.Response.ResponseParts = []types.Part{{Text: text}}
+			}
+		}
+		if result.ReturnDisplay != "" {
+			successfulCall.Response.ResultDisplay = &types.ToolResultDisplay{
+				FileDiff: result.ReturnDisplay, // Assuming display is a diff for now
+			}
+			successfulCall.Response.ContentLength = len(result.ReturnDisplay)
+		}
+		completedCall = successfulCall
 	}
 
 	if s.onAllToolCallsComplete != nil {

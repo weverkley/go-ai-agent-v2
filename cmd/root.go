@@ -19,8 +19,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
-
 	"github.com/spf13/cobra"
 )
 
@@ -28,28 +26,19 @@ var RootCmd = &cobra.Command{
 	Use:   "go-cli",
 	Short: "A Go-based CLI for Gemini",
 	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// This will run before any subcommand. We can use it to set up common configurations.
-		// Initialize the executor here so it's available to all subcommands
-		factory, err := core.NewExecutorFactory(executorType, Cfg)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
-			os.Exit(1)
-		}
-		executor, err = factory.NewExecutor(Cfg, types.GenerateContentConfig{}, []*genai.Content{})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Initialize chatService here, after executor is available
-		chatService = services.NewChatService(Cfg, executor)
-	},
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) == 0 {
-			_ = cmd.Help()
+			chatCmd, _, err := cmd.Find([]string{"chat"})
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Could not find chat command: %v\n", err)
+				os.Exit(1)
+			}
+			chatCmd.Run(chatCmd, args)
 			os.Exit(0)
 		}
+		// If arguments are passed, show help.
+		_ = cmd.Help()
+		os.Exit(0)
 	},
 }
 

@@ -47,10 +47,7 @@ type MockExecutorFactory struct {
 
 // NewExecutor creates a new MockExecutor.
 func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
-	if f.Mock != nil {
-		return f.Mock, nil
-	}
-	return &MockExecutor{}, nil
+	return NewExpressAPIMockExecutor(), nil
 }
 
 // QwenExecutorFactory is an ExecutorFactory that creates QwenChat instances.

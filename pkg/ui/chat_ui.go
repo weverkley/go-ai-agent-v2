@@ -354,6 +354,17 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	commandString := strings.TrimPrefix(input, "/")
 	args := strings.Fields(commandString)
 
+	// --- Safety Check ---
+	if len(args) > 0 {
+		switch args[0] {
+		case "chat", "exec", "generate":
+			m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("command '%s' is disabled in interactive chat to prevent freezing", args[0])})
+			m.updateViewport()
+			return m, nil
+		}
+	}
+	// --- End Safety Check ---
+
 	telemetry.LogDebugf("Executing command: %s with args: %v", commandString, args)
 
 	// Create a buffer to capture stdout and stderr
@@ -400,7 +411,9 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 		case "quit", "exit":
 			return m, tea.Quit
 		case "settings":
-			m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
+			if len(args) > 1 && (args[1] == "set" || args[1] == "reset") {
+				m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
+			}
 		case "generate", "code-guide", "find-docs":
 			// The output is already captured and displayed
 		}

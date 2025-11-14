@@ -411,3 +411,30 @@ func (gc *GeminiChat) GenerateStream(contents ...*genai.Content) (<-chan any, er
 
 	return eventChan, nil
 }
+
+// GenerateContentWithTools generates content using the Gemini API, including tools.
+func (gc *GeminiChat) GenerateContentWithTools(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error) {
+	// Set the tools for the model for this call
+	gc.model.Tools = tools
+
+	cs := gc.model.StartChat()
+
+	// The history contains the full conversation up to this point.
+	if len(history) == 0 {
+		return nil, fmt.Errorf("history cannot be empty")
+	}
+	
+	// Set the chat history up to the message before the last one.
+	if len(history) > 1 {
+		cs.History = history[:len(history)-1]
+	}
+
+	// Send the last message.
+	lastMessage := history[len(history)-1]
+	resp, err := cs.SendMessage(ctx, lastMessage.Parts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate content with tools: %w", err)
+	}
+
+	return resp, nil
+}

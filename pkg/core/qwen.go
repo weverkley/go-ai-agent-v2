@@ -362,3 +362,8 @@ func (qc *QwenChat) CompressChat(promptId string, force bool) (*types.ChatCompre
 	// Token counting is not implemented for Qwen, so we return a nil result.
 	return nil, nil
 }
+
+// GenerateContentWithTools is a placeholder implementation for QwenChat.
+func (qc *QwenChat) GenerateContentWithTools(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error) {
+	return nil, fmt.Errorf("GenerateContentWithTools not implemented for QwenChat")
+}
