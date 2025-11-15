@@ -65,6 +65,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				{ToolCallID: "mock-3", ToolName: "execute_command", Args: map[string]interface{}{"command": "cd todo-api && npm install express body-parser"}},
 				{ToolCallID: "mock-4", ToolName: "write_file", Args: map[string]interface{}{"file_path": todoAPIIndexPath, "content": "const express = require('express');\nconst bodyParser = require('body-parser');\nconst app = express();\nconst port = 3000;\n\napp.use(bodyParser.json());\n\nlet todos = []; // In-memory storage for todos\n\napp.get('/', (req, res) => {\n  res.send('Todo API is running!');\n});\n\napp.listen(port, () => {\n  console.log(`Todo API listening on port ${port}`);\n});"}},
 				{ToolCallID: "mock-5", ToolName: "read_file", Args: map[string]interface{}{"absolute_path": todoAPIIndexPath}},
+				{ToolCallID: "mock-6", ToolName: "user_confirm", Args: map[string]interface{}{"message": "Please run 'cd todo-api && node index.js &' in another terminal. Press 'continue' once the server is running."}},
 
 				{ToolCallID: "mock-7", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000"}},
 
@@ -102,6 +103,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 
 				// Phase 3: Testing and Validation (using other tools)
 				{ToolCallID: "mock-14", ToolName: "execute_command", Args: map[string]interface{}{"command": "kill $(lsof -t -i:3000) || true"}},
+				{ToolCallID: "mock-15", ToolName: "user_confirm", Args: map[string]interface{}{"message": "The todo-api server was killed. Please restart it by running 'cd todo-api && node index.js &' in another terminal. Press 'continue' once the server is running."}},
 
 				{ToolCallID: "mock-16", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos"}}, // GET all - should be empty array
 				{ToolCallID: "mock-17", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos", "method": "POST", "body": `{"title": "Learn Go AI Agent"}`}}, // add a todo

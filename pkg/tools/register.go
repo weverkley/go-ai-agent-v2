@@ -68,6 +68,9 @@ func RegisterAllTools(fs services.FileSystemService, shellService *services.Shel
 	if err := registry.Register(NewLsTool()); err != nil {
 		fmt.Printf("Error registering LsTool: %v\n", err)
 	}
+	if err := registry.Register(NewUserConfirmTool()); err != nil {
+		fmt.Printf("Error registering UserConfirmTool: %v\n", err)
+	}
 
 	return registry
 }
