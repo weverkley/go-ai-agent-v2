@@ -65,6 +65,9 @@ func RegisterAllTools(fs services.FileSystemService, shellService *services.Shel
 	if err := registry.Register(NewExtractFunctionTool()); err != nil {
 		fmt.Printf("Error registering ExtractFunctionTool: %v\n", err)
 	}
+	if err := registry.Register(NewLsTool()); err != nil {
+		fmt.Printf("Error registering LsTool: %v\n", err)
+	}
 
 	return registry
 }
