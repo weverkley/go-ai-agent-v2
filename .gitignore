@@ -1,6 +1,6 @@
 docs/*
 !docs/privacy_notice.md
 vendor
-gemini-cli
-.gemini/extensions/
-.gemini/tmp/
+.goaiagent/
+.goaiagent/extensions/
+.goaiagent/tmp/
