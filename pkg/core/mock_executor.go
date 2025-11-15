@@ -99,7 +99,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 					"old_string":  "app.put('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n\n  todo.title = req.body.title !== undefined ? req.body.title : todo.title;\n  todo.completed = req.body.completed !== undefined ? req.body.completed : todo.completed;\n  res.json(todo);\n});",
 					"new_string":  "app.put('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n\n  todo.title = req.body.title !== undefined ? req.body.title : todo.title;\n  todo.completed = req.body.completed !== undefined ? req.body.completed : todo.completed;\n  res.json(todo);\n});\n\n// DELETE a todo\napp.delete('/todos/:id', (req, res) => {\n  const index = todos.findIndex(t => t.id === parseInt(req.params.id));\n  if (index === -1) return res.status(404).send('Todo not found');\n\n  const deletedTodo = todos.splice(index, 1);\n  res.json(deletedTodo);\n});",
 				}},
-				{ToolCallID: "mock-13", ToolName: "read_file", Args: map[string]interface{}{"file_path": "todo-api/index.js"}},
+				{ToolCallID: "mock-13", ToolName: "read_file", Args: map[string]interface{}{"file_path": todoAPIIndexPath}},
 
 				// Phase 3: Testing and Validation (using other tools)
 				{ToolCallID: "mock-14", ToolName: "execute_command", Args: map[string]interface{}{"command": "kill $(lsof -t -i:3000) || true"}},
