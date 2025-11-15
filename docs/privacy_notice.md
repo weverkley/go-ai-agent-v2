@@ -1,4 +1,4 @@
-Gemini CLI Privacy Notice:
+Go AI Agent Privacy Notice:
 
 This CLI tool may collect anonymous usage data to help improve its features and performance. This data does not include any personal identifiable information.
 

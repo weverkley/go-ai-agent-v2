@@ -58,4 +58,4 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
 
 ## Contributing
 
-Contributions are welcome! Please see `PLAN.md` for the development roadmap and `docs/gemini-cli-main/GEMINI.md` for coding conventions and guidelines.
+Contributions are welcome! Please see `PLAN.md` for the development roadmap and `docs/go-ai-agent-main/GEMINI.md` for coding conventions and guidelines.

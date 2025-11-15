@@ -13,7 +13,7 @@ import (
 // initCmd represents the init command
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize a new Gemini CLI project",
+	Short: "Initialize a new Go AI Agent project",
 	Long:  `The init command analyzes the project and creates a tailored GEMINI.md file for instructional context.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
 		projectRoot, err := os.Getwd()

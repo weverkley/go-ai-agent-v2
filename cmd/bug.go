@@ -14,14 +14,14 @@ import (
 var bugCmd = &cobra.Command{
 	Use:   "bug",
 	Short: "Report a bug or provide feedback",
-	Long:  `The bug command opens a new issue in the Gemini CLI GitHub repository, allowing users to report bugs or provide feedback.`, //nolint:staticcheck
+	Long:  `The bug command opens a new issue in the Go AI Agent GitHub repository, allowing users to report bugs or provide feedback.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
 		const githubNewIssueURL = "https://github.com/wever-kley/go-ai-agent-v2/issues/new"
 
 		// Gather system information from the about command's details
 		var bodyBuilder strings.Builder
 		bodyBuilder.WriteString("\n\n---\n")
-		bodyBuilder.WriteString(fmt.Sprintf("Gemini CLI Version: %s\n", version))
+		bodyBuilder.WriteString(fmt.Sprintf("Go AI Agent Version: %s\n", version))
 		bodyBuilder.WriteString(fmt.Sprintf("Build Date: %s\n", buildDate))
 		bodyBuilder.WriteString(fmt.Sprintf("Git Commit: %s\n", gitCommit))
 		bodyBuilder.WriteString(fmt.Sprintf("Go Version: %s\n", runtime.Version()))

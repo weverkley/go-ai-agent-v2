@@ -6,7 +6,7 @@ When implementing a feature and its not fully yet implemented, or depends on ano
 
 i want to replicate the same GUI for the cli which the javascript version already have, for terminal gui tasks i want to use https://github.com/charmbracelet/bubbletea as the main cli gui.
 
-The javascript files reside in the folder docs/gemini-cli-main/packages folder The documentation about each the javascript verion feature redise in the folder docs/gemini-cli-main/docs.
+The javascript files reside in the folder docs/go-ai-agent-main/packages folder The documentation about each the javascript verion feature redise in the folder docs/go-ai-agent-main/docs.
 
 Before continuing, i want you to read my current progress and the files i have implemented already on the folder go-cli, start reading the folders and then proceed to read files.
 

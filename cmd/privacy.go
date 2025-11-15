@@ -12,7 +12,7 @@ import (
 var privacyCmd = &cobra.Command{
 	Use:   "privacy",
 	Short: "Display the privacy notice",
-	Long:  `The privacy command displays the privacy notice for the Gemini CLI.`, //nolint:staticcheck
+	Long:  `The privacy command displays the privacy notice for the Go AI Agent.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
 		privacyNoticePath := "docs/privacy_notice.md" // Path relative to project root
 		content, err := ioutil.ReadFile(privacyNoticePath)

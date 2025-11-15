@@ -104,7 +104,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				{ToolCallID: "mock-14", ToolName: "execute_command", Args: map[string]interface{}{"command": "kill $(lsof -t -i:3000) || true"}},
 				{ToolCallID: "mock-15", ToolName: "execute_command", Args: map[string]interface{}{"command": "cd todo-api && node index.js &"}},
 				{ToolCallID: "mock-16", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos"}}, // GET all - should be empty array
-				{ToolCallID: "mock-17", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos", "method": "POST", "body": `{"title": "Learn Gemini CLI"}`}}, // add a todo
+				{ToolCallID: "mock-17", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos", "method": "POST", "body": `{"title": "Learn Go AI Agent"}`}}, // add a todo
 				{ToolCallID: "mock-18", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos"}}, // GET all - should have one todo
 				{ToolCallID: "mock-19", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos/1"}}, // GET todo by ID
 				{ToolCallID: "mock-20", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos/1", "method": "PUT", "body": `{"completed": true}`}}, // update todo

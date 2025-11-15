@@ -1,6 +1,6 @@
 🧑‍💻 ## USER
 
-This is the Gemini CLI. We are setting up the context for our chat.
+This is the Go AI Agent. We are setting up the context for our chat.
 Today's date is Sunday, November 9, 2025 (formatted according to the user's locale).
 My operating system is: linux
 I'm currently working in the directory: /home/wever-kley/Workspace/go-ai-agent-v2
@@ -22,10 +22,10 @@ Showing up to 200 items (files + folders). Folders or files indicated with ... c
 │           └───.git/...
 ├───.git/...
 ├───docs/
-│   └───gemini-cli-main/...
+│   └───go-ai-agent-main/...
 └───go-cli/
     ├───copied_file.txt
-    ├───gemini-cli
+    ├───go-ai-agent
     ├───GEMINI.md
     ├───go.mod
     ├───go.sum

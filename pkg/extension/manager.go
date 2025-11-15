@@ -14,7 +14,7 @@ const (
 	settingsFile = ".gemini/settings.json"
 )
 
-// Extension represents a Gemini CLI extension.
+// Extension represents a Go AI Agent extension.
 type Extension struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -22,7 +22,7 @@ type Extension struct {
 	// Add other extension properties as needed
 }
 
-// ExtensionManager manages Gemini CLI extensions.
+// ExtensionManager manages Go AI Agent extensions.
 type Manager struct {
 	mu         sync.RWMutex
 	extensions map[string]*Extension

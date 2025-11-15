@@ -16,10 +16,10 @@ var (
 // aboutCmd represents the about command
 var aboutCmd = &cobra.Command{
 	Use:   "about",
-	Short: "Display information about the Gemini CLI",
-	Long:  `The about command displays information about the Gemini CLI, including its purpose, version, build details, and environment.`, //nolint:staticcheck
+	Short: "Display information about the Go AI Agent",
+	Long:  `The about command displays information about the Go AI Agent, including its purpose, version, build details, and environment.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Gemini CLI - A Go-based CLI for interacting with the Gemini API and managing extensions.")
+		fmt.Println("Go AI Agent - A Go-based CLI for interacting with the Gemini API and managing extensions.")
 		fmt.Printf("Version: %s\n", version)
 		fmt.Printf("Build Date: %s\n", buildDate)
 		fmt.Printf("Git Commit: %s\n", gitCommit)

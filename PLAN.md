@@ -1,6 +1,6 @@
 # Go CLI Migration Plan
 
-This document outlines the plan for migrating the JavaScript-based Gemini CLI to a new Go-based CLI application. The goal is to rewrite the entire CLI, excluding the authentication flow (which will rely on `GEMINI_API_KEY` environment variable), test files/commands, and the VS Code IDE companion.
+This document outlines the plan for migrating the JavaScript-based Go AI Agent to a new Go-based CLI application. The goal is to rewrite the entire CLI, excluding the authentication flow (which will rely on `GEMINI_API_KEY` environment variable), test files/commands, and the VS Code IDE companion.
 
 ### **IMPORTANT!**
 This project is meant to be a generic CLI, it will use multiple AI executors (e.g., Gemini, OpenAI, etc.), not only Gemini which this tool is currently based on.

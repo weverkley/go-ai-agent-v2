@@ -16,9 +16,9 @@ var compressCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Compressing chat history...")
 
-		// Check if there's a Gemini client available
+		// Check if there's a Go AI Agent client available
 		if executor == nil {
-			fmt.Fprintf(os.Stderr, "Error: Gemini client not initialized. Cannot compress chat history.\n")
+			fmt.Fprintf(os.Stderr, "Error: Go AI Agent client not initialized. Cannot compress chat history.\n")
 			os.Exit(1)
 		}
 

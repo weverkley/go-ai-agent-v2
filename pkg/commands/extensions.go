@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/gemini-cli-main/packages/cli/src/commands/extensions/examples"
+const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/go-ai-agent-main/packages/cli/src/commands/extensions/examples"
 
 // ExtensionsCommand represents the extensions command group.
 type ExtensionsCommand struct {
@@ -136,86 +136,89 @@ func (c *ExtensionsCommand) New(args extension.NewArgs) error {
 		if err != nil {
 			return fmt.Errorf("failed to marshal extension manifest: %w", err)
 		}
-		err = c.extensionManager.FSService.WriteFile(c.extensionManager.FSService.JoinPaths(args.Path, "gemini-extension.json"), string(manifestBytes))
-		if err != nil {
-			return fmt.Errorf("failed to write gemini-extension.json: %w", err)
-		}
-		fmt.Printf("Successfully created new extension at %s.\n", args.Path)
-	}
-
-	fmt.Printf("You can install this using \"gemini extensions link %s\" to test it out.\n", args.Path)
-	return nil
-}
-
-// Enable enables an extension.
-func (c *ExtensionsCommand) Enable(args extension.ExtensionScopeArgs) error {
-	var err error
-	err = c.extensionManager.EnableExtension(args.Name)
-	if err != nil {
-		return fmt.Errorf("failed to enable extension: %w", err)
-	}
-
-	if args.Scope != "" {
-		fmt.Printf("Extension \"%s\" successfully enabled for scope \"%s\".\n", args.Name, args.Scope)
-	} else {
-		fmt.Printf("Extension \"%s\" successfully enabled in all scopes.\n", args.Name)
-	}
-	return nil
-}
-
-// Disable disables an extension.
-
-func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
-
-	var err error
-
-	scope := config.SettingScopeUser
-
-	if strings.ToLower(args.Scope) == "workspace" {
-
-		scope = config.SettingScopeWorkspace
-
-	}
-
-	err = c.extensionManager.DisableExtension(args.Name)
-	if err != nil {
-		return fmt.Errorf("failed to disable extension: %w", err)
-	}
-
-	fmt.Printf("Extension \"%s\" successfully disabled for scope \"%s\".\n", args.Name, scope)
-	return nil
-}
-
-// Update updates an extension or all extensions.
-func (c *ExtensionsCommand) Update(name string, all bool) error {
-	var err error
-	if all {
-		extensions := c.extensionManager.ListExtensions()
-		for _, ext := range extensions {
-			err = c.extensionManager.UpdateExtension(ext.Name)
-			if err != nil {
-				fmt.Printf("Error updating extension %s: %v\n", ext.Name, err)
+				err = c.extensionManager.FSService.WriteFile(c.extensionManager.FSService.JoinPaths(args.Path, "go-ai-agent-extension.json"), string(manifestBytes))
+				if err != nil {
+					return fmt.Errorf("failed to write go-ai-agent-extension.json: %w", err)
+				}
+				fmt.Printf("Successfully created new extension at %s.\n", args.Path)
 			}
+		
+			fmt.Printf("You can install this using \"go-ai-agent extensions link %s\" to test it out.\n", args.Path)
+			return nil
 		}
-		fmt.Println("All extensions updated.")
-	} else {
-		err = c.extensionManager.UpdateExtension(name)
-		if err != nil {
-			return fmt.Errorf("failed to update extension: %w", err)
+		
+		// Enable enables an extension.
+		func (c *ExtensionsCommand) Enable(args extension.ExtensionScopeArgs) error {
+			var err error
+			err = c.extensionManager.EnableExtension(args.Name)
+			if err != nil {
+				return fmt.Errorf("failed to enable extension: %w", err)
+			}
+		
+			if args.Scope != "" {
+				fmt.Printf("Extension \"%s\" successfully enabled for scope \"%s\".\n", args.Name, args.Scope)
+			} else {
+				fmt.Printf("Extension \"%s\" successfully enabled in all scopes.\n", args.Name)
+			}
+			return nil
 		}
-	}
-
-	return nil
-}
-
-// Link links a local extension.
-func (c *ExtensionsCommand) Link(path string) error {
-	var err error
-	err = c.extensionManager.LinkExtension(path)
-	if err != nil {
-		return fmt.Errorf("failed to link extension: %w", err)
-	}
-
-	fmt.Printf("Extension at \"%s\" linked successfully.\n", path)
-	return nil
-}
+		
+		// Disable disables an extension.
+		
+		func (c *ExtensionsCommand) Disable(args extension.ExtensionScopeArgs) error {
+		
+			var err error
+		
+			scope := config.SettingScopeUser
+		
+			if strings.ToLower(args.Scope) == "workspace" {
+		
+				scope = config.SettingScopeWorkspace
+		
+			}
+		
+		
+		
+			err = c.extensionManager.DisableExtension(args.Name)
+			if err != nil {
+				return fmt.Errorf("failed to disable extension: %w", err)
+			}
+		
+			fmt.Printf("Extension \"%s\" successfully disabled for scope \"%s\".\n", args.Name, scope)
+			return nil
+		}
+		
+		// Update updates an extension or all extensions.
+		func (c *ExtensionsCommand) Update(name string, all bool) error {
+			var err error
+			if all {
+				extensions := c.extensionManager.ListExtensions()
+				for _, ext := range extensions {
+					err = c.extensionManager.UpdateExtension(ext.Name)
+					if err != nil {
+						fmt.Printf("Error updating extension %s: %v\n", ext.Name, err)
+					}
+				}
+				fmt.Println("All extensions updated.")
+			} else {
+				err = c.extensionManager.UpdateExtension(name)
+				if err != nil {
+					return fmt.Errorf("failed to update extension: %w", err)
+				}
+			}
+		
+			return nil
+		}
+		
+		// Link links a local extension.
+		func (c *ExtensionsCommand) Link(path string) error {
+			var err error
+			err = c.extensionManager.LinkExtension(path)
+			if err != nil {
+				return fmt.Errorf("failed to link extension: %w", err)
+			}
+		
+			fmt.Printf("Extension at \"%s\" linked successfully.\n", path)
+			return nil
+		}
+		

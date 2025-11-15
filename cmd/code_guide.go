@@ -18,11 +18,9 @@ import (
 
 var codeGuideCmd = &cobra.Command{
 	Use:   "code-guide [question]",
-	Short: "Answer questions about the Gemini CLI codebase",
-	Long: `Answer questions about the Gemini CLI codebase with explanations and code snippets.
-
-This command acts as a specialized AI prompt to help new engineers understand the Gemini CLI codebase.
-It provides clear explanations grounded in the actual source code, including full file paths and design choices.`,
+	Short: "Answer questions about the Go AI Agent codebase",
+	Long: `Answer questions about the Go AI Agent codebase with explanations and code snippets.
+This command acts as a specialized AI prompt to help new engineers understand the Go AI Agent codebase.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		runCodeGuideCmd(cmd, args, SettingsService, ShellService)

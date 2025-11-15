@@ -12,10 +12,10 @@ import (
 // docsCmd represents the docs command
 var docsCmd = &cobra.Command{
 	Use:   "docs",
-	Short: "Open full Gemini CLI documentation in your browser",
-	Long:  `The docs command opens the official documentation for the Gemini CLI in your web browser.`, //nolint:staticcheck
+	Short: "Open full Go AI Agent documentation in your browser",
+	Long:  `The docs command opens the official documentation for the Go AI Agent in your web browser.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		const docsUrl = "https://goo.gle/gemini-cli-docs"
+		const docsUrl = "https://goo.gle/go-ai-agent-docs"
 
 		if os.Getenv("SANDBOX") != "" && os.Getenv("SANDBOX") != "sandbox-exec" {
 			fmt.Printf("Please open the following URL in your browser to view the documentation:\n%s\n", docsUrl)

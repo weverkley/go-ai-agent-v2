@@ -39,7 +39,7 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
+		return nil, fmt.Errorf("failed to create Go AI Agent client: %w", err)
 	}
 
 	modelVal, found := cfg.Get("model") // Use "model" key as defined in config.Get
