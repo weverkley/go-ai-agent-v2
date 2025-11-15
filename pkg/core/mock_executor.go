@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"time"
+	"go-ai-agent-v2/go-cli/pkg/telemetry" // New import
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -125,10 +126,14 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 					eventChan <- types.ErrorEvent{Err: ctx.Err()}
 					return
 				default:
+					// Log before thinking event
+					telemetry.LogDebugf("MockExecutor: Starting step %s (Tool: %s)", step.ToolCallID, step.ToolName)
 					eventChan <- types.ThinkingEvent{}
 					time.Sleep(1 * time.Second) // Simulate model thinking time
 
 					eventChan <- step // Emit ToolCallStartEvent
+					// Log before tool execution
+					telemetry.LogDebugf("MockExecutor: Executing tool %s (ID: %s, Args: %#v)", step.ToolName, step.ToolCallID, step.Args)
 
 					toolResult, err := mock.ExecuteTool(ctx, &genai.FunctionCall{Name: step.ToolName, Args: step.Args})
 
@@ -140,6 +145,8 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 						Result:     toolResult.ReturnDisplay,
 						Err:        err,
 					}
+					// Log after tool execution
+					telemetry.LogDebugf("MockExecutor: Finished tool %s (ID: %s, Result: %s, Err: %v)", step.ToolName, step.ToolCallID, toolResult.ReturnDisplay, err)
 				}
 			}
 

@@ -391,14 +391,16 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForEvent(m.streamCh)
 
 	case streamEventMsg:
-		telemetry.LogDebugf("Received stream event: %T", msg.event)
 		switch event := msg.event.(type) {
 		case types.StreamingStartedEvent:
 			m.status = "Stream started..."
+			telemetry.LogDebugf("Received stream event: StreamingStartedEvent")
 		case types.ThinkingEvent:
 			m.status = "Thinking..."
+			telemetry.LogDebugf("Received stream event: ThinkingEvent")
 		case types.ToolCallStartEvent:
 			m.status = "Executing tool..."
+			telemetry.LogDebugf("Received stream event: ToolCallStartEvent (ID: %s, Name: %s, Args: %#v)", event.ToolCallID, event.ToolName, event.Args)
 			tcStatus := &ToolCallStatus{
 				ToolName: event.ToolName,
 				Args:     event.Args,
@@ -421,6 +423,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
+			telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", event.ToolCallID, event.ToolName, event.Result, event.Err)
 			if tc, ok := m.activeToolCalls[event.ToolCallID]; ok {
 				tc.Status = "Completed"
 				tc.Result = event.Result
@@ -428,8 +431,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case types.FinalResponseEvent:
 			m.messages = append(m.messages, BotMessage{Content: event.Content})
+			telemetry.LogDebugf("Received stream event: FinalResponseEvent (Content: %s)", event.Content)
 		case types.ErrorEvent:
-			telemetry.LogDebugf("Received error event: %#v", event.Err)
+			telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", event.Err)
 			m.messages = append(m.messages, ErrorMessage{Err: event.Err})
 			// Check for a model suggestion
 			routingCtx := &routing.RoutingContext{
