@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	workspaceStateFile = ".gemini/workspace.json"
+	workspaceStateFile = ".goaiagent/workspace.json"
 )
 
 // WorkspaceService manages workspace directories.

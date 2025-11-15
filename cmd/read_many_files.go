@@ -16,7 +16,7 @@ var (
 	readManyFilesRecursive bool
 	readManyFilesUseDefaultExcludes bool
 	readManyFilesRespectGitIgnore bool
-	readManyFilesRespectGeminiIgnore bool
+	readManyFilesRespectGoaiagentIgnore bool
 )
 
 func init() {
@@ -26,7 +26,7 @@ func init() {
 	readManyFilesCmd.Flags().BoolVar(&readManyFilesRecursive, "recursive", true, "Optional: Whether to search recursively.")
 	readManyFilesCmd.Flags().BoolVar(&readManyFilesUseDefaultExcludes, "use-default-excludes", true, "Optional: Whether to apply default exclusion patterns.")
 	readManyFilesCmd.Flags().BoolVar(&readManyFilesRespectGitIgnore, "respect-git-ignore", true, "Optional: Whether to respect .gitignore patterns.")
-	readManyFilesCmd.Flags().BoolVar(&readManyFilesRespectGeminiIgnore, "respect-gemini-ignore", true, "Optional: Whether to respect .geminiignore patterns.")
+	readManyFilesCmd.Flags().BoolVar(&readManyFilesRespectGoaiagentIgnore, "respect-goaiagent-ignore", true, "Optional: Whether to respect .goaiagentignore patterns.")
 	_ = readManyFilesCmd.MarkFlagRequired("paths")
 }
 
@@ -51,7 +51,7 @@ var readManyFilesCmd = &cobra.Command{
 			"recursive":            readManyFilesRecursive,
 			"useDefaultExcludes":   readManyFilesUseDefaultExcludes,
 			"respectGitIgnore":     readManyFilesRespectGitIgnore,
-			"respectGeminiIgnore":  readManyFilesRespectGeminiIgnore,
+			"respectGoaiagentIgnore":  readManyFilesRespectGoaiagentIgnore,
 		})
 		if err != nil {
 			fmt.Printf("Error executing read-many-files command: %v\n", err)

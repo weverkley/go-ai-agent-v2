@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	settingsFile = ".gemini/settings.json"
+	settingsFile = ".goaiagent/settings.json"
 )
 
 // Extension represents a Go AI Agent extension.
@@ -150,7 +150,7 @@ func (em *Manager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata, f
 	defer em.mu.Unlock()
 
 	// Determine a temporary path for cloning/copying to read the manifest
-	tempPath := filepath.Join(em.baseDir, ".gemini", "temp_extensions", filepath.Base(metadata.Source))
+	tempPath := filepath.Join(em.baseDir, ".goaiagent", "temp_extensions", filepath.Base(metadata.Source))
 
 	// Perform clone/copy to temp path
 	switch metadata.Type {
@@ -170,7 +170,7 @@ func (em *Manager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata, f
 	}
 
 	// Read manifest to get extension name
-	manifestPath := filepath.Join(tempPath, "gemini-extension.json")
+	manifestPath := filepath.Join(tempPath, "goaiagent-extension.json")
 	manifestDataStr, err := em.FSService.ReadFile(manifestPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to read extension manifest from %s: %w", manifestPath, err)
@@ -185,9 +185,7 @@ func (em *Manager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata, f
 	}
 
 	// Now that we have the name, construct the final extension path
-	finalExtensionPath := filepath.Join(em.baseDir, ".gemini", "extensions", manifest.Name)
-
-	// If it was a git clone to temp, move it to final path
+finalExtensionPath := filepath.Join(em.baseDir, ".goaiagent", "extensions", manifest.Name)
 	if metadata.Type == "git" {
 		// Remove existing if force is true
 		if force {
@@ -225,7 +223,7 @@ func (em *Manager) UninstallExtension(name string, interactiveConsent bool) erro
 		return fmt.Errorf("extension '%s' not found", name)
 	}
 
-	extensionPath := filepath.Join(em.baseDir, ".gemini", "extensions", ext.Name)
+	extensionPath := filepath.Join(em.baseDir, ".goaiagent", "extensions", ext.Name)
 
 	// Remove the extension directory or symlink
 	if err := em.FSService.RemoveAll(extensionPath); err != nil {
@@ -250,7 +248,7 @@ func (em *Manager) UpdateExtension(name string) error {
 		return fmt.Errorf("extension '%s' not found", name)
 	}
 
-	extensionPath := filepath.Join(em.baseDir, ".gemini", "extensions", ext.Name)
+	extensionPath := filepath.Join(em.baseDir, ".goaiagent", "extensions", ext.Name)
 
 	// For now, only git extensions can be updated
 	// In a more complex scenario, metadata would store the type
@@ -269,7 +267,7 @@ func (em *Manager) LinkExtension(path string) error {
 	defer em.mu.Unlock()
 
 	// Read manifest from the source path to get extension name
-	manifestPath := filepath.Join(path, "gemini-extension.json")
+	manifestPath := filepath.Join(path, "goaiagent-extension.json")
 	manifestDataStr, err := em.FSService.ReadFile(manifestPath)
 	if err != nil {
 		return fmt.Errorf("failed to read extension manifest from %s: %w", manifestPath, err)
@@ -284,7 +282,7 @@ func (em *Manager) LinkExtension(path string) error {
 	}
 
 	// Now that we have the name, construct the final extension path
-	finalExtensionPath := filepath.Join(em.baseDir, ".gemini", "extensions", manifest.Name)
+	finalExtensionPath := filepath.Join(em.baseDir, ".goaiagent", "extensions", manifest.Name)
 
 	// Create symlink from source to final path
 	if err := em.FSService.Symlink(path, finalExtensionPath); err != nil {

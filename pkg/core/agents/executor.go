@@ -171,7 +171,7 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 		startHistory = append([]*genai.Content{systemInstruction}, startHistory...)
 	}
 
-	chat, err := core.NewGeminiChat(
+	chat, err := core.NewGoaiagentChat(
 		ae.RuntimeContext,
 		generationConfig,
 		startHistory,

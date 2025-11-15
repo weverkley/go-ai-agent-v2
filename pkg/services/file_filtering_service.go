@@ -17,9 +17,9 @@ import (
 type FileFilteringService struct {
 	projectRoot string
 	gitIgnorePatterns []glob.Glob
-	geminiIgnorePatterns []glob.Glob
+	goaiagentIgnorePatterns []glob.Glob
 	gitIgnoreStringPatterns []string // New field
-	geminiIgnoreStringPatterns []string // New field
+	goaiagentIgnoreStringPatterns []string // New field
 	mu sync.RWMutex
 }
 
@@ -34,13 +34,13 @@ func NewFileFilteringService(projectRoot string) (*FileFilteringService, error) 
 	return fs, nil
 }
 
-// loadIgnorePatterns loads .gitignore and .geminiignore patterns.
+// loadIgnorePatterns loads .gitignore and .goaiagentignore patterns.
 func (fs *FileFilteringService) loadIgnorePatterns() error {
 	fs.mu.Lock()
 	defer fs.mu.Unlock()
 
 	gitIgnorePath := filepath.Join(fs.projectRoot, ".gitignore")
-	geminiIgnorePath := filepath.Join(fs.projectRoot, ".geminiignore")
+	goaiagentIgnorePath := filepath.Join(fs.projectRoot, ".goaiagentignore")
 
 	var err error
 	fs.gitIgnorePatterns, fs.gitIgnoreStringPatterns, err = fs.parseIgnoreFile(gitIgnorePath)
@@ -49,10 +49,10 @@ func (fs *FileFilteringService) loadIgnorePatterns() error {
 		fmt.Printf("Warning: failed to load .gitignore: %v\n", err)
 	}
 
-	fs.geminiIgnorePatterns, fs.geminiIgnoreStringPatterns, err = fs.parseIgnoreFile(geminiIgnorePath)
+	fs.goaiagentIgnorePatterns, fs.goaiagentIgnoreStringPatterns, err = fs.parseIgnoreFile(goaiagentIgnorePath)
 	if err != nil {
 		// Log error but continue, .geminiignore is optional
-		fmt.Printf("Warning: failed to load .geminiignore: %v\n", err)
+		fmt.Printf("Warning: failed to load .goaiagentignore: %v\n", err)
 	}
 	return nil
 }
@@ -137,9 +137,9 @@ func (fs *FileFilteringService) ShouldIgnoreFile(filePath string, options types.
 		}
 	}
 
-	// Check .geminiignore patterns
-	if options.RespectGeminiIgnore != nil && *options.RespectGeminiIgnore {
-		for _, pattern := range fs.geminiIgnorePatterns {
+	// Check .goaiagentignore patterns
+	if options.RespectGoaiagentIgnore != nil && *options.RespectGoaiagentIgnore {
+		for _, pattern := range fs.goaiagentIgnorePatterns {
 			if pattern.Match(normalizedPath) {
 				return true
 			}
@@ -156,6 +156,6 @@ func (fs *FileFilteringService) GetIgnoredPatterns() []string {
 
 	var patterns []string
 	patterns = append(patterns, fs.gitIgnoreStringPatterns...)
-	patterns = append(patterns, fs.geminiIgnoreStringPatterns...)
+	patterns = append(patterns, fs.goaiagentIgnoreStringPatterns...)
 	return patterns
 }

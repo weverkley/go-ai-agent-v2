@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings" // Add strings import
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/services" // Add services import
@@ -128,15 +129,16 @@ func (s *ManagerTestSuite) SetupTest() {
 	var gitService services.GitService = s.mockGit
 
 	// Mock os.ReadFile and os.WriteFile for settings.json
-	s.mockFs.On("JoinPaths", mock.AnythingOfType("[]string")).Return(filepath.Join(s.tempDir, ".gemini", "settings.json")).Maybe()
-	s.mockFs.On("CreateDirectory", filepath.Join(s.tempDir, ".gemini")).Return(nil).Maybe()
-	s.mockFs.On("WriteFile", filepath.Join(s.tempDir, ".gemini", "settings.json"), mock.Anything).Return(nil).Maybe()
+	s.mockFs.On("JoinPaths", mock.Anything, mock.Anything).Return(filepath.Join(s.tempDir, ".goaiagent", "settings.json")).Maybe()
+	s.mockFs.On("CreateDirectory", filepath.Join(s.tempDir, ".goaiagent")).Return(nil).Maybe()
+	s.mockFs.On("WriteFile", filepath.Join(s.tempDir, ".goaiagent", "settings.json"), mock.Anything).Return(nil).Maybe()
 	// Mock ReadFile for initial LoadExtensionStatus call and subsequent calls
-	s.mockFs.On("ReadFile", filepath.Join(s.tempDir, ".gemini", "settings.json")).Return("{}", nil).Maybe() // Specific mock for settings.json
+	s.mockFs.On("ReadFile", mock.MatchedBy(func(path string) bool {
+		return strings.HasSuffix(path, "settings.json")
+	})).Return("{}", nil).Maybe() // Specific mock for settings.json
 	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe() // Added this as well, as it's called in SaveExtensionStatus
-	s.mockFs.On("PathExists", filepath.Join(s.tempDir, ".gemini")).Return(true, nil).Maybe() // Mock PathExists for .gemini directory
-	s.mockFs.On("PathExists", filepath.Join(s.tempDir, ".gemini", "settings.json")).Return(true, nil).Maybe() // Mock PathExists for settings.json
-
+	s.mockFs.On("PathExists", filepath.Join(s.tempDir, ".goaiagent")).Return(true, nil).Maybe() // Mock PathExists for .goaiagent directory
+	s.mockFs.On("PathExists", filepath.Join(s.tempDir, ".goaiagent", "settings.json")).Return(true, nil).Maybe() // Mock PathExists for settings.json
 	s.manager = NewManager(s.tempDir, s.mockFs, gitService)
 }
 
@@ -154,14 +156,14 @@ func TestManagerTestSuite(t *testing.T) {
 func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Git() {
 	extName := "test-git-ext"
 	source := "https://github.com/user/repo.git"
-	ref := "main"
-	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
+	ref := "main" // Define ref here
+	extensionPath := filepath.Join(s.tempDir, ".goaiagent", "extensions", extName)
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
-	tempPath := filepath.Join(s.tempDir, ".gemini", "temp_extensions", filepath.Base(source))
+	tempPath := filepath.Join(s.tempDir, ".goaiagent", "temp_extensions", filepath.Base(source))
 	s.mockFs.On("PathExists", extensionPath).Return(false, nil).Maybe()
 	s.mockGit.On("Clone", source, tempPath, ref).Return(nil).Maybe() // Clone to tempPath
-	s.mockFs.On("ReadFile", filepath.Join(tempPath, "gemini-extension.json")).Return(manifestContent, nil).Maybe() // Read manifest from tempPath
+	s.mockFs.On("ReadFile", filepath.Join(tempPath, "goaiagent-extension.json")).Return(manifestContent, nil).Maybe() // Read manifest from tempPath
 	s.mockFs.On("Rename", tempPath, extensionPath).Return(nil).Maybe() // Rename from tempPath to final path
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // For saving status
 	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Maybe() // Add PathExists mock for other calls
@@ -186,11 +188,10 @@ func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Git() {
 func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Local() {
 	extName := "test-local-ext"
 	source := "/path/to/local/ext"
-	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
+	extensionPath := filepath.Join(s.tempDir, ".goaiagent", "extensions", extName)
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
-	s.mockFs.On("PathExists", extensionPath).Return(false, nil).Maybe()
-	s.mockFs.On("ReadFile", filepath.Join(source, "gemini-extension.json")).Return(manifestContent, nil).Maybe() // Read manifest from source
+s.mockFs.On("ReadFile", filepath.Join(source, "goaiagent-extension.json")).Return(manifestContent, nil).Maybe() // Read manifest from source
 	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Maybe() // Symlink from source to final path
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // For saving status
 	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Maybe() // Add PathExists mock for other calls
@@ -213,7 +214,7 @@ func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Local() {
 // TestUninstallExtension tests uninstalling an extension
 func (s *ManagerTestSuite) TestUninstallExtension() {
 	extName := "test-ext-to-uninstall"
-	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
+	extensionPath := filepath.Join(s.tempDir, ".goaiagent", "extensions", extName)
 
 	// Register a dummy extension first
 	s.manager.RegisterExtension(&Extension{Name: extName, Enabled: true})
@@ -235,7 +236,7 @@ func (s *ManagerTestSuite) TestUninstallExtension() {
 // TestUpdateExtension tests updating an extension
 func (s *ManagerTestSuite) TestUpdateExtension() {
 	extName := "test-ext-to-update"
-	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
+	extensionPath := filepath.Join(s.tempDir, ".goaiagent", "extensions", extName)
 
 	// Register a dummy extension first
 	s.manager.RegisterExtension(&Extension{Name: extName, Enabled: true})
@@ -252,10 +253,10 @@ func (s *ManagerTestSuite) TestUpdateExtension() {
 func (s *ManagerTestSuite) TestLinkExtension() {
 	extName := "test-linked-ext"
 	source := "/path/to/local/ext"
-	extensionPath := filepath.Join(s.tempDir, ".gemini", "extensions", extName)
+	extensionPath := filepath.Join(s.tempDir, ".goaiagent", "extensions", extName)
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
-	s.mockFs.On("ReadFile", filepath.Join(source, "gemini-extension.json")).Return(manifestContent, nil).Maybe() // Read manifest from source
+	s.mockFs.On("ReadFile", filepath.Join(source, "goaiagent-extension.json")).Return(manifestContent, nil).Once()
 	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Maybe() // Symlink from source to final path
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // For saving status
 	s.mockFs.On("PathExists", mock.Anything).Return(false, nil).Maybe() // Add PathExists mock for other calls

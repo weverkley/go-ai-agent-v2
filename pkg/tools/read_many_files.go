@@ -53,7 +53,7 @@ func NewReadManyFilesTool() *ReadManyFilesTool {
 					},
 					                    					"file_filtering_options": {
 					                    						Type:        "object",
-					                    						Description: "Whether to respect ignore patterns from .gitignore or .geminiignore",
+					                    						Description: "Whether to respect ignore patterns from .gitignore or .goaiagentignore",
 					                    						Properties: map[string]types.JsonSchemaProperty{
 					                    							"respect_git_ignore": {
 					                    								Type:        "boolean",
@@ -61,7 +61,7 @@ func NewReadManyFilesTool() *ReadManyFilesTool {
 					                    							},
 					                    							"respect_gemini_ignore": {
 					                    								Type:        "boolean",
-					                    								Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+					                    								Description: "Optional: Whether to respect .goaiagentignore patterns when listing files. Defaults to true.",
 					                    							},
 					                    						},
 					                    					},				},
@@ -123,7 +123,7 @@ func (t *ReadManyFilesTool) Execute(ctx context.Context, args map[string]any) (t
 	searchPatterns := append(pathStrings, includePatterns...)
 
 	if useDefaultExcludes {
-		excludePatterns = append(excludePatterns, "node_modules", ".git", ".gemini")
+		excludePatterns = append(excludePatterns, "node_modules", ".git", ".goaiagent")
 	}
 
 	var compiledExcludeGlobs []glob.Glob

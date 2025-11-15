@@ -47,9 +47,9 @@ func NewGlobTool() *GlobTool {
 						Type:        "boolean",
 						Description: "Optional: Whether to respect .gitignore patterns. Defaults to true.",
 					},
-					"respect_gemini_ignore": {
+					"respect_goaiagent_ignore": {
 						Type:        "boolean",
-						Description: "Optional: Whether to respect .geminiignore patterns. Defaults to true.",
+						Description: "Optional: Whether to respect .goaiagentignore patterns. Defaults to true.",
 					},
 				},
 				Required: []string{"pattern"},
@@ -67,8 +67,8 @@ type FileInfo struct {
 	ModTime time.Time
 }
 
-// getIgnorePatterns reads .gitignore and .geminiignore files and returns a list of glob patterns.
-func (t *GlobTool) getIgnorePatterns(searchDir string, respectGitIgnore, respectGeminiIgnore bool) ([]glob.Glob, error) {
+// getIgnorePatterns reads .gitignore and .goaiagentignore files and returns a list of glob patterns.
+func (t *GlobTool) getIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error) {
 	var ignorePatterns []glob.Glob
 
 	// Read .gitignore
@@ -83,13 +83,13 @@ func (t *GlobTool) getIgnorePatterns(searchDir string, respectGitIgnore, respect
 		}
 	}
 
-	// Read .geminiignore
-	if respectGeminiIgnore {
-		geminiIgnorePath := filepath.Join(searchDir, ".geminiignore")
-		if _, err := os.Stat(geminiIgnorePath); err == nil {
-			patterns, err := t.readIgnoreFile(geminiIgnorePath)
+	// Read .goaiagentignore
+	if respectGoaiagentIgnore {
+		goaiagentIgnorePath := filepath.Join(searchDir, ".goaiagentignore")
+		if _, err := os.Stat(goaiagentIgnorePath); err == nil {
+			patterns, err := t.readIgnoreFile(goaiagentIgnorePath)
 			if err != nil {
-				return nil, fmt.Errorf("failed to read .geminiignore: %w", err)
+				return nil, fmt.Errorf("failed to read .goaiagentignore: %w", err)
 			}
 			ignorePatterns = append(ignorePatterns, patterns...)
 		}
@@ -148,9 +148,9 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		respectGitIgnore = rgi
 	}
 
-	respectGeminiIgnore := true
-	if rgi, ok := args["respect_gemini_ignore"].(bool); ok {
-		respectGeminiIgnore = rgi
+	respectGoaiagentIgnore := true
+	if rgi, ok := args["respect_goaiagent_ignore"].(bool); ok {
+		respectGoaiagentIgnore = rgi
 	}
 
 	// Resolve the search path
@@ -170,7 +170,7 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	}
 
 	// Get ignore patterns
-	ignorePatterns, err := t.getIgnorePatterns(absSearchPath, respectGitIgnore, respectGeminiIgnore)
+	ignorePatterns, err := t.getIgnorePatterns(absSearchPath, respectGitIgnore, respectGoaiagentIgnore)
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to get ignore patterns: %w", err)
 	}

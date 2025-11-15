@@ -15,7 +15,7 @@ Showing up to 200 items (files + folders). Folders or files indicated with ... c
 ├───PROMPT.md
 ├───README.md
 ├───REVIEW.md
-├───.gemini/
+├───.goaiagent/
 │   └───extensions/
 │       └───test-extension/
 │           ├───gemini-extension.json
@@ -32,7 +32,7 @@ Showing up to 200 items (files + folders). Folders or files indicated with ... c
     ├───main.go
     ├───shared-chat.json
     ├───shared-chat.md
-    ├───.gemini/
+    ├───.goaiagent/
     │   ├───settings.json
     │   └───extensions/
     │       └───test-extension/

@@ -131,7 +131,7 @@ type StreamResponse struct {
 // FileFilteringOptions for filtering files.
 type FileFilteringOptions struct {
 	RespectGitIgnore    *bool `json:"respectGitIgnore,omitempty"`
-	RespectGeminiIgnore *bool `json:"respectGeminiIgnore,omitempty"`
+	RespectGoaiagentIgnore *bool `json:"respectGoaiagentIgnore,omitempty"`
 }
 
 // Part represents a part of a content message.
@@ -512,9 +512,9 @@ type ToolRegistry struct {
 
 
 
-// GeminiDirProvider provides the path to the .gemini directory.
-type GeminiDirProvider interface {
-	GetGeminiDir() string
+// GoaiagentDirProvider provides the path to the .goaiagent directory.
+type GoaiagentDirProvider interface {
+	GetGoaiagentDir() string
 }
 
 // GeminiConfigProvider provides configuration for Gemini.

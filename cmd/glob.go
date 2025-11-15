@@ -14,7 +14,7 @@ var (
 	globPath string
 	globCaseSensitive bool
 	globRespectGitIgnore bool
-	globRespectGeminiIgnore bool
+	globRespectGoaiagentIgnore bool
 )
 
 func init() {
@@ -22,7 +22,7 @@ func init() {
 	globCmd.Flags().StringVar(&globPath, "path", ".", "The absolute path to the directory to search within.")
 	globCmd.Flags().BoolVar(&globCaseSensitive, "case-sensitive", false, "Whether the search should be case-sensitive.")
 	globCmd.Flags().BoolVar(&globRespectGitIgnore, "respect-git-ignore", true, "Whether to respect .gitignore patterns.")
-	globCmd.Flags().BoolVar(&globRespectGeminiIgnore, "respect-gemini-ignore", true, "Whether to respect .geminiignore patterns.")
+	globCmd.Flags().BoolVar(&globRespectGoaiagentIgnore, "respect-goaiagent-ignore", true, "Whether to respect .goaiagentignore patterns.")
 	_ = globCmd.MarkFlagRequired("pattern")
 }
 
@@ -37,7 +37,7 @@ var globCmd = &cobra.Command{
 			"path":                  globPath,
 			"case_sensitive":        globCaseSensitive,
 			"respect_git_ignore":    globRespectGitIgnore,
-			"respect_gemini_ignore": globRespectGeminiIgnore,
+			"respect_goaiagent_ignore": globRespectGoaiagentIgnore,
 		})
 		if err != nil {
 			fmt.Printf("Error executing glob command: %v\n", err)

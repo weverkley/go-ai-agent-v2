@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	SettingsFileName = ".gemini/settings.json"
+	SettingsFileName = ".goaiagent/settings.json"
 )
 
 // Settings represents the application settings.
@@ -41,7 +41,7 @@ func LoadSettings(workspaceDir string) *Settings {
 	if err != nil {
 		// Return default settings if file doesn't exist or can't be read
 		return &Settings{
-			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
+			ExtensionPaths: []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
 			McpServers:     make(map[string]types.MCPServerConfig),
 			DebugMode:      false,
 			UserMemory:     "",
@@ -65,7 +65,7 @@ func LoadSettings(workspaceDir string) *Settings {
 		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
 		// Return default settings on parsing error
 		return &Settings{
-			ExtensionPaths: []string{filepath.Join(workspaceDir, ".gemini", "extensions")},
+			ExtensionPaths: []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
 			McpServers:     make(map[string]types.MCPServerConfig),
 			DebugMode:      false,
 			UserMemory:     "",
@@ -86,7 +86,7 @@ func LoadSettings(workspaceDir string) *Settings {
 
 	// Apply defaults if not set in the loaded settings
 	if len(settings.ExtensionPaths) == 0 {
-		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".gemini", "extensions")}
+		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")}
 	}
 	if settings.McpServers == nil {
 		settings.McpServers = make(map[string]types.MCPServerConfig)

@@ -46,10 +46,10 @@ func TestNewExecutorFactory(t *testing.T) {
 	// Create a dummy config.Config instance for NewExecutorFactory
 	dummyCfg := &MockConfig{}
 
-	t.Run("should return GeminiExecutorFactory for 'gemini' type", func(t *testing.T) {
-		factory, err := core.NewExecutorFactory("gemini", dummyCfg)
+	t.Run("should return GoaiagentExecutorFactory for 'goaiagent' type", func(t *testing.T) {
+		factory, err := core.NewExecutorFactory("goaiagent", dummyCfg)
 		assert.NoError(t, err)
-		assert.IsType(t, &core.GeminiExecutorFactory{}, factory)
+		assert.IsType(t, &core.GoaiagentExecutorFactory{}, factory)
 	})
 
 	t.Run("should return MockExecutorFactory for 'mock' type", func(t *testing.T) {
@@ -68,7 +68,7 @@ func TestNewExecutorFactory(t *testing.T) {
 
 func TestGeminiExecutorFactory_NewExecutor(t *testing.T) {
 	t.Run("should create a GeminiChat instance", func(t *testing.T) {
-		factory := &core.GeminiExecutorFactory{
+		factory := &core.GoaiagentExecutorFactory{
 			Router: routing.NewModelRouterService(&MockConfig{}), // Pass MockConfig here
 		}
 		mockConfig := &MockConfig{ModelName: "gemini-pro"}
@@ -79,11 +79,11 @@ func TestGeminiExecutorFactory_NewExecutor(t *testing.T) {
 
 		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*genai.Content{})
 		assert.NoError(t, err)
-		assert.IsType(t, &core.GeminiChat{}, executor)
+		assert.IsType(t, &core.GoaiagentChat{}, executor)
 	})
 
 	t.Run("should return error if GEMINI_API_KEY is not set", func(t *testing.T) {
-		factory := &core.GeminiExecutorFactory{
+		factory := &core.GoaiagentExecutorFactory{
 			Router: routing.NewModelRouterService(&MockConfig{}), // Pass MockConfig here
 		}
 		mockConfig := &MockConfig{ModelName: "gemini-pro"}

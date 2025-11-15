@@ -22,12 +22,12 @@ const (
 
 // ChatService provides methods for managing chat checkpoints.
 type ChatService struct {
-	config   types.GeminiDirProvider
+	config   types.GoaiagentDirProvider
 	executor core.Executor // Add executor field
 }
 
 // NewChatService creates a new ChatService instance.
-func NewChatService(cfg types.GeminiDirProvider, executor core.Executor) *ChatService {
+func NewChatService(cfg types.GoaiagentDirProvider, executor core.Executor) *ChatService {
 	return &ChatService{config: cfg, executor: executor}
 }
 
@@ -53,7 +53,7 @@ type SerializableContent struct {
 
 // getProjectTempDir returns the project's temporary directory.
 func (cs *ChatService) getProjectTempDir() (string, error) {
-	geminiDir := cs.config.GetGeminiDir()
+	geminiDir := cs.config.GetGoaiagentDir()
 	return filepath.Join(geminiDir, "checkpoints"), nil
 }
 

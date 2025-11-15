@@ -43,9 +43,9 @@ func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 								Type:        "boolean",
 								Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
 							},
-							"respect_gemini_ignore": {
+							"respect_goaiagent_ignore": {
 								Type:        "boolean",
-								Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+								Description: "Optional: Whether to respect .goaiagentignore patterns when listing files. Defaults to true.",
 							},
 						},
 					},
@@ -81,12 +81,12 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, args map[string]any) (t
 		respectGitIgnore = val
 	}
 
-	respectGeminiIgnore := true
-	if val, ok := args["respect_gemini_ignore"].(bool); ok {
-		respectGeminiIgnore = val
+	respectGoaiagentIgnore := true
+	if val, ok := args["respect_goaiagent_ignore"].(bool); ok {
+		respectGoaiagentIgnore = val
 	}
 
-	files, err := t.fileSystemService.ListDirectory(path, ignorePatterns, respectGitIgnore, respectGeminiIgnore)
+	files, err := t.fileSystemService.ListDirectory(path, ignorePatterns, respectGitIgnore, respectGoaiagentIgnore)
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to list directory %s: %w", path, err)
 	}

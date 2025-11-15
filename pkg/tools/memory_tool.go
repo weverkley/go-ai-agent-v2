@@ -51,7 +51,7 @@ func getGlobalMemoryFilePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
-	return filepath.Join(homeDir, ".gemini", DEFAULT_CONTEXT_FILENAME), nil
+	return filepath.Join(homeDir, ".goaiagent", DEFAULT_CONTEXT_FILENAME), nil
 }
 
 // readMemoryFileContent reads the current content of the memory file.

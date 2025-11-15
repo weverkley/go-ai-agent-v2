@@ -14,13 +14,13 @@ type ExecutorFactory interface {
 	NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error)
 }
 
-// GeminiExecutorFactory is an ExecutorFactory that creates GeminiChat instances.
-type GeminiExecutorFactory struct {
+// GoaiagentExecutorFactory is an ExecutorFactory that creates GoaiagentChat instances.
+type GoaiagentExecutorFactory struct {
 	Router *routing.ModelRouterService
 }
 
 // NewExecutor creates a new GeminiChat executor.
-func (f *GeminiExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (f *GoaiagentExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
 	// For now, we'll create a simple context. This will need to be updated
 	// to use the actual chat history and user request.
 	routingCtx := &routing.RoutingContext{
@@ -37,7 +37,7 @@ func (f *GeminiExecutorFactory) NewExecutor(cfg types.Config, generationConfig t
 
 	routedCfg := cfg.WithModel(decision.Model)
 
-	return NewGeminiChat(routedCfg, generationConfig, startHistory)
+	return NewGoaiagentChat(routedCfg, generationConfig, startHistory)
 }
 
 // MockExecutorFactory is an ExecutorFactory that creates MockExecutor instances.
@@ -73,8 +73,8 @@ func (f *QwenExecutorFactory) NewExecutor(cfg types.Config, generationConfig typ
 // NewExecutorFactory creates an ExecutorFactory based on the provided type.
 func NewExecutorFactory(executorType string, cfg types.Config) (ExecutorFactory, error) {
 	switch executorType {
-	case "gemini":
-		return &GeminiExecutorFactory{
+	case "goaiagent":
+		return &GoaiagentExecutorFactory{
 			Router: routing.NewModelRouterService(cfg),
 		}, nil
 	case "qwen":

@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	memoryFile = ".gemini/memory.json"
+	memoryFile = ".goaiagent/memory.json"
 )
 
 // MemoryService manages the AI's long-term memory.

@@ -59,7 +59,7 @@ func getTodosFilePath() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
-	return filepath.Join(homeDir, ".gemini", TODOS_FILENAME), nil
+	return filepath.Join(homeDir, ".goaiagent", TODOS_FILENAME), nil
 }
 
 // Execute writes the todos to a file.

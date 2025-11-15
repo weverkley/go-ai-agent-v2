@@ -78,12 +78,12 @@ func TestListDirectoryTool_Execute(t *testing.T) {
 			expectedReturnDisplay: "Listed directory /test/dir: 2 items",
 		},
 		{
-			name: "successful listing - respect_gemini_ignore false",
-			args: map[string]any{"path": "/test/dir", "respect_gemini_ignore": false},
+			name: "successful listing - respect_goaiagent_ignore false",
+			args: map[string]any{"path": "/test/dir", "respect_goaiagent_ignore": false},
 			setupMock: func() {
-				mockFSS.On("ListDirectory", "/test/dir", []string{}, true, false).Return([]string{"file1.txt", "ignored.gemini"}, nil).Once()
+				mockFSS.On("ListDirectory", "/test/dir", []string{}, true, false).Return([]string{"file1.txt", "ignored.goaiagent"}, nil).Once()
 			},
-			expectedLLMContent:    "file1.txt\nignored.gemini",
+			expectedLLMContent:    "file1.txt\nignored.goaiagent",
 			expectedReturnDisplay: "Listed directory /test/dir: 2 items",
 		},
 	}

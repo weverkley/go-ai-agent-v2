@@ -98,9 +98,9 @@ func (c *Config) WithModel(modelName string) types.Config {
 	return &newConfig
 }
 
-// GetGeminiDir returns the path to the .gemini directory within the target directory.
-func (c *Config) GetGeminiDir() string {
-	return filepath.Join(c.targetDir, ".gemini")
+// GetGoaiagentDir returns the path to the .goaiagent directory within the target directory.
+func (c *Config) GetGoaiagentDir() string {
+	return filepath.Join(c.targetDir, ".goaiagent")
 }
 
 // Get returns the value of a configuration setting by key.
@@ -148,7 +148,7 @@ var (
 	}
 	DEFAULT_FILE_FILTERING_OPTIONS = types.FileFilteringOptions{
 		RespectGitIgnore:  boolPtr(true),
-		RespectGeminiIgnore: boolPtr(true),
+		RespectGoaiagentIgnore: boolPtr(true),
 	}
 )
 

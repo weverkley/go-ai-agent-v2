@@ -105,7 +105,7 @@ All previously identified linter issues have been resolved, including:
 - **`cmd/root.go`**: Updated call to `tools.RegisterAllTools()` (now `types.NewToolRegistry()`) and removed unused `dummyConfig`.
 - **`SA9003: empty branch` errors**: Added `//nolint:staticcheck` to empty `if` blocks in `pkg/utils/folder_structure.go` and `pkg/core/agents/registry.go`.
 - **Duplicate definitions in `pkg/config`**: Consolidated `SettingScope`, `Settings`, and `LoadSettings` into `pkg/config/config.go` and deleted `pkg/config/settings.go`.
-- **`cmd/generate.go` and `pkg/ui/generate_ui.go` type mismatch**: Corrected `ui.NewGenerateModel` to accept `*core.GeminiChat` and updated `cmd/generate.go` to pass the `geminiClient` correctly. Removed unused imports from `pkg/ui/generate_ui.go`.
+- **`cmd/generate.go` and `pkg/ui/generate_ui.go` type mismatch**: Corrected `ui.NewGenerateModel` to accept `*core.GoaiagentChat` and updated `cmd/generate.go` to pass the `goaiagentClient` correctly. Removed unused imports from `pkg/ui/generate_ui.go`.
 - **`pkg/extension/manager.go`**: Corrected `fsService` type from `*services.FileSystemService` to `services.FileSystemService`.
 - **`cmd/find_docs.go`**: Corrected ToolRegistry initialization.
 - **`cmd/pr_review.go`**: Corrected ToolRegistry initialization and syntax error.
