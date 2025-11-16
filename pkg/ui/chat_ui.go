@@ -28,17 +28,14 @@ import (
 // --- Message Interface and Structs ---
 
 type Message interface {
-	Render(m *ChatModel, forLog bool) string
+	Render(m *ChatModel) string
 }
 
 type UserMessage struct {
 	Content string
 }
 
-func (msg UserMessage) Render(m *ChatModel, forLog bool) string {
-	if forLog {
-		return "You: " + msg.Content
-	}
+func (msg UserMessage) Render(m *ChatModel) string {
 	return m.senderStyle.Render("You: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
 }
 
@@ -46,10 +43,7 @@ type BotMessage struct {
 	Content string
 }
 
-func (msg BotMessage) Render(m *ChatModel, forLog bool) string {
-	if forLog {
-		return "Bot: " + msg.Content
-	}
+func (msg BotMessage) Render(m *ChatModel) string {
 	return m.botStyle.Render("Bot: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
 }
 
@@ -65,7 +59,7 @@ type ToolCallGroupMessage struct {
 	ToolCalls map[string]*ToolCallStatus
 }
 
-func (msg *ToolCallGroupMessage) Render(m *ChatModel, forLog bool) string {
+func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 	var builder strings.Builder
 
 	// Sort the keys for a stable order
@@ -140,16 +134,11 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel, forLog bool) string {
 			}
 		}
 
-		var legend string
-		if forLog {
-			legend = fmt.Sprintf("%s %s %s", statusIcon, actionWord, argument)
-		} else {
-			legend = fmt.Sprintf("%s %s %s",
-				lipgloss.NewStyle().Foreground(iconColor).Render(statusIcon),
-				actionWordStyle.Render(actionWord),
-				argumentStyle.Render(argument),
-			)
-		}
+		legend := fmt.Sprintf("%s %s %s",
+			lipgloss.NewStyle().Foreground(iconColor).Render(statusIcon),
+			actionWordStyle.Render(actionWord),
+			argumentStyle.Render(argument),
+		)
 		boxContent.WriteString(legend)
 
 		// --- Special Content (for write_file, smart_edit, and user_confirm) ---
@@ -163,8 +152,7 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel, forLog bool) string {
 			} else if tc.ToolName == "smart_edit" {
 				// For smart_edit, display the new_string and the instruction
 				instruction, _ := tc.Args["instruction"].(string)
-				var newString string // Declare newString
-				newString, _ = tc.Args["new_string"].(string)
+				newString, _ := tc.Args["new_string"].(string)
 				filePathForLexer, _ = tc.Args["file_path"].(string)
 
 				contentToDisplay = fmt.Sprintf("Instruction: %s\n\n--- NEW CONTENT ---\n%s", instruction, newString)
@@ -177,59 +165,43 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel, forLog bool) string {
 			}
 			truncatedContent := strings.Join(lines, "\n")
 
-			if forLog {
-				boxContent.WriteString("\n\n")
-				boxContent.WriteString(truncatedContent)
-			} else {
-				lexer := lexers.Match(filePathForLexer)
-				if lexer == nil {
-					lexer = lexers.Analyse(truncatedContent)
-				}
-				if lexer == nil {
-					lexer = lexers.Fallback
-				}
-				style := styles.Get("monokai")
-				if style == nil {
-					style = styles.Fallback
-				}
-				formatter := formatters.Get("terminal256")
-				iterator, err := lexer.Tokenise(nil, truncatedContent)
-				if err == nil {
-					var highlightedContent strings.Builder
-					if formatter.Format(&highlightedContent, style, iterator) == nil {
-						boxContent.WriteString("\n\n") // Add a newline to separate legend from code
-						boxContent.WriteString(highlightedContent.String())
-					}
+			lexer := lexers.Match(filePathForLexer)
+			if lexer == nil {
+				lexer = lexers.Analyse(truncatedContent)
+			}
+			if lexer == nil {
+				lexer = lexers.Fallback
+			}
+			style := styles.Get("monokai")
+			if style == nil {
+				style = styles.Fallback
+			}
+			formatter := formatters.Get("terminal256")
+			iterator, err := lexer.Tokenise(nil, truncatedContent)
+			if err == nil {
+				var highlightedContent strings.Builder
+				if formatter.Format(&highlightedContent, style, iterator) == nil {
+					boxContent.WriteString("\n\n") // Add a newline to separate legend from code
+					boxContent.WriteString(highlightedContent.String())
 				}
 			}
 		} else if tc.ToolName == "user_confirm" && tc.Args != nil {
 			if message, ok := tc.Args["message"].(string); ok {
 				boxContent.WriteString("\n\n")
-				if forLog {
-					boxContent.WriteString(message)
-					boxContent.WriteString("\n")
-					boxContent.WriteString(" (c: continue, x: cancel)")
-				} else {
-					boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(message))
-					boxContent.WriteString("\n")
-					boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)"))
-				}
+				boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(message))
+				boxContent.WriteString("\n")
+				boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)"))
 			}
 		}
 
 		// --- Box Rendering ---
-		var box string
-		if forLog {
-			box = boxContent.String()
-		} else {
-			contentWidth := m.viewport.Width - 6
-			box = lipgloss.NewStyle().
-				Border(lipgloss.RoundedBorder()).
-				BorderForeground(lipgloss.Color("240")).
-				Padding(0, 1).
-				Width(contentWidth).
-				Render(boxContent.String())
-		}
+		contentWidth := m.viewport.Width - 6
+		box := lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("240")).
+			Padding(0, 1).
+			Width(contentWidth).
+			Render(boxContent.String())
 
 		builder.WriteString(box)
 		if i < len(ids)-1 {
@@ -243,10 +215,7 @@ type ErrorMessage struct {
 	Err error
 }
 
-func (msg ErrorMessage) Render(m *ChatModel, forLog bool) string {
-	if forLog {
-		return fmt.Sprintf("Error: %v", msg.Err)
-	}
+func (msg ErrorMessage) Render(m *ChatModel) string {
 	return m.errorStyle.Width(m.viewport.Width - 10).Render(fmt.Sprintf("Error: %v", msg.Err))
 }
 
@@ -254,10 +223,7 @@ type SuggestionMessage struct {
 	Content string
 }
 
-func (msg SuggestionMessage) Render(m *ChatModel, forLog bool) string {
-	if forLog {
-		return "Suggestion: " + msg.Content
-	}
+func (msg SuggestionMessage) Render(m *ChatModel) string {
 	return m.suggestionStyle.Width(m.viewport.Width - 10).Render(msg.Content)
 }
 
@@ -552,8 +518,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if group == nil {
 				group = &ToolCallGroupMessage{ToolCalls: make(map[string]*ToolCallStatus)}
-				m.messages = append(m.messages, Message(group)) // Explicitly cast to Message
-				m.logMessage(Message(group)) // Log tool call group message
+				m.messages = append(m.messages, group)
+				m.logMessage(group) // Log tool call group message
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
 
@@ -655,7 +621,7 @@ func (m *ChatModel) renderStatus() string {
 func (m *ChatModel) updateViewport() {
 	var renderedMessages []string
 	for _, msg := range m.messages {
-		renderedMessages = append(renderedMessages, msg.Render(m, false)) // Render for terminal display
+		renderedMessages = append(renderedMessages, msg.Render(m))
 	}
 	m.viewport.SetContent(strings.Join(renderedMessages, "\n"))
 	m.viewport.GotoBottom()
@@ -729,7 +695,7 @@ func (m *ChatModel) logMessage(msg Message) {
 		return
 	}
 	// Render the message to a string and write to log
-	_, err := m.logWriter.WriteString(msg.Render(m, true) + "\n")
+	_, err := m.logWriter.WriteString(msg.Render(m) + "\n")
 	if err != nil {
 		fmt.Printf("Error writing to chat log: %v\n", err)
 	}
