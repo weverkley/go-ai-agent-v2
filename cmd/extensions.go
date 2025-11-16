@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
+
 
 	"github.com/spf13/cobra"
 )
@@ -18,7 +18,7 @@ var ExtensionsCmd = &cobra.Command{
 }
 
 
-var extensionsCliCommand *commands.ExtensionsCommand
+
 
 func init() {
 }

@@ -298,6 +298,9 @@ type ChatModel struct {
 
 	awaitingConfirmation bool // New field to indicate if user confirmation is pending
 	userConfirmationResponseChan chan bool // Channel to send user confirmation back to executor
+
+	commandHistory []string // Stores previous commands
+	historyIndex   int      // Current position in command history
 }
 
 func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService *services.ShellExecutionService) *ChatModel {
@@ -368,6 +371,8 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 		logFile:         logFile,
 		logWriter:       logWriter,
 		userConfirmationResponseChan: make(chan bool, 1), // Initialize the channel
+		commandHistory:  []string{},
+		historyIndex:    0,
 	}
 
 	// Pass the confirmation channel to the executor
@@ -477,6 +482,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 
+			// Add to history if not empty and not a duplicate of the last entry
+			if len(m.commandHistory) == 0 || m.commandHistory[len(m.commandHistory)-1] != userInput {
+				m.commandHistory = append(m.commandHistory, userInput)
+			}
+			m.historyIndex = len(m.commandHistory) // Reset history index to the end
+
 			if strings.HasPrefix(userInput, "/") {
 				m.messages = append(m.messages, UserMessage{Content: userInput})
 				m.updateViewport()
@@ -491,7 +502,21 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Sending..."
 			telemetry.LogDebugf("Sending user input to executor: %s", userInput)
 			return m, m.startStreaming(userInput) // Call updated startStreaming method
-		}
+
+		case tea.KeyUp:
+			if m.historyIndex > 0 {
+				m.historyIndex--
+				m.textarea.SetValue(m.commandHistory[m.historyIndex])
+			}
+		case tea.KeyDown:
+			if m.historyIndex < len(m.commandHistory)-1 {
+				m.historyIndex++
+				m.textarea.SetValue(m.commandHistory[m.historyIndex])
+			} else if m.historyIndex == len(m.commandHistory)-1 {
+				// If at the last history item and pressing down, clear the input
+				m.historyIndex = len(m.commandHistory)
+				m.textarea.SetValue("")
+			}		}
 
 	// --- Streaming messages ---
 	case streamChannelMsg:

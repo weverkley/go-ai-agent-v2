@@ -40,95 +40,8 @@ var SettingsService *services.SettingsService   // Declare package-level setting
 
 var FSService services.FileSystemService // Declare package-level FileSystemService
 var ShellService *services.ShellExecutionService   // Declare package-level ShellExecutionService
+var extensionsCliCommand *commands.ExtensionsCommand // Declare package-level extensionsCliCommand
 
-func Execute() {
-	if err := RootCmd.Execute(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-}
-
-func init() {
-	RootCmd.Run = func(cmd *cobra.Command, args []string) {
-		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
-	}
-
-	// Initialize sessionStartTime
-	SessionStartTime = time.Now()
-
-	// Initialize workspaceService here
-	projectRoot, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-	WorkspaceService = services.NewWorkspaceService(projectRoot)
-
-	// Initialize FileSystemService
-	FSService = services.NewFileSystemService()
-
-	// Initialize ShellService
-	ShellService = services.NewShellExecutionService()
-
-	// Initialize extensionManager here
-	ExtensionManager = extension.NewManager(projectRoot, FSService, services.NewGitService())
-	// Initialize settingsService here
-	SettingsService = services.NewSettingsService(projectRoot)
-
-	// Get telemetry settings
-	telemetrySettings := SettingsService.GetTelemetrySettings()
-
-	// Initialize extensionsCliCommand here
-	extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
-	// Register all tools
-	toolRegistry := tools.RegisterAllTools(FSService, ShellService)
-
-	// Initialize ConfigParameters
-	params := &config.ConfigParameters{
-		// Set default values or load from settings file
-		DebugMode: false,
-		ModelName: config.DEFAULT_GEMINI_MODEL,
-		Telemetry: &types.TelemetrySettings{ // Initialize TelemetrySettings
-			Enabled: false, // Default to disabled
-			Outfile: "",    // Default to no outfile
-		},
-		// Add other parameters as needed
-		ToolRegistry: toolRegistry, // Pass the populated toolRegistry
-	}
-
-	// Merge loaded settings
-	if telemetrySettings != nil {
-		params.Telemetry = telemetrySettings
-	}
-
-	// Create the final Config instance
-	Cfg = config.NewConfig(params)
-	Cfg.WorkspaceContext = WorkspaceService // Set the workspace context
-
-	// Set the executorType to "gemini" as it's the factory type, not the model name
-	executorType = "gemini"
-
-	// Initialize FileFilteringService
-	fileFilteringService, err := services.NewFileFilteringService(projectRoot)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error initializing FileFilteringService: %v\n", err)
-		os.Exit(1)
-	}
-	Cfg.FileFilteringService = fileFilteringService // Set the file filtering service directly
-
-	// Initialize the global telemetry logger
-	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(params.Telemetry)
-
-	RootCmd.AddCommand(todosCmd)
-	chatCmd.Run = func(cmd *cobra.Command, args []string) {
-		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
-	}
-	RootCmd.AddCommand(chatCmd)
-	RootCmd.AddCommand(authCmd)
-	RootCmd.AddCommand(modelCmd)
-	RootCmd.AddCommand(settingsCmd)
-	RootCmd.AddCommand(memoryCmd)
-	RootCmd.AddCommand(ExtensionsCmd)
 var extensionsListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "List all available extensions",
@@ -288,13 +201,85 @@ Example:
 	},
 }
 
-	ExtensionsCmd.AddCommand(installCmd)
-	ExtensionsCmd.AddCommand(extensionsListCmd)
-	ExtensionsCmd.AddCommand(extensionsEnableCmd)
-	ExtensionsCmd.AddCommand(extensionsDisableCmd)
-	ExtensionsCmd.AddCommand(newCmd)
-	ExtensionsCmd.AddCommand(updateCmd)
-	ExtensionsCmd.AddCommand(linkCmd)
+func Execute() {
+	if err := RootCmd.Execute(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func initSessionStartTime() {
+	SessionStartTime = time.Now()
+}
+
+func initServices(projectRoot string) (
+	*services.WorkspaceService,
+	services.FileSystemService,
+	*services.ShellExecutionService,
+	*extension.Manager,
+	*services.SettingsService,
+	*services.FileFilteringService,
+) {
+	workspaceService := services.NewWorkspaceService(projectRoot)
+	fsService := services.NewFileSystemService()
+	shellService := services.NewShellExecutionService()
+	extensionManager := extension.NewManager(projectRoot, fsService, services.NewGitService())
+	settingsService := services.NewSettingsService(projectRoot)
+
+	fileFilteringService, err := services.NewFileFilteringService(projectRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing FileFilteringService: %v\n", err)
+		os.Exit(1)
+	}
+
+	return workspaceService, fsService, shellService, extensionManager, settingsService, fileFilteringService
+}
+
+func getTelemetrySettings(settingsService *services.SettingsService) *types.TelemetrySettings {
+	return settingsService.GetTelemetrySettings()
+}
+
+func registerTools(fsService services.FileSystemService, shellService *services.ShellExecutionService) *types.ToolRegistry {
+	return tools.RegisterAllTools(fsService, shellService)
+}
+
+func initConfig(
+	toolRegistry *types.ToolRegistry,
+	telemetrySettings *types.TelemetrySettings,
+	workspaceService *services.WorkspaceService,
+	fileFilteringService *services.FileFilteringService,
+) *config.Config {
+	params := &config.ConfigParameters{
+		DebugMode: false,
+		ModelName: config.DEFAULT_GEMINI_MODEL,
+		Telemetry: &types.TelemetrySettings{
+			Enabled: false,
+			Outfile: "",
+		},
+		ToolRegistry: toolRegistry,
+	}
+
+	if telemetrySettings != nil {
+		params.Telemetry = telemetrySettings
+	}
+
+	cfg := config.NewConfig(params)
+	cfg.WorkspaceContext = workspaceService
+	cfg.FileFilteringService = fileFilteringService
+	return cfg
+}
+
+func registerCommands() {
+	RootCmd.AddCommand(todosCmd)
+	chatCmd.Run = func(cmd *cobra.Command, args []string) {
+		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+	}
+	RootCmd.AddCommand(chatCmd)
+	RootCmd.AddCommand(authCmd)
+	RootCmd.AddCommand(modelCmd)
+	RootCmd.AddCommand(settingsCmd)
+	RootCmd.AddCommand(memoryCmd)
+	RootCmd.AddCommand(ExtensionsCmd)
 
 	// Add flags for installCmd
 	installCmd.Flags().String("ref", "", "Specify a ref (branch, tag, or commit) for git installations.")
@@ -356,4 +341,34 @@ Example:
 	RootCmd.AddCommand(terminalSetupCmd)
 	RootCmd.AddCommand(themeCmd)
 	RootCmd.AddCommand(vimCmd)
+}
+
+func init() {
+	initSessionStartTime()
+
+	RootCmd.Run = func(cmd *cobra.Command, args []string) {
+		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+	}
+
+	projectRoot, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService := initServices(projectRoot)
+	telemetrySettings := getTelemetrySettings(SettingsService)
+	toolRegistry := registerTools(FSService, ShellService)
+	Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService)
+
+	// Set the executorType to "gemini" as it's the factory type, not the model name
+	executorType = "gemini"
+
+	// Initialize the global telemetry logger
+	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
+
+	// Initialize extensionsCliCommand here
+	extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
+
+	registerCommands()
 }

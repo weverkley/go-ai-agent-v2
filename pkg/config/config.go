@@ -60,7 +60,7 @@ type Config struct {
 	modelName          string
 	mcpServers     map[string]types.MCPServerConfig
 	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
-	telemetry      *types.TelemetrySettings
+	Telemetry      *types.TelemetrySettings
 	output         *OutputSettings
 	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
 	toolRegistry types.ToolRegistryInterface // Changed to interface
@@ -81,7 +81,7 @@ func NewConfig(params *ConfigParameters) *Config {
 		modelName:          params.ModelName,
 		mcpServers:     params.McpServers,
 		approvalMode:   params.ApprovalMode,
-		telemetry:      params.Telemetry,
+		Telemetry:      params.Telemetry,
 		output:         params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
 		toolRegistry:   params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
@@ -123,8 +123,8 @@ func (c *Config) Get(key string) (interface{}, bool) {
 	case "toolCallCommand":
 		return c.toolCallCommand, true
 	case "telemetryEnabled":
-		if c.telemetry != nil {
-			return c.telemetry.Enabled, true
+		if c.Telemetry != nil {
+			return c.Telemetry.Enabled, true
 		}
 		return false, true // Default to false if telemetry settings are nil
 	case "toolRegistry":

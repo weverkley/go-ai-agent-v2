@@ -24,6 +24,7 @@ type MockExecutor struct {
 	CompressChatFunc           func(promptId string, force bool) (*types.ChatCompressionResult, error)
 	GenerateStreamFunc         func(ctx context.Context, contents ...*genai.Content) (<-chan any, error)
 	toolRegistry               types.ToolRegistryInterface
+	UserConfirmationChan       chan bool // Expose for testing
 }
 
 // NewRealisticMockExecutor creates a mock executor that simulates a realistic workflow.
@@ -259,5 +260,5 @@ func (m *MockExecutor) GenerateStream(ctx context.Context, contents ...*genai.Co
 
 // SetUserConfirmationChannel mocks the SetUserConfirmationChannel method.
 func (m *MockExecutor) SetUserConfirmationChannel(ch chan bool) {
-	// No-op for mock
+	m.UserConfirmationChan = ch
 }
