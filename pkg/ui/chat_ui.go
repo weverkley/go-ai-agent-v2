@@ -297,6 +297,7 @@ type ChatModel struct {
 	logWriter *bufio.Writer
 
 	awaitingConfirmation bool // New field to indicate if user confirmation is pending
+	userConfirmationResponseChan chan bool // Channel to send user confirmation back to executor
 }
 
 func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService *services.ShellExecutionService) *ChatModel {
@@ -342,7 +343,7 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 	}
 	logWriter := bufio.NewWriter(logFile)
 
-	return &ChatModel{
+	model := &ChatModel{
 		viewport:        vp,
 		textarea:        ta,
 		spinner:         s,
@@ -366,7 +367,13 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 		suggestionStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
 		logFile:         logFile,
 		logWriter:       logWriter,
+		userConfirmationResponseChan: make(chan bool, 1), // Initialize the channel
 	}
+
+	// Pass the confirmation channel to the executor
+	model.executor.SetUserConfirmationChannel(model.userConfirmationResponseChan)
+
+	return model
 }
 
 // Close closes the log file.
@@ -523,12 +530,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
 
-			if event.ToolName == "user_confirm" {
-				m.awaitingConfirmation = true
-				m.status = "Awaiting user confirmation..."
-				m.updateViewport()
-				return m, nil // Stop processing stream events until user confirms
-			}
+		case types.UserConfirmationRequestEvent:
+			telemetry.LogDebugf("Received stream event: UserConfirmationRequestEvent (ID: %s, Message: %s)", event.ToolCallID, event.Message)
+			// Add a message to the UI indicating confirmation is needed
+			m.messages = append(m.messages, SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s (c: continue, x: cancel)", types.USER_CONFIRM_TOOL_NAME, event.Message)})
+			m.logMessage(SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s", types.USER_CONFIRM_TOOL_NAME, event.Message)})
+			m.awaitingConfirmation = true
+			m.status = "Awaiting user confirmation..."
+			m.updateViewport()
+			return m, nil // Stop processing stream events until user confirms
 
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
@@ -582,12 +592,17 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case userConfirmationMsg:
-		// Send the user's confirmation back to the executor
-		// This will unblock the executor and allow it to continue processing
-		// the stream.
 		telemetry.LogDebugf("User confirmation received: ToolCallID: %s, Response: %s", msg.toolCallID, msg.response)
-		// Here, you would typically send this response back to the executor.
-		// For now, we'll just log it and continue the stream.
+		// Send the user's confirmation back to the executor
+		select {
+		case m.userConfirmationResponseChan <- (msg.response == "continue"):
+			// Successfully sent confirmation
+		case <-m.cancelCtx.Done():
+			// Context was cancelled, don't block sending
+		default:
+			// Channel might be full or closed, log an error or handle appropriately
+			telemetry.LogErrorf("Failed to send user confirmation to executor: channel blocked or closed")
+		}
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
 	}
 

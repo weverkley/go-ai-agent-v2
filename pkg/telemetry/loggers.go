@@ -25,3 +25,8 @@ func LogAgentFinish(event types.AgentFinishEvent) {
 func LogDebugf(format string, args ...interface{}) {
 	GlobalLogger.LogDebugf(format, args...)
 }
+
+// LogErrorf logs an error message.
+func LogErrorf(format string, args ...interface{}) {
+	GlobalLogger.LogErrorf(format, args...)
+}

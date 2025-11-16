@@ -18,4 +18,5 @@ type Executor interface {
 	SetHistory(history []*genai.Content) error
 	CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error)
 	GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error)
+	SetUserConfirmationChannel(chan bool) // New method for user confirmation
 }

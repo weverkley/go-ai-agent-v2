@@ -266,6 +266,7 @@ const (
 
 const (
 	TASK_COMPLETE_TOOL_NAME = "task_complete"
+	USER_CONFIRM_TOOL_NAME  = "user_confirm"
 )
 
 const (
@@ -672,4 +673,9 @@ type FinalResponseEvent struct {
 
 type ErrorEvent struct {
 	Err error
+}
+
+type UserConfirmationRequestEvent struct {
+	ToolCallID string
+	Message    string
 }

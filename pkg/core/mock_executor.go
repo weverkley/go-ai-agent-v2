@@ -256,3 +256,8 @@ func (m *MockExecutor) GenerateStream(ctx context.Context, contents ...*genai.Co
 	close(respChan)
 	return respChan, fmt.Errorf("GenerateStream not implemented in mock")
 }
+
+// SetUserConfirmationChannel mocks the SetUserConfirmationChannel method.
+func (m *MockExecutor) SetUserConfirmationChannel(ch chan bool) {
+	// No-op for mock
+}

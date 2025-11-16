@@ -366,3 +366,8 @@ func (qc *QwenChat) CompressChat(promptId string, force bool) (*types.ChatCompre
 func (qc *QwenChat) GenerateContentWithTools(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error) {
 	return nil, fmt.Errorf("GenerateContentWithTools not implemented for QwenChat")
 }
+
+// SetUserConfirmationChannel is a no-op for QwenChat as it does not directly support user confirmation.
+func (qc *QwenChat) SetUserConfirmationChannel(ch chan bool) {
+	// No-op
+}

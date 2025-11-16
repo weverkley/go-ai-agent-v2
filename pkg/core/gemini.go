@@ -20,13 +20,14 @@ type ContentGenerator interface {
 
 // GoaiagentChat represents a Go AI Agent chat client.
 type GoaiagentChat struct {
-	client           *genai.Client
-	model            *genai.GenerativeModel
-	Name             string
-	generationConfig types.GenerateContentConfig
-	startHistory     []*genai.Content
-	toolRegistry     *types.ToolRegistry // Add ToolRegistry
-	toolCallCounter  int
+	client                *genai.Client
+	model                 *genai.GenerativeModel
+	Name                  string
+	generationConfig      types.GenerateContentConfig
+	startHistory          []*genai.Content
+	toolRegistry          *types.ToolRegistry // Add ToolRegistry
+	toolCallCounter       int
+	userConfirmationChan  chan bool           // Channel for user confirmation: true for continue, false for cancel
 }
 
 // NewGoaiagentChat creates a new GoaiagentChat instance.
@@ -78,13 +79,14 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 	}
 
 	return &GoaiagentChat{
-		client:           client,
-		model:            model,
-		Name:             geminiChatModelName,
-		generationConfig: generationConfig,
-		startHistory:     startHistory,
-		toolRegistry:     geminiChatToolRegistry, // Store the ToolRegistry
-		toolCallCounter:  0,
+		client:                client,
+		model:                 model,
+		Name:                  geminiChatModelName,
+		generationConfig:      generationConfig,
+		startHistory:          startHistory,
+		toolRegistry:          geminiChatToolRegistry, // Store the ToolRegistry
+		toolCallCounter:       0,
+		userConfirmationChan:  make(chan bool, 1), // Initialize the channel
 	}, nil
 }
 
@@ -326,6 +328,11 @@ func (gc *GoaiagentChat) CompressChat(promptId string, force bool) (*types.ChatC
 	}, nil
 }
 
+// SetUserConfirmationChannel sets the channel for user confirmation.
+func (gc *GoaiagentChat) SetUserConfirmationChannel(ch chan bool) {
+	gc.userConfirmationChan = ch
+}
+
 // GenerateStream generates content and streams events back to the caller.
 func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
 	telemetry.LogDebugf("GenerateStream called")
@@ -381,7 +388,40 @@ func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.
 							Args:       p.Args,
 						}
 
-						toolResult, err := gc.ExecuteTool(ctx, p)
+						var toolResult types.ToolResult
+						var err error
+
+						if p.Name == types.USER_CONFIRM_TOOL_NAME {
+							message, ok := p.Args["message"].(string)
+							if !ok {
+								err = fmt.Errorf("user_confirm tool: missing or invalid 'message' argument")
+							} else {
+								telemetry.LogDebugf("Sending UserConfirmationRequestEvent for tool: %s", p.Name)
+								eventChan <- types.UserConfirmationRequestEvent{
+									ToolCallID: toolCallID,
+									Message:    message,
+								}
+
+								// Await user confirmation from the UI
+								select {
+								case confirmed := <-gc.userConfirmationChan:
+									if !confirmed {
+										err = fmt.Errorf("user cancelled tool execution")
+										toolResult.LLMContent = "cancel"
+										toolResult.ReturnDisplay = "User cancelled tool execution."
+									} else {
+										toolResult.LLMContent = "continue"
+										toolResult.ReturnDisplay = "User confirmed tool execution."
+									}
+								case <-ctx.Done():
+									err = ctx.Err()
+									toolResult.LLMContent = "cancel"
+									toolResult.ReturnDisplay = "Tool execution cancelled due to context done."
+								}
+							}
+						} else {
+							toolResult, err = gc.ExecuteTool(ctx, p)
+						}
 
 						telemetry.LogDebugf("Sending ToolCallEndEvent: %s", p.Name)
 						eventChan <- types.ToolCallEndEvent{
@@ -392,8 +432,7 @@ func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.
 						}
 
 						if err != nil {
-							// Optionally, send a tool result error back to the model
-							// For now, we just stop.
+							// If user cancelled or an error occurred, we stop the stream.
 							return
 						}
 
