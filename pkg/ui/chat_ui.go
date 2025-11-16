@@ -120,6 +120,11 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 			if filePath, ok := tc.Args["file_path"].(string); ok {
 				argument = filePath
 			}
+		case "user_confirm": // New case for user_confirm
+			actionWord = "Confirmation Required:"
+			if message, ok := tc.Args["message"].(string); ok {
+				argument = message
+			}
 		default:
 			actionWord = tc.ToolName + ":"
 			argument = fmt.Sprintf("%v", tc.Args)
@@ -220,6 +225,11 @@ type streamEventMsg struct{ event any }
 type streamErrorMsg struct{ err error }
 type streamFinishMsg struct{}
 
+type userConfirmationMsg struct {
+	toolCallID string
+	response   string // "continue" or "cancel"
+}
+
 type ChatModel struct {
 	viewport viewport.Model
 
@@ -277,6 +287,8 @@ type ChatModel struct {
 
 	logFile *os.File
 	logWriter *bufio.Writer
+
+	awaitingConfirmation bool // New field to indicate if user confirmation is pending
 }
 
 func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService *services.ShellExecutionService) *ChatModel {
@@ -373,6 +385,44 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.awaitingConfirmation {
+			switch msg.String() {
+			case "c", "C": // Continue
+				// Find the active user_confirm tool call
+				var toolCallID string
+				for id, tc := range m.activeToolCalls {
+					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
+						toolCallID = id
+						break
+					}
+				}
+				if toolCallID != "" {
+					m.awaitingConfirmation = false
+					m.status = "User confirmed. Resuming..."
+					return m, func() tea.Msg {
+						return userConfirmationMsg{toolCallID: toolCallID, response: "continue"}
+					}
+				}
+			case "x", "X": // Cancel
+				// Find the active user_confirm tool call
+				var toolCallID string
+				for id, tc := range m.activeToolCalls {
+					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
+						toolCallID = id
+						break
+					}
+				}
+				if toolCallID != "" {
+					m.awaitingConfirmation = false
+					m.status = "User cancelled."
+					return m, func() tea.Msg {
+						return userConfirmationMsg{toolCallID: toolCallID, response: "cancel"}
+					}
+				}
+			}
+			return m, nil // Consume key presses while awaiting confirmation
+		}
+
 		switch msg.Type {
 		case tea.KeyEsc: // Handle ESC for cancellation
 			if m.isStreaming && m.cancelFunc != nil {
@@ -450,6 +500,13 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
 
+			if event.ToolName == "user_confirm" {
+				m.awaitingConfirmation = true
+				m.status = "Awaiting user confirmation..."
+				m.updateViewport()
+				return m, nil // Stop processing stream events until user confirms
+			}
+
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
 			telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", event.ToolCallID, event.ToolName, event.Result, event.Err)
@@ -500,6 +557,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cancelFunc = nil // Clear cancel function
 		m.cancelCtx = nil  // Clear context
 		return m, nil
+
+	case userConfirmationMsg:
+		// Send the user's confirmation back to the executor
+		// This will unblock the executor and allow it to continue processing
+		// the stream.
+		telemetry.LogDebugf("User confirmation received: ToolCallID: %s, Response: %s", msg.toolCallID, msg.response)
+		// Here, you would typically send this response back to the executor.
+		// For now, we'll just log it and continue the stream.
+		return m, waitForEvent(m.streamCh) // Continue waiting for events
 	}
 
 	return m, tea.Batch(cmds...)
@@ -522,6 +588,9 @@ func (m *ChatModel) renderStatus() string {
 		// Add "Press ESC to stop" instruction for executing / streaming processes
 		instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
 		return m.spinner.View() + " " + statusLine + instruction
+	} else if m.awaitingConfirmation {
+		confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
+		return statusLine + confirmationOptions
 	}
 	return statusLine
 }
