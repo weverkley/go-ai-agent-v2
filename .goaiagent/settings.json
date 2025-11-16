@@ -1,8 +1,0 @@
-{
-  "telemetry": {
-    "enabled": true,
-    "outfile": ".goaiagent/tmp/gemini-debug.log",
-    "logLevel": "debug"
-  },
-  "executor": "mock"
-}
