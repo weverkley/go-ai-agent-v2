@@ -5,3 +5,5 @@ vendor
 .goaiagent/extensions/
 .goaiagent/tmp/
 todo-api/
+chat_log.txt
+gemini-debug.log

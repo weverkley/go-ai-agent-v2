@@ -8,3 +8,8 @@ Bot: command executed
 Bot: command executed                                                      
 
 Bot: final response                                                        
+You: hello                                                                 
+Bot: command executed                                                      
+Bot: command executed                                                      
+
+Bot: final response                                                        

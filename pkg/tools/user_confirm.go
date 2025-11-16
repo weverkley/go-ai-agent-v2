@@ -44,19 +44,10 @@ func (t *UserConfirmTool) Execute(ctx context.Context, args map[string]any) (typ
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'message' argument")
 	}
 
-	// In a real CLI, this would interact with the user.
 	// For the mock executor, we'll simulate a "continue" response.
 	// This will be replaced with actual UI interaction later.
-	fmt.Printf("\n--- User Confirmation Required ---\n")
-	fmt.Printf("Message: %s\n", message)
-	fmt.Printf("Please run the command in another terminal and then choose an option.\n")
-	fmt.Printf("Options: [continue, cancel]\n")
-	fmt.Printf("----------------------------------\n")
-
-	// Simulate user input for now. In a real scenario, this would block and wait for user input.
-	// For the mock, we'll just assume continue.
 	return types.ToolResult{
 		LLMContent:    "continue",
-		ReturnDisplay: "User chose to continue.",
+		ReturnDisplay: fmt.Sprintf("User confirmation requested: %s. (Simulated 'continue' for mock executor)", message),
 	}, nil
 }

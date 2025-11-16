@@ -140,7 +140,7 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 		)
 		boxContent.WriteString(legend)
 
-		// --- Special Content (for write_file and smart_edit) ---
+		// --- Special Content (for write_file, smart_edit, and user_confirm) ---
 		if (tc.ToolName == "write_file" || tc.ToolName == "smart_edit") && tc.Args != nil {
 			var contentToDisplay string
 			var filePathForLexer string
@@ -183,6 +183,13 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 					boxContent.WriteString("\n\n") // Add a newline to separate legend from code
 					boxContent.WriteString(highlightedContent.String())
 				}
+			}
+		} else if tc.ToolName == "user_confirm" && tc.Args != nil {
+			if message, ok := tc.Args["message"].(string); ok {
+				boxContent.WriteString("\n\n")
+				boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(message))
+				boxContent.WriteString("\n")
+				boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)"))
 			}
 		}
 
