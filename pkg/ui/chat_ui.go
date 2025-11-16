@@ -552,8 +552,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if group == nil {
 				group = &ToolCallGroupMessage{ToolCalls: make(map[string]*ToolCallStatus)}
-				m.messages = append(m.messages, group)
-				m.logMessage(group) // Log tool call group message
+				m.messages = append(m.messages, Message(group)) // Explicitly cast to Message
+				m.logMessage(Message(group)) // Log tool call group message
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
 
