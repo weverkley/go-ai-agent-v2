@@ -4,3 +4,4 @@ vendor
 .goaiagent/
 .goaiagent/extensions/
 .goaiagent/tmp/
+todo-api/

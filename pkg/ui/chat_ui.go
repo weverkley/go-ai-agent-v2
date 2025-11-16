@@ -1,14 +1,16 @@
 package ui
 
 import (
-	"context" // New import
+	"bufio" // New import
+	"context"
 	"fmt"
+	"os" // New import
 	"sort"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
-	"go-ai-agent-v2/go-cli/pkg/services" // New import
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -272,6 +274,9 @@ type ChatModel struct {
 	titleStyle lipgloss.Style
 
 	suggestionStyle lipgloss.Style
+
+	logFile *os.File
+	logWriter *bufio.Writer
 }
 
 func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService *services.ShellExecutionService) *ChatModel {
@@ -293,6 +298,14 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
+	// Open log file
+	logFile, err := os.OpenFile("chat_log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Printf("Error opening chat log file: %v\n", err)
+		// Handle error, perhaps return nil or a model with a disabled logger
+	}
+	logWriter := bufio.NewWriter(logFile)
 
 	return &ChatModel{
 		viewport:        vp,
@@ -316,7 +329,20 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 		statusStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		titleStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
 		suggestionStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		logFile:         logFile,
+		logWriter:       logWriter,
 	}
+}
+
+// Close closes the log file.
+func (m *ChatModel) Close() error {
+	if m.logWriter != nil {
+		m.logWriter.Flush()
+	}
+	if m.logFile != nil {
+		return m.logFile.Close()
+	}
+	return nil
 }
 func (m *ChatModel) Init() tea.Cmd {
 	return tea.Batch(textarea.Blink, m.spinner.Tick)
@@ -377,7 +403,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.handleSlashCommand(userInput)
 			}
 
-			m.messages = append(m.messages, UserMessage{Content: userInput})
+			userMsg := UserMessage{Content: userInput}
+			m.messages = append(m.messages, userMsg)
+			m.logMessage(userMsg) // Log user message
 			m.updateViewport()
 			m.isStreaming = true
 			m.status = "Sending..."
@@ -418,6 +446,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if group == nil {
 				group = &ToolCallGroupMessage{ToolCalls: make(map[string]*ToolCallStatus)}
 				m.messages = append(m.messages, group)
+				m.logMessage(group) // Log tool call group message
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
 
@@ -430,11 +459,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				tc.Err = event.Err
 			}
 		case types.FinalResponseEvent:
-			m.messages = append(m.messages, BotMessage{Content: event.Content})
+			botMsg := BotMessage{Content: event.Content}
+			m.messages = append(m.messages, botMsg)
+			m.logMessage(botMsg) // Log bot message
 			telemetry.LogDebugf("Received stream event: FinalResponseEvent (Content: %s)", event.Content)
 		case types.ErrorEvent:
 			telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", event.Err)
-			m.messages = append(m.messages, ErrorMessage{Err: event.Err})
+			errMsg := ErrorMessage{Err: event.Err}
+			m.messages = append(m.messages, errMsg)
+			m.logMessage(errMsg) // Log error message
 			// Check for a model suggestion
 			routingCtx := &routing.RoutingContext{
 				IsFallback:   true,
@@ -444,6 +477,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err == nil && decision != nil {
 				suggestion := fmt.Sprintf("Model error. Suggestion: switch to '%s'. Use '/settings set model %s' to switch.", decision.Model, decision.Model)
 				m.messages = append(m.messages, SuggestionMessage{Content: suggestion})
+				m.logMessage(SuggestionMessage{Content: suggestion}) // Log suggestion message
 			}
 		}
 		m.updateViewport()
@@ -525,13 +559,19 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	telemetry.LogDebugf("Captured output: %s", output)
 
 	if err != nil {
-		m.messages = append(m.messages, ErrorMessage{Err: err})
+		errMsg := ErrorMessage{Err: err}
+		m.messages = append(m.messages, errMsg)
+		m.logMessage(errMsg) // Log error message
 	}
 
 	if output != "" {
-		m.messages = append(m.messages, BotMessage{Content: output})
+		botMsg := BotMessage{Content: output}
+		m.messages = append(m.messages, botMsg)
+		m.logMessage(botMsg) // Log bot message
 	} else if err == nil {
-		m.messages = append(m.messages, BotMessage{Content: "Command executed successfully."})
+		botMsg := BotMessage{Content: "Command executed successfully."}
+		m.messages = append(m.messages, botMsg)
+		m.logMessage(botMsg) // Log bot message
 	}
 
 	// Handle specific commands that might require UI changes
@@ -556,6 +596,19 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 }
 
 // --- Commands ---
+
+// logMessage writes a message to the chat log file.
+func (m *ChatModel) logMessage(msg Message) {
+	if m.logWriter == nil {
+		return
+	}
+	// Render the message to a string and write to log
+	_, err := m.logWriter.WriteString(msg.Render(m) + "\n")
+	if err != nil {
+		fmt.Printf("Error writing to chat log: %v\n", err)
+	}
+	m.logWriter.Flush() // Ensure message is written immediately
+}
 
 // startStreaming initiates the stream and returns a message with the channel.
 func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
