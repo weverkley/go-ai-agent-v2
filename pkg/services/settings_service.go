@@ -33,6 +33,8 @@ type Settings struct {
 	ToolCallCommand      string `json:"toolCallCommand,omitempty"`
 	Telemetry      *types.TelemetrySettings       `json:"telemetry,omitempty"`
 	GoogleCustomSearch *types.GoogleCustomSearchSettings `json:"googleCustomSearch,omitempty"`
+	WebSearchProvider  types.WebSearchProvider    `json:"webSearchProvider,omitempty"`
+	Tavily             *types.TavilySettings      `json:"tavily,omitempty"`
 }
 
 // LoadSettings loads the application settings from various sources.
@@ -59,6 +61,8 @@ func LoadSettings(workspaceDir string) *Settings {
 				Enabled: false,
 			},
 			GoogleCustomSearch: &types.GoogleCustomSearchSettings{},
+			WebSearchProvider:  types.WebSearchProviderGoogleCustomSearch, // Default to Google Custom Search
+			Tavily:             &types.TavilySettings{},
 		}
 	}
 
@@ -84,6 +88,8 @@ func LoadSettings(workspaceDir string) *Settings {
 				Enabled: false,
 			},
 			GoogleCustomSearch: &types.GoogleCustomSearchSettings{},
+			WebSearchProvider:  types.WebSearchProviderGoogleCustomSearch, // Default to Google Custom Search
+			Tavily:             &types.TavilySettings{},
 		}
 	}
 
@@ -119,6 +125,12 @@ func LoadSettings(workspaceDir string) *Settings {
 	}
 	if settings.GoogleCustomSearch == nil {
 		settings.GoogleCustomSearch = &types.GoogleCustomSearchSettings{}
+	}
+	if settings.WebSearchProvider == "" {
+		settings.WebSearchProvider = types.WebSearchProviderGoogleCustomSearch
+	}
+	if settings.Tavily == nil {
+		settings.Tavily = &types.TavilySettings{}
 	}
 
 	return &settings
@@ -210,6 +222,20 @@ func (ss *SettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSe
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
 	return ss.settings.GoogleCustomSearch
+}
+
+// GetWebSearchProvider returns the configured web search provider.
+func (ss *SettingsService) GetWebSearchProvider() types.WebSearchProvider {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.WebSearchProvider
+}
+
+// GetTavilySettings returns the Tavily settings.
+func (ss *SettingsService) GetTavilySettings() *types.TavilySettings {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.Tavily
 }
 
 // Set sets the value of a specific setting.

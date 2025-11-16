@@ -197,8 +197,8 @@ func TestUpdate_StreamingEvents(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// TODO: Fix TestUpdate_UserConfirmationFlow - currently panics with nil pointer dereference
 /*
-/* TODO: Fix TestUpdate_UserConfirmationFlow - currently panics with nil pointer dereference
 func TestUpdate_UserConfirmationFlow(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
@@ -332,5 +332,4 @@ func TestUpdate_UserConfirmationFlow(t *testing.T) {
 		t.Fatal("Timed out waiting for cancellation response")
 	}
 }
-*/
 */

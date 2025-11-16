@@ -685,3 +685,16 @@ type GoogleCustomSearchSettings struct {
 	ApiKey string `json:"apiKey"`
 	CxId   string `json:"cxId"`
 }
+
+// WebSearchProvider defines the available web search providers.
+type WebSearchProvider string
+
+const (
+	WebSearchProviderGoogleCustomSearch WebSearchProvider = "googleCustomSearch"
+	WebSearchProviderTavily             WebSearchProvider = "tavily"
+)
+
+// TavilySettings represents the configuration for Tavily web search.
+type TavilySettings struct {
+	ApiKey string `json:"apiKey"`
+}
