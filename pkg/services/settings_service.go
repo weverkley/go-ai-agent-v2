@@ -32,6 +32,7 @@ type Settings struct {
 	ToolDiscoveryCommand string `json:"toolDiscoveryCommand,omitempty"`
 	ToolCallCommand      string `json:"toolCallCommand,omitempty"`
 	Telemetry      *types.TelemetrySettings       `json:"telemetry,omitempty"`
+	GoogleCustomSearch *types.GoogleCustomSearchSettings `json:"googleCustomSearch,omitempty"`
 }
 
 // LoadSettings loads the application settings from various sources.
@@ -57,6 +58,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			Telemetry: &types.TelemetrySettings{
 				Enabled: false,
 			},
+			GoogleCustomSearch: &types.GoogleCustomSearchSettings{},
 		}
 	}
 
@@ -81,6 +83,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			Telemetry: &types.TelemetrySettings{
 				Enabled: false,
 			},
+			GoogleCustomSearch: &types.GoogleCustomSearchSettings{},
 		}
 	}
 
@@ -113,6 +116,9 @@ func LoadSettings(workspaceDir string) *Settings {
 		settings.Telemetry = &types.TelemetrySettings{
 			Enabled: false,
 		}
+	}
+	if settings.GoogleCustomSearch == nil {
+		settings.GoogleCustomSearch = &types.GoogleCustomSearchSettings{}
 	}
 
 	return &settings
@@ -197,6 +203,13 @@ func (ss *SettingsService) GetTelemetrySettings() *types.TelemetrySettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
 	return ss.settings.Telemetry
+}
+
+// GetGoogleCustomSearchSettings returns the Google Custom Search settings.
+func (ss *SettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSearchSettings {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.GoogleCustomSearch
 }
 
 // Set sets the value of a specific setting.

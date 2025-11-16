@@ -29,7 +29,7 @@ var grepCodeCmd = &cobra.Command{
 // runGrepCodeCmd contains the logic for the grep-code command, accepting necessary services.
 func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService *services.ShellExecutionService) {
 	// Initialize the ToolRegistry
-	toolRegistry := tools.RegisterAllTools(FSService, shellService)
+	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {

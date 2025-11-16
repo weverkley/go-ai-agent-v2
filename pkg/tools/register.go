@@ -8,7 +8,7 @@ import (
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(fs services.FileSystemService, shellService *services.ShellExecutionService) *types.ToolRegistry {
+func RegisterAllTools(fs services.FileSystemService, shellService *services.ShellExecutionService, settingsService *services.SettingsService) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
@@ -32,7 +32,7 @@ func RegisterAllTools(fs services.FileSystemService, shellService *services.Shel
 	if err := registry.Register(NewWebFetchTool()); err != nil {
 		fmt.Printf("Error registering WebFetchTool: %v\n", err)
 	}
-	if err := registry.Register(NewWebSearchTool()); err != nil {
+	if err := registry.Register(NewWebSearchTool(settingsService)); err != nil {
 		fmt.Printf("Error registering WebSearchTool: %v\n", err)
 	}
 	if err := registry.Register(NewMemoryTool()); err != nil {

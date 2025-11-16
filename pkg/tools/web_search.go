@@ -3,9 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"google.golang.org/api/customsearch/v1"
@@ -15,12 +15,13 @@ import (
 // WebSearchTool represents the web-search tool.
 type WebSearchTool struct {
 	*types.BaseDeclarativeTool
+	settingsService *services.SettingsService
 }
 
 // NewWebSearchTool creates a new instance of WebSearchTool.
-func NewWebSearchTool() *WebSearchTool {
+func NewWebSearchTool(settingsService *services.SettingsService) *WebSearchTool {
 	return &WebSearchTool{
-		types.NewBaseDeclarativeTool(
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			"web_search",
 			"web_search",
 			"Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.",
@@ -39,6 +40,7 @@ func NewWebSearchTool() *WebSearchTool {
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
+		settingsService: settingsService,
 	}
 }
 
@@ -49,11 +51,13 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (types
 		return types.ToolResult{}, fmt.Errorf("invalid or missing 'query' argument")
 	}
 
-	apiKey := os.Getenv("GOOGLE_API_KEY")
-	cx := os.Getenv("GOOGLE_CUSTOM_SEARCH_CX")
+	googleCustomSearchConfig := t.settingsService.GetGoogleCustomSearchSettings()
 
-	if apiKey == "" || cx == "" {
-		return types.ToolResult{}, fmt.Errorf("GOOGLE_API_KEY and GOOGLE_CUSTOM_SEARCH_CX environment variables must be set for web search")
+	apiKey := googleCustomSearchConfig.ApiKey
+	cxId := googleCustomSearchConfig.CxId
+
+	if apiKey == "" || cxId == "" {
+		return types.ToolResult{}, fmt.Errorf("googleCustomSearch.apiKey and googleCustomSearch.cxId must be set in settings.json for web search")
 	}
 
 	svc, err := customsearch.NewService(ctx, option.WithAPIKey(apiKey))
@@ -61,7 +65,7 @@ func (t *WebSearchTool) Execute(ctx context.Context, args map[string]any) (types
 		return types.ToolResult{}, fmt.Errorf("failed to create customsearch service: %w", err)
 	}
 
-	resp, err := svc.Cse.List().Q(query).Cx(cx).Do()
+	resp, err := svc.Cse.List().Q(query).Cx(cxId).Do()
 	if err != nil {
 		return types.ToolResult{}, fmt.Errorf("failed to perform custom search: %w", err)
 	}

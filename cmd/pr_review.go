@@ -31,7 +31,7 @@ It evaluates code quality, adherence to standards, and readiness for merging, pr
 // runPrReviewCmd contains the logic for the pr-review command, accepting necessary services.
 func runPrReviewCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService *services.ShellExecutionService) {
 	// Initialize the ToolRegistry
-	toolRegistry := tools.RegisterAllTools(FSService, shellService)
+	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {

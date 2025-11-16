@@ -679,3 +679,9 @@ type UserConfirmationRequestEvent struct {
 	ToolCallID string
 	Message    string
 }
+
+// GoogleCustomSearchSettings represents the configuration for Google Custom Search.
+type GoogleCustomSearchSettings struct {
+	ApiKey string `json:"apiKey"`
+	CxId   string `json:"cxId"`
+}

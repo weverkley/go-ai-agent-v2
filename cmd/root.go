@@ -239,8 +239,8 @@ func getTelemetrySettings(settingsService *services.SettingsService) *types.Tele
 	return settingsService.GetTelemetrySettings()
 }
 
-func registerTools(fsService services.FileSystemService, shellService *services.ShellExecutionService) *types.ToolRegistry {
-	return tools.RegisterAllTools(fsService, shellService)
+func registerTools(fsService services.FileSystemService, shellService *services.ShellExecutionService, settingsService *services.SettingsService) *types.ToolRegistry {
+	return tools.RegisterAllTools(fsService, shellService, settingsService)
 }
 
 func initConfig(
@@ -358,7 +358,7 @@ func init() {
 
 	WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService := initServices(projectRoot)
 	telemetrySettings := getTelemetrySettings(SettingsService)
-	toolRegistry := registerTools(FSService, ShellService)
+	toolRegistry := registerTools(FSService, ShellService, SettingsService)
 	Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService)
 
 	// Set the executorType to "gemini" as it's the factory type, not the model name
