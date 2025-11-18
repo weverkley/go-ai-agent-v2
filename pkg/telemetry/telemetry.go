@@ -15,6 +15,8 @@ type TelemetryLogger interface {
 	LogAgentStart(event types.AgentStartEvent)
 	LogAgentFinish(event types.AgentFinishEvent)
 	LogErrorf(format string, args ...interface{})
+	LogWarnf(format string, args ...interface{}) // Added
+	LogInfof(format string, args ...interface{}) // Added
 	LogDebugf(format string, args ...interface{})
 }
 
@@ -24,6 +26,8 @@ type noopTelemetryLogger struct{}
 func (l *noopTelemetryLogger) LogAgentStart(event types.AgentStartEvent) {}
 func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent) {}
 func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{})    {}
+func (l *noopTelemetryLogger) LogWarnf(format string, args ...interface{})     {} // Added
+func (l *noopTelemetryLogger) LogInfof(format string, args ...interface{})     {} // Added
 func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{})    {}
 
 // fileTelemetryLogger logs telemetry events to a specified file.
@@ -121,6 +125,46 @@ func (l *fileTelemetryLogger) LogErrorf(format string, args ...interface{}) {
 	data, err := json.Marshal(logEntry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshaling error log entry: %v\n", err)
+		return
+	}
+	l.writeLog(data)
+}
+
+func (l *fileTelemetryLogger) LogWarnf(format string, args ...interface{}) {
+	if !l.enabled || (l.logLevel != "debug" && l.logLevel != "info" && l.logLevel != "warn") {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	logEntry := map[string]interface{}{
+		"type":    "Warn",
+		"message": fmt.Sprintf(format, args...),
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling warn log entry: %v\n", err)
+		return
+	}
+	l.writeLog(data)
+}
+
+func (l *fileTelemetryLogger) LogInfof(format string, args ...interface{}) {
+	if !l.enabled || (l.logLevel != "debug" && l.logLevel != "info") {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	logEntry := map[string]interface{}{
+		"type":    "Info",
+		"message": fmt.Sprintf(format, args...),
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling info log entry: %v\n", err)
 		return
 	}
 	l.writeLog(data)

@@ -4,11 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath" // Added
+	"runtime" // Added
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
+
+// ... (rest of the file)
 
 func loadPromptsFromFile(filePath string) (map[string]string, error) {
 	content, err := os.ReadFile(filePath)
@@ -35,7 +39,20 @@ func loadPromptsFromFile(filePath string) (map[string]string, error) {
 	return prompts, nil
 }
 
-var prompts, _ = loadPromptsFromFile("pkg/core/agents/codebase_investigator_prompts.md")
+var prompts map[string]string
+func init() {
+	var err error
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("failed to get current file path")
+	}
+	// The path to the prompts file is relative to the current file.
+	promptsFilePath := filepath.Join(filepath.Dir(filename), "codebase_investigator_prompts.md")
+	prompts, err = loadPromptsFromFile(promptsFilePath)
+	if err != nil {
+		panic(fmt.Sprintf("failed to load codebase investigator prompts from %s: %v", promptsFilePath, err))
+	}
+}
 
 // CodebaseInvestigatorAgent defines the Codebase Investigator subagent.
 var CodebaseInvestigatorAgent = AgentDefinition{

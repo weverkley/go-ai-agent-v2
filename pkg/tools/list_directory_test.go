@@ -18,7 +18,7 @@ func TestListDirectoryTool_Execute(t *testing.T) {
 
 	// Create a ListDirectoryTool with the mock service
 	tool := &ListDirectoryTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool("list_directory", "", "", types.KindOther, types.JsonSchemaObject{}, false, false, nil),
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool("list_directory", "", "", types.KindOther, (&types.JsonSchemaObject{Type: "object"}).SetProperties(map[string]*types.JsonSchemaProperty{}).SetRequired([]string{}), false, false, nil),
 		fileSystemService:   mockFSS, // Assign the mock directly
 	}
 
@@ -70,7 +70,7 @@ func TestListDirectoryTool_Execute(t *testing.T) {
 		},
 		{
 			name: "successful listing - respect_git_ignore false",
-			args: map[string]any{"path": "/test/dir", "respect_git_ignore": false},
+			args: map[string]any{"path": "/test/dir", "file_filtering_options": map[string]any{"respect_git_ignore": false}},
 			setupMock: func() {
 				mockFSS.On("ListDirectory", "/test/dir", []string{}, false, true).Return([]string{"file1.txt", "ignored.log"}, nil).Once()
 			},
@@ -79,7 +79,7 @@ func TestListDirectoryTool_Execute(t *testing.T) {
 		},
 		{
 			name: "successful listing - respect_goaiagent_ignore false",
-			args: map[string]any{"path": "/test/dir", "respect_goaiagent_ignore": false},
+			args: map[string]any{"path": "/test/dir", "file_filtering_options": map[string]any{"respect_goaiagent_ignore": false}},
 			setupMock: func() {
 				mockFSS.On("ListDirectory", "/test/dir", []string{}, true, false).Return([]string{"file1.txt", "ignored.goaiagent"}, nil).Once()
 			},

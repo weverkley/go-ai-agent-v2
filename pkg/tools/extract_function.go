@@ -3,9 +3,9 @@ package tools
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"go-ai-agent-v2/go-cli/pkg/core/agents"
+	"go-ai-agent-v2/go-cli/pkg/services" // Added
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
@@ -16,36 +16,37 @@ const EXTRACT_FUNCTION_TOOL_NAME = "extract_function"
 // ExtractFunctionTool is a tool that extracts a code block into a new function or method.
 type ExtractFunctionTool struct {
 	*types.BaseDeclarativeTool
+	fileSystemService services.FileSystemService
 }
 
 // NewExtractFunctionTool creates a new ExtractFunctionTool.
-func NewExtractFunctionTool() *ExtractFunctionTool {
+func NewExtractFunctionTool(fileSystemService services.FileSystemService) *ExtractFunctionTool {
 	return &ExtractFunctionTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			EXTRACT_FUNCTION_TOOL_NAME,
 			"Extract Function/Method",
 			"Extracts a code block into a new function or method in a Go file.",
 			types.KindOther,
-			types.JsonSchemaObject{
+			&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"filePath": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"filePath": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The absolute path to the Go file.",
 					},
-					"startLine": {
+					"startLine": &types.JsonSchemaProperty{
 						Type:        "integer",
 						Description: "The starting line number of the code block to extract (1-indexed).",
 					},
-					"endLine": {
+					"endLine": &types.JsonSchemaProperty{
 						Type:        "integer",
 						Description: "The ending line number of the code block to extract (1-indexed).",
 					},
-					"newFunctionName": {
+					"newFunctionName": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The name for the new function or method.",
 					},
-					"receiver": {
+					"receiver": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "Optional: The receiver for the new method (e.g., 's *MyStruct'). Leave empty for a function.",
 					},
@@ -56,6 +57,7 @@ func NewExtractFunctionTool() *ExtractFunctionTool {
 			true,  // canUpdateOutput - This tool modifies files
 			nil,   // MessageBus
 		),
+		fileSystemService: fileSystemService,
 	}
 }
 
@@ -66,23 +68,17 @@ func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) 
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'filePath' argument")
 	}
 
-	startLineStr, ok := args["startLine"].(string)
+	startLineFloat, ok := args["startLine"].(float64)
 	if !ok {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'startLine' argument")
 	}
-	startLine, err := strconv.Atoi(startLineStr)
-	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("invalid 'startLine' argument: %w", err)
-	}
+	startLine := int(startLineFloat)
 
-	endLineStr, ok := args["endLine"].(string)
+	endLineFloat, ok := args["endLine"].(float64)
 	if !ok {
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'endLine' argument")
 	}
-	endLine, err := strconv.Atoi(endLineStr)
-	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("invalid 'endLine' argument: %w", err)
-	}
+	endLine := int(endLineFloat)
 
 	newFunctionName, ok := args["newFunctionName"].(string)
 	if !ok {
@@ -93,13 +89,27 @@ func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) 
 
 	extracted, err := agents.ExtractFunction(filePath, startLine, endLine, newFunctionName, receiver)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to extract function: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to extract function: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to extract function: %w", err)
 	}
 
-	// For now, we just return the new code. A real implementation would write to file.
+	err = t.fileSystemService.WriteFile(filePath, extracted.NewCode)
+	if err != nil {
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to write extracted code to file: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to write extracted code to file: %w", err)
+	}
+
 	return types.ToolResult{
-		LLMContent:    extracted.NewCode,
-		ReturnDisplay: fmt.Sprintf("Successfully extracted function. New code:\n```go\n%s\n```", extracted.NewCode),
+		LLMContent:    fmt.Sprintf("Successfully extracted function and wrote to file. New code:\n```go\n%s\n```", extracted.NewCode),
+		ReturnDisplay: fmt.Sprintf("Successfully extracted function and wrote to file. New code:\n```go\n%s\n```", extracted.NewCode),
 	}, nil
 }
 

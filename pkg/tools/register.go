@@ -1,75 +1,76 @@
 package tools
 
 import (
-	"fmt"
+	"net/http"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(fs services.FileSystemService, shellService *services.ShellExecutionService, settingsService *services.SettingsService) *types.ToolRegistry {
+func RegisterAllTools(fs services.FileSystemService, shellService *services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
-		fmt.Printf("Error registering GrepTool: %v\n", err)
+		telemetry.LogErrorf("Error registering GrepTool: %v", err)
 	}
-	if err := registry.Register(NewGlobTool()); err != nil {
-		fmt.Printf("Error registering GlobTool: %v\n", err)
+	if err := registry.Register(NewGlobTool(fs)); err != nil { // Updated
+		telemetry.LogErrorf("Error registering GlobTool: %v", err)
 	}
 	if err := registry.Register(NewReadFileTool()); err != nil {
-		fmt.Printf("Error registering ReadFileTool: %v\n", err)
+		telemetry.LogErrorf("Error registering ReadFileTool: %v", err)
 	}
 	if err := registry.Register(NewWriteFileTool(fs)); err != nil {
-		fmt.Printf("Error registering WriteFileTool: %v\n", err)
+		telemetry.LogErrorf("Error registering WriteFileTool: %v", err)
 	}
-	if err := registry.Register(NewReadManyFilesTool()); err != nil {
-		fmt.Printf("Error registering ReadManyFilesTool: %v\n", err)
+	if err := registry.Register(NewReadManyFilesTool(fs)); err != nil {
+		telemetry.LogErrorf("Error registering ReadManyFilesTool: %v", err)
 	}
 	if err := registry.Register(NewSmartEditTool(fs)); err != nil {
-		fmt.Printf("Error registering SmartEditTool: %v\n", err)
+		telemetry.LogErrorf("Error registering SmartEditTool: %v", err)
 	}
 	if err := registry.Register(NewWebFetchTool()); err != nil {
-		fmt.Printf("Error registering WebFetchTool: %v\n", err)
+		telemetry.LogErrorf("Error registering WebFetchTool: %v", err)
 	}
-	if err := registry.Register(NewWebSearchTool(settingsService)); err != nil {
-		fmt.Printf("Error registering WebSearchTool: %v\n", err)
+	if err := registry.Register(NewWebSearchTool(settingsService, http.DefaultClient, nil)); err != nil { // Updated
+		telemetry.LogErrorf("Error registering WebSearchTool: %v", err)
 	}
 	if err := registry.Register(NewMemoryTool()); err != nil {
-		fmt.Printf("Error registering MemoryTool: %v\n", err)
+		telemetry.LogErrorf("Error registering MemoryTool: %v", err)
 	}
 	if err := registry.Register(NewWriteTodosTool()); err != nil {
-		fmt.Printf("Error registering WriteTodosTool: %v\n", err)
+		telemetry.LogErrorf("Error registering WriteTodosTool: %v", err)
 	}
 	if err := registry.Register(NewListDirectoryTool(fs)); err != nil {
-		fmt.Printf("Error registering ListDirectoryTool: %v\n", err)
+		telemetry.LogErrorf("Error registering ListDirectoryTool: %v", err)
 	}
 	if err := registry.Register(NewGetCurrentBranchTool()); err != nil {
-		fmt.Printf("Error registering GetCurrentBranchTool: %v\n", err)
+		telemetry.LogErrorf("Error registering GetCurrentBranchTool: %v", err)
 	}
 	if err := registry.Register(NewGetRemoteURLTool()); err != nil {
-		fmt.Printf("Error registering GetRemoteURLTool: %v\n", err)
+		telemetry.LogErrorf("Error registering GetRemoteURLTool: %v", err)
 	}
 	if err := registry.Register(NewCheckoutBranchTool()); err != nil {
-		fmt.Printf("Error registering NewCheckoutBranchTool: %v\n", err)
+		telemetry.LogErrorf("Error registering NewCheckoutBranchTool: %v", err)
 	}
 	if err := registry.Register(NewPullTool()); err != nil {
-		fmt.Printf("Error registering PullTool: %v\n", err)
+		telemetry.LogErrorf("Error registering PullTool: %v", err)
 	}
 	if err := registry.Register(NewExecuteCommandTool(shellService)); err != nil {
-		fmt.Printf("Error registering ExecuteCommandTool: %v\n", err)
+		telemetry.LogErrorf("Error registering ExecuteCommandTool: %v", err)
 	}
 	if err := registry.Register(NewFindUnusedCodeTool()); err != nil {
-		fmt.Printf("Error registering FindUnusedCodeTool: %v\n", err)
+		telemetry.LogErrorf("Error registering FindUnusedCodeTool: %v", err)
 	}
-	if err := registry.Register(NewExtractFunctionTool()); err != nil {
-		fmt.Printf("Error registering ExtractFunctionTool: %v\n", err)
+	if err := registry.Register(NewExtractFunctionTool(fs)); err != nil { // Updated
+		telemetry.LogErrorf("Error registering ExtractFunctionTool: %v", err)
 	}
 	if err := registry.Register(NewLsTool()); err != nil {
-		fmt.Printf("Error registering LsTool: %v\n", err)
+		telemetry.LogErrorf("Error registering LsTool: %v", err)
 	}
 	if err := registry.Register(NewUserConfirmTool()); err != nil {
-		fmt.Printf("Error registering UserConfirmTool: %v\n", err)
+		telemetry.LogErrorf("Error registering UserConfirmTool: %v", err)
 	}
 
 	return registry

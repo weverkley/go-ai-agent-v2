@@ -20,16 +20,14 @@ func NewUserConfirmTool() *UserConfirmTool {
 			"User Confirm",
 			"Asks the user for confirmation with a message and provides 'continue' or 'cancel' options.",
 			types.KindOther, // Assuming KindOther for now
-			types.JsonSchemaObject{
+			(&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"message": {
-						Type:        "string",
-						Description: "The message to display to the user for confirmation.",
-					},
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"message": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "The message to display to the user for confirmation.",
 				},
-				Required: []string{"message"},
-			},
+			}).SetRequired([]string{"message"}),
 			false, // isOutputMarkdown
 			false, // canUpdateOutput
 			nil,   // MessageBus
@@ -41,7 +39,12 @@ func NewUserConfirmTool() *UserConfirmTool {
 func (t *UserConfirmTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	message, ok := args["message"].(string)
 	if !ok || message == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'message' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Missing or invalid 'message' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'message' argument")
 	}
 
 	// For the mock executor, we'll simulate a "continue" response.

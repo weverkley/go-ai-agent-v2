@@ -19,43 +19,42 @@ type ListDirectoryTool struct {
 func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 	return &ListDirectoryTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"list_directory",
-			"List Directory",
-			"Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.",
-			types.KindOther,
-			types.JsonSchemaObject{
+		types.LIST_DIRECTORY_TOOL_NAME,
+		"List Directory",
+		"Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.",
+		types.KindOther,
+					&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"path": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"dir_path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The absolute path to the directory to list (must be absolute, not relative)",
+						Description: "The path to the directory to list",
 					},
-					"ignore": {
+					"ignore": &types.JsonSchemaProperty{
 						Type:        "array",
 						Description: "List of glob patterns to ignore",
-						Items:       &types.JsonSchemaPropertyItem{Type: "string"},
+						Items:       &types.JsonSchemaObject{Type: "string"},
 					},
-					"file_filtering_options": {
-						Type:        "object",
-						Description: "Whether to respect ignore patterns from .gitignore or .geminiignore",
-						Properties: map[string]types.JsonSchemaProperty{
-							"respect_git_ignore": {
-								Type:        "boolean",
-								Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
-							},
-							"respect_goaiagent_ignore": {
-								Type:        "boolean",
-								Description: "Optional: Whether to respect .goaiagentignore patterns when listing files. Defaults to true.",
-							},
-						},
-					},
-				},
-				Required: []string{"path"},
+					                    "file_filtering_options": &types.JsonSchemaProperty{
+					                        Type:        "object",
+					                        Description: "Optional: Whether to respect ignore patterns from .gitignore or .geminiignore",
+					                        Properties: map[string]*types.JsonSchemaProperty{
+					                            "respect_git_ignore": &types.JsonSchemaProperty{
+					                                Type:        "boolean",
+					                                Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
+					                            },
+					                            "respect_gemini_ignore": &types.JsonSchemaProperty{
+					                                Type:        "boolean",
+					                                Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+					                            },
+					                        },
+					                    },				},
+				Required: []string{"dir_path"},
 			},
-			false,
-			false,
-			nil,
-		),
+		false, // isOutputMarkdown
+		false, // canUpdateOutput
+		nil,   // MessageBus
+	),
 		fileSystemService: fs,
 	}
 }
@@ -77,18 +76,25 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, args map[string]any) (t
 	}
 
 	respectGitIgnore := true
-	if val, ok := args["respect_git_ignore"].(bool); ok {
-		respectGitIgnore = val
-	}
-
 	respectGoaiagentIgnore := true
-	if val, ok := args["respect_goaiagent_ignore"].(bool); ok {
-		respectGoaiagentIgnore = val
+
+	if fileFilteringOptions, ok := args["file_filtering_options"].(map[string]any); ok {
+		if val, ok := fileFilteringOptions["respect_git_ignore"].(bool); ok {
+			respectGitIgnore = val
+		}
+		if val, ok := fileFilteringOptions["respect_goaiagent_ignore"].(bool); ok {
+			respectGoaiagentIgnore = val
+		}
 	}
 
 	files, err := t.fileSystemService.ListDirectory(path, ignorePatterns, respectGitIgnore, respectGoaiagentIgnore)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to list directory %s: %w", path, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to list directory %s: %v", path, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to list directory %s: %w", path, err)
 	}
 
 	return types.ToolResult{

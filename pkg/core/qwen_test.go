@@ -107,10 +107,10 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 			"Test Tool",
 			"A tool for testing",
 			types.KindOther,
-			types.JsonSchemaObject{
+			&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"arg1": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"arg1": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "An argument",
 					},

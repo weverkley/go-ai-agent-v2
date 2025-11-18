@@ -25,7 +25,7 @@ type GoaiagentChat struct {
 	Name                  string
 	generationConfig      types.GenerateContentConfig
 	startHistory          []*genai.Content
-	toolRegistry          *types.ToolRegistry // Add ToolRegistry
+	toolRegistry          types.ToolRegistryInterface // Change to interface
 	toolCallCounter       int
 	userConfirmationChan  chan bool           // Channel for user confirmation: true for continue, false for cancel
 }
@@ -70,11 +70,12 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 	}
 
 	// Set tools for the model
-	toolRegistryVal, ok := cfg.Get("toolRegistry")
-	var geminiChatToolRegistry *types.ToolRegistry
-	if ok && toolRegistryVal != nil {
-		if tr, toolRegistryOk := toolRegistryVal.(*types.ToolRegistry); toolRegistryOk {
+	var geminiChatToolRegistry types.ToolRegistryInterface
+	if toolRegistryVal, ok := cfg.Get("toolRegistry"); ok && toolRegistryVal != nil {
+		if tr, toolRegistryOk := toolRegistryVal.(types.ToolRegistryInterface); toolRegistryOk {
 			geminiChatToolRegistry = tr
+		} else {
+			return nil, fmt.Errorf("tool registry in config is not of expected type types.ToolRegistryInterface")
 		}
 	}
 
@@ -259,7 +260,7 @@ func (gc *GoaiagentChat) SetHistory(history []*genai.Content) error {
 func (gc *GoaiagentChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
 	ctx := context.Background() // Define ctx here
 
-	fmt.Printf("DEBUG: len(gc.startHistory) = %d\n", len(gc.startHistory))
+	telemetry.LogDebugf("CompressChat: len(gc.startHistory) = %d", len(gc.startHistory))
 
 	// Convert []*genai.Content to []genai.Part for token counting
 	var originalHistoryParts []genai.Part

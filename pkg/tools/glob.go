@@ -1,7 +1,6 @@
 package tools
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -10,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"go-ai-agent-v2/go-cli/pkg/services" // Added
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/gobwas/glob"
@@ -18,38 +18,39 @@ import (
 // GlobTool represents the glob tool.
 type GlobTool struct {
 	*types.BaseDeclarativeTool
+	fileSystemService services.FileSystemService
 }
 
 // NewGlobTool creates a new instance of GlobTool.
-func NewGlobTool() *GlobTool {
+func NewGlobTool(fileSystemService services.FileSystemService) *GlobTool {
 	return &GlobTool{
-		types.NewBaseDeclarativeTool(
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			"glob",
 			"glob",
 			"Efficiently finds files matching specific glob patterns.",
 			types.KindOther, // Assuming KindOther for now
-			types.JsonSchemaObject{
+			&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"pattern": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"pattern": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
 					},
-					"path": {
+					"path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+						Description: "Optional: The path to the directory to search within. If omitted, searches the current working directory.",
 					},
-					"case_sensitive": {
-						Type:        "string", // Should be boolean, but for now string to match the current implementation
+					"case_sensitive": &types.JsonSchemaProperty{
+						Type:        "boolean",
 						Description: "Optional: Whether the search should be case-sensitive. Defaults to false.",
 					},
-					"respect_git_ignore": {
+					"respect_git_ignore": &types.JsonSchemaProperty{
 						Type:        "boolean",
-						Description: "Optional: Whether to respect .gitignore patterns. Defaults to true.",
+						Description: "Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.",
 					},
-					"respect_goaiagent_ignore": {
+					"respect_goaiagent_ignore": &types.JsonSchemaProperty{
 						Type:        "boolean",
-						Description: "Optional: Whether to respect .goaiagentignore patterns. Defaults to true.",
+						Description: "Optional: Whether to respect .goaiagentignore patterns when finding files. Defaults to true.",
 					},
 				},
 				Required: []string{"pattern"},
@@ -58,6 +59,7 @@ func NewGlobTool() *GlobTool {
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
+		fileSystemService: fileSystemService,
 	}
 }
 
@@ -67,70 +69,16 @@ type FileInfo struct {
 	ModTime time.Time
 }
 
-// getIgnorePatterns reads .gitignore and .goaiagentignore files and returns a list of glob patterns.
-func (t *GlobTool) getIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error) {
-	var ignorePatterns []glob.Glob
-
-	// Read .gitignore
-	if respectGitIgnore {
-		gitIgnorePath := filepath.Join(searchDir, ".gitignore")
-		if _, err := os.Stat(gitIgnorePath); err == nil {
-			patterns, err := t.readIgnoreFile(gitIgnorePath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read .gitignore: %w", err)
-			}
-			ignorePatterns = append(ignorePatterns, patterns...)
-		}
-	}
-
-	// Read .goaiagentignore
-	if respectGoaiagentIgnore {
-		goaiagentIgnorePath := filepath.Join(searchDir, ".goaiagentignore")
-		if _, err := os.Stat(goaiagentIgnorePath); err == nil {
-			patterns, err := t.readIgnoreFile(goaiagentIgnorePath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read .goaiagentignore: %w", err)
-			}
-			ignorePatterns = append(ignorePatterns, patterns...)
-		}
-	}
-
-	return ignorePatterns, nil
-}
-
-// readIgnoreFile reads an ignore file and compiles its patterns.
-func (t *GlobTool) readIgnoreFile(filePath string) ([]glob.Glob, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var patterns []glob.Glob
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue // Skip empty lines and comments
-		}
-		g, err := glob.Compile(line)
-		if err != nil {
-			return nil, fmt.Errorf("failed to compile ignore pattern %s from %s: %w", line, filePath, err)
-		}
-		patterns = append(patterns, g)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-	return patterns, nil
-}
-
 // Execute performs a glob search.
 func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	pattern, ok := args["pattern"].(string)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Invalid or missing 'pattern' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("invalid or missing 'pattern' argument")
 	}
 
 	searchPath := "."
@@ -156,7 +104,12 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	// Resolve the search path
 	absSearchPath, err := filepath.Abs(searchPath)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to resolve absolute path for %s: %v", searchPath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
 	}
 
 	// Compile the glob pattern
@@ -166,15 +119,24 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	}
 	g, err := glob.Compile(compiledPattern)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to compile glob pattern %s: %w", pattern, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to compile glob pattern %s: %v", pattern, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to compile glob pattern %s: %w", pattern, err)
 	}
 
-	// Get ignore patterns
-	ignorePatterns, err := t.getIgnorePatterns(absSearchPath, respectGitIgnore, respectGoaiagentIgnore)
+	// Get ignore patterns using FileSystemService
+	ignorePatterns, err := t.fileSystemService.GetIgnorePatterns(absSearchPath, respectGitIgnore, respectGoaiagentIgnore)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to get ignore patterns: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get ignore patterns: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to get ignore patterns: %w", err)
 	}
-
 	var matchedFiles []FileInfo
 
 	err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
@@ -201,7 +163,7 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 
 		// Check against ignore patterns
 		for _, ignoreG := range ignorePatterns {
-			if ignoreG.Match(relPath) { // Ignore patterns are usually case-sensitive by default, but glob library handles it.
+			if ignoreG.Match(relPath) {
 				return nil // Skip this file
 			}
 		}
@@ -216,7 +178,12 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	})
 
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Error walking the path %s: %v", absSearchPath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
 	}
 
 	// Sort files by modification time (newest first)

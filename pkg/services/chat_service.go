@@ -39,10 +39,11 @@ type ChatDetail struct {
 
 // SerializablePart represents a serializable part of a genai.Content.
 type SerializablePart struct {
-	Text           string                 `json:"text,omitempty"`
-	FunctionCall   *genai.FunctionCall    `json:"functionCall,omitempty"`
+	Text             string                 `json:"text,omitempty"`
+	FunctionCall     *genai.FunctionCall    `json:"functionCall,omitempty"`
 	FunctionResponse *genai.FunctionResponse `json:"functionResponse,omitempty"`
-	// Add other part types as needed
+	InlineData       *genai.Blob            `json:"inlineData,omitempty"` // Changed to genai.Blob
+	FileData         *genai.FileData        `json:"fileData,omitempty"`
 }
 
 // SerializableContent represents a serializable genai.Content.
@@ -134,6 +135,10 @@ func (cs *ChatService) SaveCheckpoint(history []*genai.Content, tag string) erro
 				serializableParts[j].FunctionCall = fc
 			} else if fr, ok := part.(*genai.FunctionResponse); ok {
 				serializableParts[j].FunctionResponse = fr
+			} else if id, ok := part.(*genai.Blob); ok { // Changed to genai.Blob
+				serializableParts[j].InlineData = id
+			} else if fd, ok := part.(*genai.FileData); ok {
+				serializableParts[j].FileData = fd
 			}
 		}
 		serializableHistory[i] = &SerializableContent{
@@ -184,6 +189,10 @@ func (cs *ChatService) LoadCheckpoint(tag string) ([]*genai.Content, error) {
 				genaiParts[j] = sPart.FunctionCall
 			} else if sPart.FunctionResponse != nil {
 				genaiParts[j] = sPart.FunctionResponse
+			} else if sPart.InlineData != nil {
+				genaiParts[j] = sPart.InlineData
+			} else if sPart.FileData != nil {
+				genaiParts[j] = sPart.FileData
 			}
 		}
 		history[i] = &genai.Content{

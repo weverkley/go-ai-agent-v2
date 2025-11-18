@@ -28,29 +28,36 @@ type WriteTodosTool struct {
 // NewWriteTodosTool creates a new instance of WriteTodosTool.
 func NewWriteTodosTool() *WriteTodosTool {
 	return &WriteTodosTool{
-		types.NewBaseDeclarativeTool(
-			"write_todos",
-			"write_todos",
-			"This tool can help you list out the current subtasks that are required to be completed for a given user request.",
-			types.KindOther, // Assuming KindOther for now
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"todos": {
+			types.NewBaseDeclarativeTool(
+				types.WRITE_TODOS_TOOL_NAME,
+				"Write Todos",
+				"This tool can help you list out the current subtasks that are required to be completed for a given user request.",
+				types.KindOther,
+				(&types.JsonSchemaObject{
+					Type: "object",
+				}).SetProperties(map[string]*types.JsonSchemaProperty{
+					"todos": &types.JsonSchemaProperty{
 						Type:        "array",
 						Description: "The complete list of todo items. This will replace the existing list.",
-						Items: &types.JsonSchemaPropertyItem{
-							Type: "object", // This should be object, not string
-						},
+						Items: (&types.JsonSchemaObject{
+							Type: "object",
+						}).SetProperties(map[string]*types.JsonSchemaProperty{
+							"description": &types.JsonSchemaProperty{
+								Type:        "string",
+								Description: "The description of the task.",
+							},
+							"status": &types.JsonSchemaProperty{
+								Type:        "string",
+								Description: "The current status of the task.",
+								Enum:        []string{"pending", "in_progress", "completed", "cancelled"},
+							},
+						}).SetRequired([]string{"description", "status"}),
 					},
-				},
-				Required: []string{"todos"},
-			},
-			false, // isOutputMarkdown
-			false, // canUpdateOutput
-			nil,   // MessageBus
-		),
-	}
+				}).SetRequired([]string{"todos"}),
+				false, // isOutputMarkdown
+				false, // canUpdateOutput
+				nil,   // MessageBus
+			),	}
 }
 
 // getTodosFilePath returns the path to the TODOS.md file.
@@ -66,14 +73,24 @@ func getTodosFilePath() (string, error) {
 func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	todosData, ok := args["todos"].([]any)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("invalid or missing 'todos' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Invalid or missing 'todos' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("invalid or missing 'todos' argument")
 	}
 
 	var todos []Todo
 	for _, item := range todosData {
 		todoMap, ok := item.(map[string]any)
 		if !ok {
-			return types.ToolResult{}, fmt.Errorf("invalid todo item format")
+			return types.ToolResult{
+				Error: &types.ToolError{
+					Message: "Invalid todo item format",
+					Type:    types.ToolErrorTypeExecutionFailed,
+				},
+			}, fmt.Errorf("invalid todo item format")
 		}
 		desc, _ := todoMap["description"].(string)
 		status, _ := todoMap["status"].(string)
@@ -83,11 +100,21 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 	// Validate todos
 	inProgressCount := 0
 	for _, todo := range todos {
-		if todo.Description == "" {
-			return types.ToolResult{}, fmt.Errorf("each todo must have a non-empty description")
-		}
+			if todo.Description == "" {
+				return types.ToolResult{
+					Error: &types.ToolError{
+						Message: "Each todo must have a non-empty description",
+						Type:    types.ToolErrorTypeExecutionFailed,
+					},
+				}, fmt.Errorf("each todo must have a non-empty description")
+			}
 		if !isValidTodoStatus(todo.Status) {
-			return types.ToolResult{}, fmt.Errorf("invalid todo status: %s", todo.Status)
+			return types.ToolResult{
+				Error: &types.ToolError{
+					Message: fmt.Sprintf("Invalid todo status: %s", todo.Status),
+					Type:    types.ToolErrorTypeExecutionFailed,
+				},
+			}, fmt.Errorf("invalid todo status: %s", todo.Status)
 		}
 		if todo.Status == "in_progress" {
 			inProgressCount++
@@ -95,17 +122,32 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 	}
 
 	if inProgressCount > 1 {
-		return types.ToolResult{}, fmt.Errorf("only one task can be \"in_progress\" at a time")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Only one task can be \"in_progress\" at a time",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("only one task can be \"in_progress\" at a time")
 	}
 
 	todosFilePath, err := getTodosFilePath()
 	if err != nil {
-		return types.ToolResult{}, err
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get todos file path: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, err
 	}
 
 	err = os.MkdirAll(filepath.Dir(todosFilePath), 0755)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to create todos directory: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to create todos directory: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to create todos directory: %w", err)
 	}
 
 	// Format todos for writing to file
@@ -119,7 +161,12 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 
 	err = os.WriteFile(todosFilePath, []byte(todoListBuilder.String()), 0644)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to write todos file: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to write todos file: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to write todos file: %w", err)
 	}
 
 	llmContent := "Successfully updated the todo list."

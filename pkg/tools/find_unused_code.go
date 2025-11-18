@@ -21,26 +21,24 @@ type FindUnusedCodeTool struct {
 // NewFindUnusedCodeTool creates a new FindUnusedCodeTool.
 func NewFindUnusedCodeTool() *FindUnusedCodeTool {
 	return &FindUnusedCodeTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			FIND_UNUSED_CODE_TOOL_NAME,
-			"Find Unused Code",
-			"Finds unused functions and methods in a given directory.",
-			types.KindOther,
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"directory": {
-						Type:        "string",
-						Description: "The absolute path to the directory to scan for unused code.",
-					},
+			BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+				types.FIND_UNUSED_CODE_TOOL_NAME,
+				"Find Unused Code",
+				"Finds unused code in the specified directory.",
+				types.KindOther,
+				&types.JsonSchemaObject{
+					Type: "object",
+									Properties: map[string]*types.JsonSchemaProperty{
+										"dir_path": &types.JsonSchemaProperty{
+											Type:        "string",
+											Description: "The path to the directory to search for unused code.",
+										},
+									},					Required: []string{"dir_path"},
 				},
-				Required: []string{"directory"},
-			},
-			false, // isOutputMarkdown
-			false, // canUpdateOutput
-			nil,   // MessageBus
-		),
-	}
+				false, // isOutputMarkdown
+				false, // canUpdateOutput
+				nil,   // MessageBus
+			),	}
 }
 
 // Execute implements the Tool interface.
@@ -53,12 +51,22 @@ func (t *FindUnusedCodeTool) Execute(ctx context.Context, args map[string]any) (
 	// Resolve the absolute path
 	absPath, err := filepath.Abs(directory)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to resolve absolute path for directory '%s': %w", directory, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to resolve absolute path for directory '%s': %v", directory, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to resolve absolute path for directory '%s': %w", directory, err)
 	}
 
 	unusedFunctions, err := agents.FindUnusedFunctions(absPath)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to find unused functions in '%s': %w", absPath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to find unused functions in '%s': %v", absPath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to find unused functions in '%s': %w", absPath, err)
 	}
 
 	// Format the output

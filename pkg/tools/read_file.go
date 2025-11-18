@@ -24,18 +24,18 @@ func NewReadFileTool() *ReadFileTool {
 			"read_file",
 			"Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
 			types.KindOther, // Assuming KindOther for now
-			types.JsonSchemaObject{
+			&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"absolute_path": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"absolute_path": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
 					},
-					"offset": {
+					"offset": &types.JsonSchemaProperty{
 						Type:        "number",
 						Description: "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
 					},
-					"limit": {
+					"limit": &types.JsonSchemaProperty{
 						Type:        "number",
 						Description: "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
 					},
@@ -70,14 +70,29 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 	info, err := os.Stat(absolutePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return types.ToolResult{}, fmt.Errorf("file not found: %s", absolutePath)
+			return types.ToolResult{
+				Error: &types.ToolError{
+					Message: fmt.Sprintf("File not found: %s", absolutePath),
+					Type:    types.ToolErrorTypeFileNotFound,
+				},
+			}, fmt.Errorf("file not found: %s", absolutePath)
 		}
-		return types.ToolResult{}, fmt.Errorf("failed to get file info for %s: %w", absolutePath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get file info for %s: %v", absolutePath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to get file info for %s: %w", absolutePath, err)
 	}
 
 	// Check if it's a directory
 	if info.IsDir() {
-		return types.ToolResult{}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Path is a directory, not a file: %s", absolutePath),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
 	}
 
 		// Handle different file types
@@ -118,7 +133,12 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 
 	file, err := os.Open(absolutePath)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to open file %s: %w", absolutePath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to open file %s: %v", absolutePath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to open file %s: %w", absolutePath, err)
 	}
 	defer file.Close()
 
@@ -128,7 +148,12 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 		lines = append(lines, scanner.Text())
 	}
 	if err := scanner.Err(); err != nil {
-		return types.ToolResult{}, fmt.Errorf("error reading file %s: %w", absolutePath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Error reading file %s: %v", absolutePath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("error reading file %s: %w", absolutePath, err)
 	}
 
 	originalLineCount := len(lines)
@@ -145,9 +170,11 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 
 	if linesShownStart >= originalLineCount {
 		return types.ToolResult{
-			LLMContent:    fmt.Sprintf("Offset %d is beyond the end of the file (total lines: %d)", offset, originalLineCount),
-			ReturnDisplay: fmt.Sprintf("Offset %d is beyond the end of the file (total lines: %d)", offset, originalLineCount),
-		}, nil
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Offset %d is beyond the end of the file (total lines: %d)", offset, originalLineCount),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("offset %d is beyond the end of the file (total lines: %d)", offset, originalLineCount)
 	}
 
 	if linesShownEnd > originalLineCount {

@@ -28,10 +28,10 @@ func NewMemoryTool() *MemoryTool {
 			"save_memory",
 			"Saves a specific piece of information or fact to your long-term memory.",
 			types.KindOther, // Assuming KindOther for now
-			types.JsonSchemaObject{
+			&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"fact": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"fact": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The specific fact or piece of information to remember. Should be a clear, self-contained statement.",
 					},
@@ -124,24 +124,44 @@ func (t *MemoryTool) Execute(ctx context.Context, args map[string]any) (types.To
 
 	memoryFilePath, err := getGlobalMemoryFilePath()
 	if err != nil {
-		return types.ToolResult{}, err
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get global memory file path: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, err
 	}
 
 	err = os.MkdirAll(filepath.Dir(memoryFilePath), 0755)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to create memory directory: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to create memory directory: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to create memory directory: %w", err)
 	}
 
 	currentContent, err := readMemoryFileContent()
 	if err != nil {
-		return types.ToolResult{}, err
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to read memory file content: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, err
 	}
 
 	newContent := computeNewContent(currentContent, fact)
 
 	err = os.WriteFile(memoryFilePath, []byte(newContent), 0644)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to write memory file: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to write memory file: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to write memory file: %w", err)
 	}
 
 	successMessage := fmt.Sprintf("Okay, I've remembered that: \"%s\"", fact)

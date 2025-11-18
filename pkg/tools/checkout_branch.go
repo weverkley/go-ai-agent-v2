@@ -18,27 +18,21 @@ type CheckoutBranchTool struct {
 func NewCheckoutBranchTool() *CheckoutBranchTool {
 	return &CheckoutBranchTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"checkout_branch",
-			"Checkout Git Branch",
-			"Checks out the specified branch in the given Git repository.",
+			types.CHECKOUT_BRANCH_TOOL_NAME,
+			"Checkout Branch",
+			"Checks out a Git branch.",
 			types.KindOther,
-			types.JsonSchemaObject{
+			(&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"dir": {
-						Type:        "string",
-						Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
-					},
-					"branch_name": {
-						Type:        "string",
-						Description: "The name of the branch to checkout.",
-					},
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"branch_name": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "The name of the Git branch to checkout.",
 				},
-				Required: []string{"dir", "branch_name"},
-			},
-			false,
-			false,
-			nil,
+			}).SetRequired([]string{"branch_name"}),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
 		),
 		gitService: services.NewGitService(),
 	}
@@ -57,7 +51,12 @@ func (t *CheckoutBranchTool) Execute(ctx context.Context, args map[string]any) (
 
 	err := t.gitService.CheckoutBranch(dir, branchName)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to checkout branch %s in %s: %w", branchName, dir, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to checkout branch %s in %s: %v", branchName, dir, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to checkout branch %s in %s: %w", branchName, dir, err)
 	}
 
 	return types.ToolResult{

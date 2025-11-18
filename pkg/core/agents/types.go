@@ -144,7 +144,7 @@ type AnyToolInvocation interface {
 type ToolCall interface {
 	GetStatus() string
 	GetRequest() types.ToolCallRequestInfo
-	GetTool() AnyDeclarativeTool
+	GetTool() types.Tool // Changed to types.Tool
 	GetInvocation() AnyToolInvocation
 	GetOutcome() types.ToolConfirmationOutcome
 	GetStartTime() *time.Time
@@ -155,14 +155,14 @@ type ToolCall interface {
 // BaseToolCall provides common fields for all ToolCall types.
 type BaseToolCall struct {
 	Request    types.ToolCallRequestInfo
-	Tool       AnyDeclarativeTool
+	Tool       types.Tool // Changed to types.Tool
 	Invocation AnyToolInvocation
 	StartTime  *time.Time
 	Outcome    types.ToolConfirmationOutcome
 }
 
 func (b *BaseToolCall) GetRequest() types.ToolCallRequestInfo { return b.Request }
-func (b *BaseToolCall) GetTool() AnyDeclarativeTool     { return b.Tool }
+func (b *BaseToolCall) GetTool() types.Tool     { return b.Tool }
 func (b *BaseToolCall) GetInvocation() AnyToolInvocation { return b.Invocation }
 func (b *BaseToolCall) GetOutcome() types.ToolConfirmationOutcome { return b.Outcome }
 func (b *BaseToolCall) GetStartTime() *time.Time { return b.StartTime }

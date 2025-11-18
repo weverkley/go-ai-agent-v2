@@ -15,6 +15,7 @@ import (
 // FileSystemService interface defines the methods for interacting with the file system.
 type FileSystemService interface {
 	ListDirectory(dirPath string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error)
+	GetIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error)
 	PathExists(path string) (bool, error)
 	IsDirectory(path string) (bool, error)
 	ReadFile(filePath string) (string, error)
@@ -52,8 +53,8 @@ func (s *fileSystemService) Rename(oldpath, newpath string) error {
 	return os.Rename(oldpath, newpath)
 }
 
-// getIgnorePatterns reads .gitignore and .goaiagentignore files and returns a list of glob patterns.
-func (s *fileSystemService) getIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error) {
+// GetIgnorePatterns reads .gitignore and .goaiagentignore files and returns a list of glob patterns.
+func (s *fileSystemService) GetIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error) {
 	var ignorePatterns []glob.Glob
 
 	// Read .gitignore
@@ -131,7 +132,7 @@ func (s *fileSystemService) ListDirectory(dirPath string, ignorePatterns []strin
 	}
 
 	// Get ignore patterns from files
-	fileIgnoreGlobs, err := s.getIgnorePatterns(dirPath, respectGitIgnore, respectGoaiagentIgnore)
+	fileIgnoreGlobs, err := s.GetIgnorePatterns(dirPath, respectGitIgnore, respectGoaiagentIgnore)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get ignore patterns from files: %w", err)
 	}

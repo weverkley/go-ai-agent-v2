@@ -253,9 +253,8 @@ func (m *MockExecutor) GenerateStream(ctx context.Context, contents ...*genai.Co
 	if m.GenerateStreamFunc != nil {
 		return m.GenerateStreamFunc(ctx, contents...)
 	}
-	respChan := make(chan any)
-	close(respChan)
-	return respChan, fmt.Errorf("GenerateStream not implemented in mock")
+	// Return nil channel and error if not implemented
+	return nil, fmt.Errorf("GenerateStream not implemented in mock")
 }
 
 // SetUserConfirmationChannel mocks the SetUserConfirmationChannel method.

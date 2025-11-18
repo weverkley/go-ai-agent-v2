@@ -17,26 +17,24 @@ type GetRemoteURLTool struct {
 // NewGetRemoteURLTool creates a new GetRemoteURLTool.
 func NewGetRemoteURLTool() *GetRemoteURLTool {
 	return &GetRemoteURLTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"get_remote_url",
-			"Get Git Remote URL",
-			"Returns the URL of the 'origin' remote for the given Git repository.",
-			types.KindOther,
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"dir": {
-						Type:        "string",
-						Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
-					},
-				},
-				Required: []string{"dir"},
-			},
-			false,
-			false,
-			nil,
-		),
-		gitService: services.NewGitService(),
+		        BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+		            "get_remote_url",
+		            "Get Git Remote URL",
+		            "Returns the URL of the 'origin' remote for the given Git repository.",
+		            types.KindOther,
+		            &types.JsonSchemaObject{
+		                Type: "object",
+		                		            Properties: map[string]*types.JsonSchemaProperty{
+		                		                "dir": &types.JsonSchemaProperty{
+		                		                    Type:        "string",
+		                		                    Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
+		                		                },
+		                		            },		                Required: []string{"dir"},
+		            },
+		            false,
+		            false,
+		            nil,
+		        ),		gitService: services.NewGitService(),
 	}
 }
 
@@ -49,7 +47,12 @@ func (t *GetRemoteURLTool) Execute(ctx context.Context, args map[string]any) (ty
 
 	remoteURL, err := t.gitService.GetRemoteURL(dir)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to get remote URL for %s: %w", dir, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get remote URL for %s: %v", dir, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to get remote URL for %s: %w", dir, err)
 	}
 
 	return types.ToolResult{

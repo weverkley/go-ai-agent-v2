@@ -3,7 +3,6 @@ package extension
 import (
 	"encoding/json"
 	"fmt"
-	"os"
 	"path/filepath"
 	"sync"
 
@@ -19,6 +18,8 @@ type Extension struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Enabled     bool   `json:"enabled"`
+	Path        string `json:"path"`
+	Type        string `json:"type"`
 	// Add other extension properties as needed
 }
 
@@ -97,12 +98,6 @@ func (em *Manager) saveExtensionStatusLocked() error {
 		return fmt.Errorf("failed to marshal extension statuses: %w", err)
 	}
 
-	// Ensure the parent directory exists
-	err = em.FSService.MkdirAll(filepath.Dir(filePath), 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create directory for settings file: %w", err)
-	}
-
 	if err := em.FSService.WriteFile(filePath, string(data)); err != nil {
 		return fmt.Errorf("failed to write settings file: %w", err)
 	}
@@ -126,15 +121,33 @@ func (em *Manager) LoadExtensionStatus() error {
 	defer em.mu.Unlock()
 
 	filePath := filepath.Join(em.baseDir, settingsFile)
-	dataStr, err := em.FSService.ReadFile(filePath)
-	if os.IsNotExist(err) {
+	exists, err := em.FSService.PathExists(filePath)
+	if err != nil {
+		return fmt.Errorf("failed to check for settings file: %w", err)
+	}
+	if !exists {
 		em.extensions = make(map[string]*Extension) // File doesn't exist, start with empty
+		// Also ensure the directory is created for subsequent saves
+		if err := em.FSService.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			return fmt.Errorf("failed to create directory for settings file: %w", err)
+		}
+		// Write an empty settings file to ensure it exists for subsequent operations
+		if err := em.FSService.WriteFile(filePath, "{}"); err != nil {
+			return fmt.Errorf("failed to write initial empty settings file: %w", err)
+		}
 		return nil
 	}
+
+	dataStr, err := em.FSService.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("failed to read settings file: %w", err)
 	}
 	data := []byte(dataStr)
+
+	if len(data) == 0 {
+		em.extensions = make(map[string]*Extension)
+		return nil
+	}
 
 	var loadedExtensions map[string]*Extension
 	if err := json.Unmarshal(data, &loadedExtensions); err != nil {
@@ -151,6 +164,15 @@ func (em *Manager) InstallOrUpdateExtension(metadata ExtensionInstallMetadata, f
 
 	// Determine a temporary path for cloning/copying to read the manifest
 	tempPath := filepath.Join(em.baseDir, ".goaiagent", "temp_extensions", filepath.Base(metadata.Source))
+
+	// Ensure tempPath is cleaned up afterwards if it was created for git clone
+	if metadata.Type == "git" {
+		defer func() {
+			if err := em.FSService.RemoveAll(tempPath); err != nil {
+				fmt.Printf("Warning: failed to clean up temporary extension path %s: %v\n", tempPath, err)
+			}
+		}()
+	}
 
 	// Perform clone/copy to temp path
 	switch metadata.Type {
@@ -204,8 +226,14 @@ finalExtensionPath := filepath.Join(em.baseDir, ".goaiagent", "extensions", mani
 	ext := &Extension{
 		Name:    manifest.Name,
 		Enabled: true, // Enable by default on install
+		Path:    finalExtensionPath,
+		Type:    metadata.Type,
 	}
 	em.RegisterExtension(ext)
+	// Ensure the parent directory exists
+	if err := em.FSService.MkdirAll(filepath.Dir(filepath.Join(em.baseDir, settingsFile)), 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory for settings file: %w", err)
+	}
 	if err := em.SaveExtensionStatus(); err != nil {
 		return "", fmt.Errorf("failed to save extension status: %w", err)
 	}
@@ -292,8 +320,14 @@ func (em *Manager) LinkExtension(path string) error {
 	ext := &Extension{
 		Name:    manifest.Name,
 		Enabled: true, // Enable by default on link
+		Path:    finalExtensionPath,
+		Type:    "local",
 	}
 	em.RegisterExtension(ext)
+	// Ensure the parent directory exists
+	if err := em.FSService.MkdirAll(filepath.Dir(filepath.Join(em.baseDir, settingsFile)), 0755); err != nil {
+		return fmt.Errorf("failed to create directory for settings file: %w", err)
+	}
 	if err := em.SaveExtensionStatus(); err != nil {
 		return fmt.Errorf("failed to save extension status: %w", err)
 	}

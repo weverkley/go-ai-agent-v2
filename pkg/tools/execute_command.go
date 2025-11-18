@@ -18,33 +18,28 @@ type ExecuteCommandTool struct {
 // NewExecuteCommandTool creates a new ExecuteCommandTool.
 func NewExecuteCommandTool(shellService *services.ShellExecutionService) *ExecuteCommandTool {
 	return &ExecuteCommandTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"execute_command",
-			"Execute Shell Command",
-			"Executes a given shell command in the specified directory.",
-			types.KindOther,
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"command": {
-						Type:        "string",
-						Description: "The shell command to execute.",
-					},
-					"dir": {
-						Type:        "string",
-						Description: "Optional: The absolute path of the directory to run the command in. If not provided, the current working directory is used.",
-					},
-					"background": {
-						Type:        "boolean",
-						Description: "Optional: If true, the command will be executed in the background. The tool will return immediately with the process ID. Default is false.",
-					},
-				},
-				Required: []string{"command"},
-			},
-			false,
-			false,
-			nil,
-		),
+	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+		types.EXECUTE_COMMAND_TOOL_NAME,
+		"Execute Command",
+		"Executes a shell command and returns its output.",
+		types.KindOther,
+		&types.JsonSchemaObject{
+			Type: "object",
+					Properties: map[string]*types.JsonSchemaProperty{
+						"command": &types.JsonSchemaProperty{
+							Type:        "string",
+							Description: "The shell command to execute.",
+						},
+						"dir_path": &types.JsonSchemaProperty{
+							Type:        "string",
+							Description: "Optional: The directory to execute the command in. Defaults to the current working directory.",
+						},
+					},			Required: []string{"command"},
+		},
+		false, // isOutputMarkdown
+		false, // canUpdateOutput
+		nil,   // MessageBus
+	),
 		shellService: shellService,
 	}
 }
@@ -69,7 +64,12 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, args map[string]any) (
 	if background {
 		pid, err := t.shellService.ExecuteCommandInBackground(command, dir)
 		if err != nil {
-			return types.ToolResult{}, fmt.Errorf("failed to execute command in background: %w", err)
+			return types.ToolResult{
+				Error: &types.ToolError{
+					Message: fmt.Sprintf("Failed to execute command in background: %v", err),
+					Type:    types.ToolErrorTypeExecutionFailed,
+				},
+			}, fmt.Errorf("failed to execute command in background: %w", err)
 		}
 		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("Command '%s' started in background with PID %d", command, pid),
@@ -97,9 +97,19 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, args map[string]any) (
 		llmContent = "Command executed successfully with no output."
 	}
 
+	if err != nil {
+		return types.ToolResult{
+			LLMContent:    llmContent,
+			ReturnDisplay: llmContent,
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Command execution failed: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("command execution failed: %w", err)
+	}
+
 	return types.ToolResult{
 		LLMContent:    llmContent,
 		ReturnDisplay: llmContent,
-	},
-	nil
+	}, nil
 }

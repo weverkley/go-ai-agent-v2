@@ -17,25 +17,27 @@ type PullTool struct {
 // NewPullTool creates a new PullTool.
 func NewPullTool() *PullTool {
 	return &PullTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"pull",
-			"Pull Git Changes",
-			"Pulls the latest changes from the remote for the current branch in the given Git repository.",
-			types.KindOther,
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"dir": {
-						Type:        "string",
-						Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
-					},
-				},
-				Required: []string{"dir"},
+	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+		types.PULL_TOOL_NAME,
+		"Pull",
+		"Pulls changes from a remote Git repository.",
+		types.KindOther,
+		(&types.JsonSchemaObject{
+			Type: "object",
+		}).SetProperties(map[string]*types.JsonSchemaProperty{
+			"remote_name": &types.JsonSchemaProperty{
+				Type:        "string",
+				Description: "The name of the Git remote (e.g., 'origin'). Defaults to 'origin'.",
 			},
-			false,
-			false,
-			nil,
-		),
+			"branch_name": &types.JsonSchemaProperty{
+				Type:        "string",
+				Description: "The name of the branch to pull. Defaults to the current branch.",
+			},
+		}),
+		false, // isOutputMarkdown
+		false, // canUpdateOutput
+		nil,   // MessageBus
+	),
 		gitService: services.NewGitService(),
 	}
 }
@@ -49,7 +51,12 @@ func (t *PullTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 
 	err := t.gitService.Pull(dir, "")
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to pull changes in %s: %w", dir, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to pull changes in %s: %v", dir, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to pull changes in %s: %w", dir, err)
 	}
 
 	return types.ToolResult{

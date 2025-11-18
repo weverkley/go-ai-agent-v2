@@ -207,6 +207,9 @@ type ToolErrorType string
 
 const (
 	ToolErrorTypeExecutionFailed ToolErrorType = "EXECUTION_FAILED"
+	ToolErrorTypeFileNotFound    ToolErrorType = "FILE_NOT_FOUND"
+	ToolErrorTypeAPIKeyNotSet    ToolErrorType = "API_KEY_NOT_SET"
+	ToolErrorTypeAPIError        ToolErrorType = "API_ERROR"
 )
 
 // FunctionCall represents a function call requested by the model.
@@ -227,6 +230,10 @@ type ToolResult struct {
 type ToolError struct {
 	Message string        `json:"message"`
 	Type    ToolErrorType `json:"type"`
+}
+
+func (e *ToolError) Error() string {
+	return fmt.Sprintf("%s: %s", e.Type, e.Message)
 }
 
 // ToolCallRequestInfo represents the information for a tool call request.
@@ -318,22 +325,30 @@ type ToolCallResponseInfo struct {
 // JsonSchemaObject defines the structure for a JSON Schema object.
 type JsonSchemaObject struct {
 	Type       string                        `json:"type"` // "object"
-	Properties map[string]JsonSchemaProperty `json:"properties"`
+	Properties map[string]*JsonSchemaProperty `json:"properties"`
 	Required   []string                      `json:"required,omitempty"`
+}
+
+// SetProperties sets the properties of the JsonSchemaObject.
+func (jso *JsonSchemaObject) SetProperties(properties map[string]*JsonSchemaProperty) *JsonSchemaObject {
+	jso.Properties = properties
+	return jso
+}
+
+// SetRequired sets the required fields of the JsonSchemaObject.
+func (jso *JsonSchemaObject) SetRequired(required []string) *JsonSchemaObject {
+	jso.Required = required
+	return jso
 }
 
 // JsonSchemaProperty defines the structure for a property within a JsonSchemaObject.
 type JsonSchemaProperty struct {
 	Type        string                        `json:"type"` // "string", "number", "integer", "boolean", "array", "object"
 	Description string                        `json:"description"`
-	Items       *JsonSchemaPropertyItem       `json:"items,omitempty"`
-	Properties  map[string]JsonSchemaProperty `json:"properties,omitempty"` // Added Properties field
-	Required    []string                      `json:"required,omitempty"`   // Added Required field for nested objects
-}
-
-// JsonSchemaPropertyItem defines the structure for items within a JsonSchemaProperty.
-type JsonSchemaPropertyItem struct {
-	Type string `json:"type"` // "string", "number"
+	Items       *JsonSchemaObject             `json:"items,omitempty"` // Changed to JsonSchemaObject for arrays of objects
+	Properties  map[string]*JsonSchemaProperty `json:"properties,omitempty"`
+	Required    []string                      `json:"required,omitempty"`
+	Enum        []string                      `json:"enum,omitempty"` // Added Enum field
 }
 
 // Tool is the interface that all tools must implement.
@@ -365,7 +380,7 @@ type BaseDeclarativeTool struct {
 	displayName      string
 	description      string
 	kind             Kind
-	parameterSchema  JsonSchemaObject
+	parameterSchema  *JsonSchemaObject
 	isOutputMarkdown bool
 	canUpdateOutput  bool
 	MessageBus       interface{}
@@ -378,7 +393,7 @@ func NewBaseDeclarativeTool(
 	displayName string,
 	description string,
 	kind Kind,
-	parameterSchema JsonSchemaObject,
+	parameterSchema *JsonSchemaObject,
 	isOutputMarkdown bool,
 	canUpdateOutput bool,
 	MessageBus interface{},
@@ -434,22 +449,45 @@ func (bdt *BaseDeclarativeTool) Definition() *genai.Tool {
 
 		var itemsSchema *genai.Schema
 		if v.Items != nil {
-			var itemType genai.Type
-			switch v.Items.Type {
-			case "string":
-				itemType = genai.TypeString
-			case "number":
-				itemType = genai.TypeNumber
-			default:
-				itemType = genai.TypeString // Default to string
+			// Recursively convert JsonSchemaObject to genai.Schema
+			itemProperties := make(map[string]*genai.Schema)
+			for itemK, itemV := range v.Items.Properties {
+				var itemPropType genai.Type
+				switch itemV.Type {
+				case "string":
+					itemPropType = genai.TypeString
+				case "number":
+					itemPropType = genai.TypeNumber
+				case "integer":
+					itemPropType = genai.TypeInteger
+				case "boolean":
+					itemPropType = genai.TypeBoolean
+				case "array":
+					itemPropType = genai.TypeArray
+				case "object":
+					itemPropType = genai.TypeObject
+				default:
+					itemPropType = genai.TypeString // Default to string
+				}
+				itemProperties[itemK] = &genai.Schema{
+					Type:        itemPropType,
+					Description: itemV.Description,
+					Enum:        itemV.Enum,
+					// Items and Properties for nested objects would require further recursion
+				}
 			}
-			itemsSchema = &genai.Schema{Type: itemType}
+			itemsSchema = &genai.Schema{
+				Type:       genai.TypeObject, // Assuming array items are always objects for now
+				Properties: itemProperties,
+				Required:   v.Items.Required,
+			}
 		}
 
 		properties[k] = &genai.Schema{
 			Type:        propType,
 			Description: v.Description,
 			Items:       itemsSchema,
+			Enum:        v.Enum,
 		}
 	}
 
@@ -503,6 +541,19 @@ type ToolRegistryInterface interface {
 	GetAllTools() []Tool
 	GetAllToolNames() []string
 	GetFunctionDeclarationsFiltered(toolNames []string) []genai.FunctionDeclaration
+}
+
+// SettingsServiceIface defines the interface for application settings management.
+type SettingsServiceIface interface {
+	Get(key string) (interface{}, bool)
+	GetTelemetrySettings() *TelemetrySettings
+	GetGoogleCustomSearchSettings() *GoogleCustomSearchSettings
+	GetWebSearchProvider() WebSearchProvider
+	GetTavilySettings() *TavilySettings
+	Set(key string, value interface{}) error
+	AllSettings() map[string]interface{}
+	Reset() error
+	Save() error
 }
 
 // ToolRegistry manages the registration and retrieval of tools.

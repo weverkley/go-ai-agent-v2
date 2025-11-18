@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"fmt"
+	"go-ai-agent-v2/go-cli/pkg/telemetry" // Added
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"os/exec"
@@ -45,21 +46,21 @@ func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServer
 
 	// Start the command in a new goroutine to avoid blocking
 	go func() {
-		fmt.Printf("Starting local MCP server '%s': %s %v\n", name, serverConfig.Command, serverConfig.Args)
+		telemetry.LogDebugf("Starting local MCP server '%s': %s %v", name, serverConfig.Command, serverConfig.Args)
 		if err := cmd.Start(); err != nil {
-			fmt.Printf("Error starting local MCP server '%s': %v\n", name, err)
+			telemetry.LogErrorf("Error starting local MCP server '%s': %v", name, err)
 			return
 		}
 		m.mu.Lock()
 		m.runningServers[name] = cmd
 		m.mu.Unlock()
-		fmt.Printf("Local MCP server '%s' started with PID %d\n", name, cmd.Process.Pid)
+		telemetry.LogDebugf("Local MCP server '%s' started with PID %d", name, cmd.Process.Pid)
 
 		// Wait for the command to finish (or be stopped)
 		if err := cmd.Wait(); err != nil {
-			fmt.Printf("Local MCP server '%s' exited with error: %v\n", name, err)
+			telemetry.LogErrorf("Local MCP server '%s' exited with error: %v", name, err)
 		} else {
-			fmt.Printf("Local MCP server '%s' exited normally.\n", name)
+			telemetry.LogDebugf("Local MCP server '%s' exited normally.", name)
 		}
 		m.mu.Lock()
 		delete(m.runningServers, name) // Clean up after exit
@@ -71,11 +72,11 @@ func (m *McpClientManager) StartServer(name string, serverConfig types.MCPServer
 
 // DiscoverAllMcpTools initiates the tool discovery process for all configured MCP servers.
 func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
-	fmt.Println("Discovering MCP tools...")
+	telemetry.LogDebugf("Discovering MCP tools...")
 
 	mcpServersVal, found := cliConfig.Get("mcpServers")
 	if !found || mcpServersVal == nil {
-		fmt.Println("No MCP servers configured.")
+		telemetry.LogDebugf("No MCP servers configured.")
 		return nil
 	}
 	mcpServers, ok := mcpServersVal.(map[string]types.MCPServerConfig)
@@ -84,12 +85,12 @@ func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
 	}
 
 	for name, serverConfig := range mcpServers {
-		fmt.Printf("Connecting to MCP server: %s (URL: %s)\n", name, serverConfig.Url)
+		telemetry.LogDebugf("Connecting to MCP server: %s (URL: %s)", name, serverConfig.Url)
 		client := NewMcpClient(name, "v1.0", serverConfig) // Pass serverConfig
 		
 		// Simulate connection
 		if err := client.Connect(5*time.Second); err != nil {
-			fmt.Printf("Error connecting to MCP server %s: %v\n", name, err)
+			telemetry.LogErrorf("Error connecting to MCP server %s: %v", name, err)
 			continue
 		}
 		m.mu.Lock()
@@ -97,18 +98,18 @@ func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
 		m.mu.Unlock()
 
 		// Simulate tool discovery and registration
-		fmt.Printf("Simulating tool discovery for %s...\n", name)
+		telemetry.LogDebugf("Simulating tool discovery for %s...", name)
 		discoveredTools, err := client.GetTools()
 		if err != nil {
-			fmt.Printf("Error getting simulated tools from MCP server %s: %v\n", name, err)
+			telemetry.LogErrorf("Error getting simulated tools from MCP server %s: %v", name, err)
 			continue
 		}
 
 		for _, tool := range discoveredTools {
 			if err := m.toolRegistry.Register(tool); err != nil {
-				fmt.Printf("Error registering tool %s from MCP server %s: %v\n", tool.Name(), name, err)
+				telemetry.LogErrorf("Error registering tool %s from MCP server %s: %v", tool.Name(), name, err)
 			} else {
-				fmt.Printf("Registered tool: %s from MCP server: %s\n", tool.Name(), name)
+				telemetry.LogDebugf("Registered tool: %s from MCP server: %s", tool.Name(), name)
 			}
 		}
 	}
@@ -118,7 +119,7 @@ func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
 
 // Stop stops all running local MCP servers and closes all client connections.
 func (m *McpClientManager) Stop() error {
-	fmt.Println("Stopping MCP clients and local servers...")
+	telemetry.LogDebugf("Stopping MCP clients and local servers...")
 
 	var allErrors []error
 
@@ -136,11 +137,11 @@ func (m *McpClientManager) Stop() error {
 	// Terminate local server processes
 	for name, cmd := range m.runningServers {
 		if cmd.Process != nil {
-			fmt.Printf("Terminating local MCP server '%s' (PID: %d)...\n", name, cmd.Process.Pid)
+			telemetry.LogDebugf("Terminating local MCP server '%s' (PID: %d)...", name, cmd.Process.Pid)
 			if err := cmd.Process.Kill(); err != nil {
 				allErrors = append(allErrors, fmt.Errorf("error killing process for server %s (PID %d): %w", name, cmd.Process.Pid, err))
 			} else {
-				fmt.Printf("Local MCP server '%s' (PID: %d) terminated.\n", name, cmd.Process.Pid)
+				telemetry.LogDebugf("Local MCP server '%s' (PID: %d) terminated.", name, cmd.Process.Pid)
 			}
 		}
 		delete(m.runningServers, name)
@@ -150,7 +151,7 @@ func (m *McpClientManager) Stop() error {
 		return fmt.Errorf("multiple errors occurred during MCP stop: %v", allErrors)
 	}
 
-	fmt.Println("All MCP clients and local servers stopped.")
+	telemetry.LogDebugf("All MCP clients and local servers stopped.")
 	return nil
 }
 

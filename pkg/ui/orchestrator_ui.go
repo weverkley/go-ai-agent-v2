@@ -297,7 +297,9 @@ func (m *OrchestratorModel) handleToolResult(msg toolResultMsg) (tea.Model, tea.
 	defer m.toolResultsMutex.Unlock()
 
 	if msg.err != nil {
-		// Error is already logged
+		m.err = msg.err
+		m.state = stateError
+		return m, tea.Quit
 	}
 	m.toolResults = append(m.toolResults, msg.result)
 	m.pendingToolCalls--

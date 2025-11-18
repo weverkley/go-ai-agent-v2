@@ -19,11 +19,11 @@ func TemplateString(template string, inputs map[string]interface{}) string {
 }
 
 // LogAgentStart logs the start of an agent's execution.
-func LogAgentStart(runtimeContext interface{}, event types.AgentStartEvent) {
+func LogAgentStart(event types.AgentStartEvent) {
 	telemetry.GlobalLogger.LogAgentStart(event)
 }
 
 // LogAgentFinish logs the finish of an agent's execution.
-func LogAgentFinish(runtimeContext interface{}, event types.AgentFinishEvent) {
+func LogAgentFinish(event types.AgentFinishEvent) {
 	telemetry.GlobalLogger.LogAgentFinish(event)
 }

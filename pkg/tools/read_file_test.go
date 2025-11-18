@@ -96,8 +96,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 				assert.NoError(t, err)
 				return tempFile, func() {}
 			},
-			expectedLLMContent:    "Offset 5 is beyond the end of the file (total lines: 3)",
-			expectedReturnDisplay: "Offset 5 is beyond the end of the file (total lines: 3)",
+			expectedError: "offset 5 is beyond the end of the file (total lines: 3)",
 		},
 		{
 			name: "limit exceeding file end",

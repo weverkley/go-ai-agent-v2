@@ -184,8 +184,7 @@ func (c *Config) GetDirectoryContextString() (string, error) {
 		workingDirPreamble = fmt.Sprintf("I'm currently working in the following directories:\n%s", strings.Join(dirList, "\n"))
 	}
 
-	return fmt.Sprintf("%s\n\n%s%c\n%s", workingDirPreamble, folderStructure, filepath.Separator, strings.Join(folderStructures, "\n")),
-		nil
+	return fmt.Sprintf("%s\n\n%s", workingDirPreamble, folderStructure), nil
 }
 
 // _getFolderStructure generates a string representation of a directory's structure.
@@ -332,7 +331,18 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 					continue
 				}
 
-				if options.FileIncludePattern == nil || regexp.MustCompile(*options.FileIncludePattern).MatchString(fileName) {
+				var fileIncludeRegex *regexp.Regexp
+				if options.FileIncludePattern != nil {
+					var err error
+					fileIncludeRegex, err = regexp.Compile(*options.FileIncludePattern)
+					if err != nil {
+						// Log the error and continue without applying the filter
+						fmt.Printf("Warning: invalid regex pattern for FileIncludePattern: %v\n", err)
+						fileIncludeRegex = nil // Disable the filter
+					}
+				}
+
+				if fileIncludeRegex == nil || fileIncludeRegex.MatchString(fileName) {
 					filesInCurrentDir = append(filesInCurrentDir, fileName)
 					currentItemCount++
 					folderInfo.TotalFiles++

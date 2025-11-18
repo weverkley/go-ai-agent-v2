@@ -355,6 +355,24 @@ func (ss *SettingsService) Set(key string, value interface{}) error {
 		} else {
 			return fmt.Errorf("invalid type for toolCallCommand setting, expected string")
 		}
+	case "enabledExtensions":
+		if v, ok := value.(map[types.SettingScope][]string); ok {
+			ss.settings.EnabledExtensions = v
+		} else {
+			return fmt.Errorf("invalid type for enabledExtensions setting, expected map[types.SettingScope][]string")
+		}
+	case "extensionPaths":
+		if v, ok := value.([]string); ok {
+			ss.settings.ExtensionPaths = v
+		} else {
+			return fmt.Errorf("invalid type for extensionPaths setting, expected []string")
+		}
+	case "mcpServers":
+		if v, ok := value.(map[string]types.MCPServerConfig); ok {
+			ss.settings.McpServers = v
+		} else {
+			return fmt.Errorf("invalid type for mcpServers setting, expected map[string]types.MCPServerConfig")
+		}
 	// Add other settings here
 	default:
 		return fmt.Errorf("setting '%s' not found or not settable", key)

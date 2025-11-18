@@ -62,6 +62,22 @@ func (s *CoreToolScheduler) Schedule(
 	}
 
 	startTime := time.Now()
+
+	// Notify that a tool call has started
+	if s.onToolCallsUpdate != nil {
+		s.onToolCallsUpdate([]ToolCall{
+			&ExecutingToolCall{ // Changed to ExecutingToolCall
+				BaseToolCall: BaseToolCall{
+					Request:    request,
+					Tool:       nil, // Simplified
+					Invocation: nil, // Simplified
+					StartTime:  &startTime,
+					Outcome:    types.ToolConfirmationOutcomeProceedAlways,
+				},
+			},
+		})
+	}
+
 	result, err := toolInstance.Execute(ctx, request.Args)
 	durationMs := time.Since(startTime).Milliseconds()
 
@@ -73,7 +89,7 @@ func (s *CoreToolScheduler) Schedule(
 		erroredCall := &ErroredToolCall{
 			BaseToolCall: BaseToolCall{
 				Request:    request,
-				Tool:       nil, // Simplified, as we don't have AnyDeclarativeTool here
+				Tool:       toolInstance, // Populate with actual tool instance
 				Invocation: nil, // Simplified
 				StartTime:  &startTime,
 				Outcome:    types.ToolConfirmationOutcomeProceedAlways,
@@ -100,7 +116,7 @@ func (s *CoreToolScheduler) Schedule(
 		successfulCall := &SuccessfulToolCall{
 			BaseToolCall: BaseToolCall{
 				Request:    request,
-				Tool:       nil, // Simplified
+				Tool:       toolInstance, // Populate with actual tool instance
 				Invocation: nil, // Simplified
 				StartTime:  &startTime,
 				Outcome:    types.ToolConfirmationOutcomeProceedAlways,
@@ -116,7 +132,7 @@ func (s *CoreToolScheduler) Schedule(
 		}
 		if result.ReturnDisplay != "" {
 			successfulCall.Response.ResultDisplay = &types.ToolResultDisplay{
-				FileDiff: result.ReturnDisplay, // Assuming display is a diff for now
+				FileDiff: result.ReturnDisplay,
 			}
 			successfulCall.Response.ContentLength = len(result.ReturnDisplay)
 		}

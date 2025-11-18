@@ -26,14 +26,14 @@ func NewWriteFileTool(fileSystemService services.FileSystemService) *WriteFileTo
 			"Write File",
 			"Writes content to a specified file in the local filesystem.",
 			types.KindOther,
-			types.JsonSchemaObject{
+			&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"file_path": {
+				Properties: map[string]*types.JsonSchemaProperty{
+					"file_path": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
 					},
-					"content": {
+					"content": &types.JsonSchemaProperty{
 						Type:        "string",
 						Description: "The content to write to the file.",
 					},
@@ -52,17 +52,32 @@ func NewWriteFileTool(fileSystemService services.FileSystemService) *WriteFileTo
 func (t *WriteFileTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	filePath, ok := args["file_path"].(string)
 	if !ok || filePath == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'file_path' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Missing or invalid 'file_path' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'file_path' argument")
 	}
 
 	content, ok := args["content"].(string)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'content' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Missing or invalid 'content' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'content' argument")
 	}
 
 	err := t.fileSystemService.WriteFile(filePath, content)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to write to file %s: %w", filePath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to write to file %s: %v", filePath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to write to file %s: %w", filePath, err)
 	}
 
 	output := fmt.Sprintf("Successfully wrote to file: %s", filePath)

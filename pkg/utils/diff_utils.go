@@ -50,3 +50,11 @@ func GetDiffStat(
 		UserRemovedChars:   max(0, userRemovedChars),
 	}
 }
+
+// max returns the greater of two integers.
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}

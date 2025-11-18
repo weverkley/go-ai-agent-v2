@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"fmt" // Added
 	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
 	"strings"
 )
@@ -40,9 +41,16 @@ func (s *DefaultStrategy) Name() string {
 }
 
 func (s *DefaultStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
-	model, _ := cfg.Get("model")
+	modelVal, ok := cfg.Get("model")
+	if !ok || modelVal == nil {
+		return nil, fmt.Errorf("model not found in config")
+	}
+	model, ok := modelVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("model in config is not a string")
+	}
 	return &RoutingDecision{
-		Model: model.(string),
+		Model: model,
 		Metadata: map[string]interface{}{
 			"source":    s.Name(),
 			"reasoning": "Default model selected",
@@ -58,13 +66,20 @@ func (s *OverrideStrategy) Name() string {
 }
 
 func (s *OverrideStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
-	model, ok := cfg.Get("model")
-	if !ok || model.(string) == "auto" {
+	modelVal, ok := cfg.Get("model")
+	if !ok || modelVal == nil {
+		return nil, nil // Pass to the next strategy
+	}
+	model, ok := modelVal.(string)
+	if !ok {
+		return nil, fmt.Errorf("model in config is not a string")
+	}
+	if model == "auto" {
 		return nil, nil // Pass to the next strategy
 	}
 
 	return &RoutingDecision{
-		Model: model.(string),
+		Model: model,
 		Metadata: map[string]interface{}{
 			"source":    s.Name(),
 			"reasoning": "Model overridden by user",
@@ -84,9 +99,13 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 		return nil, nil // Not a fallback scenario, pass to the next strategy.
 	}
 
-	currentModel, ok := cfg.Get("model")
+	currentModelVal, ok := cfg.Get("model")
+	if !ok || currentModelVal == nil {
+		return nil, fmt.Errorf("current model not found in config for fallback strategy")
+	}
+	currentModel, ok := currentModelVal.(string)
 	if !ok {
-		return nil, nil // Cannot suggest if we don't know the current model.
+		return nil, fmt.Errorf("current model in config is not a string for fallback strategy")
 	}
 
 	suggester, ok := modelSuggesters[ctx.ExecutorType]
@@ -94,7 +113,7 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 		return nil, nil // No suggester for this executor type.
 	}
 
-	suggestedModel, ok := suggester(currentModel.(string))
+	suggestedModel, ok := suggester(currentModel)
 	if !ok {
 		return nil, nil // No suggestion available.
 	}

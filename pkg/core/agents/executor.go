@@ -34,7 +34,6 @@ func (ae *AgentExecutor) Run(inputs AgentInputs, ctx context.Context) (OutputObj
 	var finalResult string
 
 	utils.LogAgentStart(
-		ae.RuntimeContext,
 		types.AgentStartEvent{AgentID: ae.AgentID, AgentName: ae.Definition.Name},
 	)
 
@@ -114,7 +113,6 @@ MainLoop:
 	}
 
 	utils.LogAgentFinish(
-		ae.RuntimeContext,
 		types.AgentFinishEvent{
 			AgentID:         ae.AgentID,
 			AgentName:       ae.Definition.Name,
@@ -313,6 +311,16 @@ func (ae *AgentExecutor) callModel(
 				argsMap[k] = v
 			}
 			parts = append(parts, types.Part{FunctionCall: &types.FunctionCall{Name: fc.Name, Args: argsMap}})
+		} else if fr, ok := p.(genai.FunctionResponse); ok {
+			argsMap := make(map[string]interface{})
+			for k, v := range fr.Response {
+				argsMap[k] = v
+			}
+			parts = append(parts, types.Part{FunctionResponse: &types.FunctionResponse{Name: fr.Name, Response: argsMap}})
+		} else if id, ok := p.(genai.Blob); ok { // genai.Blob is used for InlineData
+			parts = append(parts, types.Part{InlineData: &types.InlineData{MimeType: id.MIMEType, Data: string(id.Data)}})
+		} else if fd, ok := p.(genai.FileData); ok {
+			parts = append(parts, types.Part{FileData: &types.FileData{MimeType: fd.MIMEType, FileURL: fd.URI}}) // Changed FileURL to URI
 		}
 	}
 

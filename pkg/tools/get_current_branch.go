@@ -17,25 +17,18 @@ type GetCurrentBranchTool struct {
 // NewGetCurrentBranchTool creates a new GetCurrentBranchTool.
 func NewGetCurrentBranchTool() *GetCurrentBranchTool {
 	return &GetCurrentBranchTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"get_current_branch",
-			"Get Current Git Branch",
-			"Returns the name of the current Git branch in the specified directory.",
-			types.KindOther,
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"dir": {
-						Type:        "string",
-						Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
-					},
-				},
-				Required: []string{"dir"},
-			},
-			false,
-			false,
-			nil,
-		),
+	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+		types.GET_CURRENT_BRANCH_TOOL_NAME,
+		"Get Current Branch",
+		"Retrieves the name of the current Git branch.",
+		types.KindOther,
+		(&types.JsonSchemaObject{
+			Type:       "object",
+		}).SetProperties(map[string]*types.JsonSchemaProperty{}),
+		false, // isOutputMarkdown
+		false, // canUpdateOutput
+		nil,   // MessageBus
+	),
 		gitService: services.NewGitService(),
 	}
 }
@@ -49,7 +42,12 @@ func (t *GetCurrentBranchTool) Execute(ctx context.Context, args map[string]any)
 
 	branch, err := t.gitService.GetCurrentBranch(dir)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to get current branch for %s: %w", dir, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get current branch for %s: %v", dir, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to get current branch for %s: %w", dir, err)
 	}
 
 	return types.ToolResult{

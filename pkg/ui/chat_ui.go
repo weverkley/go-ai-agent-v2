@@ -238,6 +238,12 @@ type userConfirmationMsg struct {
 	response   string // "continue" or "cancel"
 }
 
+func userConfirmationCmd(toolCallID, response string) tea.Cmd {
+	return func() tea.Msg {
+		return userConfirmationMsg{toolCallID: toolCallID, response: response}
+	}
+}
+
 type ChatModel struct {
 	viewport viewport.Model
 
@@ -326,7 +332,7 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 	// Determine the log file path
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
-		fmt.Printf("Error getting user home directory: %v\n", err)
+		telemetry.LogErrorf("Error getting user home directory: %v", err)
 		// Handle error, perhaps return nil or a model with a disabled logger
 	}
 	logDirPath := filepath.Join(homeDir, ".goaiagent", "tmp")
@@ -334,14 +340,14 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 
 	// Ensure the log directory exists
 	if err := os.MkdirAll(logDirPath, 0755); err != nil {
-		fmt.Printf("Error creating log directory: %v\n", err)
+		telemetry.LogErrorf("Error creating log directory: %v", err)
 		// Handle error
 	}
 
 	// Open log file
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Printf("Error opening chat log file: %v\n", err)
+		telemetry.LogErrorf("Error opening chat log file: %v", err)
 		// Handle error, perhaps return nil or a model with a disabled logger
 	}
 	logWriter := bufio.NewWriter(logFile)
@@ -422,39 +428,36 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.awaitingConfirmation {
 			switch msg.String() {
-			case "c", "C": // Continue
-				// Find the active user_confirm tool call
-				var toolCallID string
-				for id, tc := range m.activeToolCalls {
-					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
-						toolCallID = id
-						break
-					}
-				}
-				if toolCallID != "" {
-					m.awaitingConfirmation = false
-					m.status = "User confirmed. Resuming..."
-					return m, func() tea.Msg {
-						return userConfirmationMsg{toolCallID: toolCallID, response: "continue"}
-					}
-				}
-			case "x", "X": // Cancel
-				// Find the active user_confirm tool call
-				var toolCallID string
-				for id, tc := range m.activeToolCalls {
-					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
-						toolCallID = id
-						break
-					}
-				}
-				if toolCallID != "" {
-					m.awaitingConfirmation = false
-					m.status = "User cancelled."
-					return m, func() tea.Msg {
-						return userConfirmationMsg{toolCallID: toolCallID, response: "cancel"}
-					}
-				}
-			}
+							case "c", "C": // Continue
+								// Find the active user_confirm tool call
+								var toolCallID string
+								for id, tc := range m.activeToolCalls {
+									if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
+										toolCallID = id
+										break
+									}
+								}
+								if toolCallID != "" {
+									m.awaitingConfirmation = false
+									m.status = "User confirmed. Resuming..."
+									// Directly send the confirmation message
+									return m, userConfirmationCmd(toolCallID, "continue")
+								}
+							case "x", "X": // Cancel
+								// Find the active user_confirm tool call
+								var toolCallID string
+								for id, tc := range m.activeToolCalls {
+									if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
+										toolCallID = id
+										break
+									}
+								}
+								if toolCallID != "" {
+									m.awaitingConfirmation = false
+									m.status = "User cancelled."
+									// Directly send the cancellation message
+									return m, userConfirmationCmd(toolCallID, "cancel")
+								}			}
 			return m, nil // Consume key presses while awaiting confirmation
 		}
 
@@ -562,6 +565,14 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logMessage(SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s", types.USER_CONFIRM_TOOL_NAME, event.Message)})
 			m.awaitingConfirmation = true
 			m.status = "Awaiting user confirmation..."
+
+			// Add a dummy tool call status for user_confirm to activeToolCalls
+			m.activeToolCalls[event.ToolCallID] = &ToolCallStatus{
+				ToolName: types.USER_CONFIRM_TOOL_NAME,
+				Args:     map[string]interface{}{"message": event.Message},
+				Status:   "Executing", // Mark as executing to be found by confirmation logic
+			}
+
 			m.updateViewport()
 			return m, nil // Stop processing stream events until user confirms
 
@@ -621,6 +632,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Send the user's confirmation back to the executor
 		select {
 		case m.userConfirmationResponseChan <- (msg.response == "continue"):
+			telemetry.LogDebugf("Sent user confirmation to executor: %t", (msg.response == "continue"))
 			// Successfully sent confirmation
 		case <-m.cancelCtx.Done():
 			// Context was cancelled, don't block sending
@@ -676,7 +688,11 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	if len(args) > 0 {
 		switch args[0] {
 		case "chat", "exec", "generate":
-			m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("command '%s' is disabled in interactive chat to prevent freezing", args[0])})
+			err := fmt.Errorf("command '%s' is disabled in interactive chat to prevent freezing", args[0])
+			m.messages = append(m.messages, ErrorMessage{Err: &types.ToolError{
+				Message: err.Error(),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			}})
 			m.updateViewport()
 			return m, nil
 		}
@@ -737,7 +753,7 @@ func (m *ChatModel) logMessage(msg Message) {
 	// Render the message to a string and write to log
 	_, err := m.logWriter.WriteString(msg.Render(m) + "\n")
 	if err != nil {
-		fmt.Printf("Error writing to chat log: %v\n", err)
+		telemetry.LogErrorf("Error writing to chat log: %v", err)
 	}
 	m.logWriter.Flush() // Ensure message is written immediately
 }

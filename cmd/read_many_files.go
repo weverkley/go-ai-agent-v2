@@ -1,10 +1,11 @@
 package cmd
 
 import (
-	"context" // New import
+	"context"
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 	"github.com/spf13/cobra"
 )
@@ -43,7 +44,8 @@ var readManyFilesCmd = &cobra.Command{
 	Short: "Reads content from multiple files",
 	Long:  `Reads content from multiple files specified by paths or glob patterns within a configured target directory. For text files, it concatenates their content into a single string.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		readManyFilesTool := tools.NewReadManyFilesTool()
+		fileSystemService := services.NewFileSystemService()
+		readManyFilesTool := tools.NewReadManyFilesTool(fileSystemService)
 		result, err := readManyFilesTool.Execute(context.Background(), map[string]any{
 			"paths":                stringSliceToAnySlice(readManyFilesPaths),
 			"include":              stringSliceToAnySlice(readManyFilesInclude),

@@ -3,6 +3,7 @@ package services
 import (
 	"os"
 
+	"github.com/gobwas/glob"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -15,6 +16,12 @@ type MockFileSystemService struct {
 func (m *MockFileSystemService) ListDirectory(path string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error) {
 	args := m.Called(path, ignorePatterns, respectGitIgnore, respectGeminiIgnore)
 	return args.Get(0).([]string), args.Error(1)
+}
+
+// GetIgnorePatterns mocks the GetIgnorePatterns method.
+func (m *MockFileSystemService) GetIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error) {
+	args := m.Called(searchDir, respectGitIgnore, respectGoaiagentIgnore)
+	return args.Get(0).([]glob.Glob), args.Error(1)
 }
 
 // PathExists mocks the PathExists method.

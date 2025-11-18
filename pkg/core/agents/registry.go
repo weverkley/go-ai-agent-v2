@@ -1,8 +1,9 @@
 package agents
 
 import (
-	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
+	"go-ai-agent-v2/go-cli/pkg/config" // Added
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // AgentRegistry manages the discovery, loading, validation, and registration of AgentDefinitions.
@@ -68,8 +69,8 @@ func (ar *AgentRegistry) loadBuiltInAgents() {
 // registerAgent registers an agent definition.
 func (ar *AgentRegistry) registerAgent(definition AgentDefinition) {
 	// Basic validation
-	if definition.Name == "" || definition.Description == "" { //nolint:staticcheck
-		// debugLogger.Warn("Agent definition missing name or description.")
+	if definition.Name == "" || definition.Description == "" {
+		telemetry.LogErrorf("Agent definition missing name or description.") // Changed to LogErrorf
 		return
 	}
 
@@ -81,8 +82,8 @@ func (ar *AgentRegistry) registerAgent(definition AgentDefinition) {
 		}
 	}
 
-	if _, exists := ar.agents[definition.Name]; exists && debugMode { //nolint:staticcheck
-		// debugLogger.Debug(fmt.Sprintf("Overriding existing agent: %s", definition.Name))
+	if _, exists := ar.agents[definition.Name]; exists && debugMode {
+		telemetry.LogDebugf("Overriding existing agent: %s", definition.Name)
 	}
 
 	ar.agents[definition.Name] = definition

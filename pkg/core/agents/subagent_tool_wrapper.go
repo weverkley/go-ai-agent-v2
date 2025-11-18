@@ -32,11 +32,11 @@ func NewSubagentToolWrapper(
 		definition.Name,
 		definition.DisplayName,
 		definition.Description,
-		types.KindOther, // Assuming subagents are "OTHER" kind
+		types.KindOther, // Assuming KindOther for now
 		parameterSchema,
-		true,        // isOutputMarkdown
-		true,        // canUpdateOutput
-		messageBus,
+		false, // isOutputMarkdown
+		false, // canUpdateOutput
+		messageBus,   // MessageBus
 	)
 
 	return &SubagentToolWrapper{

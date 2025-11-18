@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
+
+	"github.com/gobwas/glob"
 )
 
 // GrepTool represents the grep tool.
@@ -25,24 +27,22 @@ func NewGrepTool() *GrepTool {
 			"grep",
 			"Searches for a regular expression pattern within files in a specified directory.",
 			types.KindOther, // Assuming KindOther for now
-			types.JsonSchemaObject{
+			(&types.JsonSchemaObject{
 				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"pattern": {
-						Type:        "string",
-						Description: "The regular expression (regex) pattern to search for.",
-					},
-					"path": {
-						Type:        "string",
-						Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
-					},
-					"include": {
-						Type:        "string",
-						Description: "Optional: A glob pattern to filter which files are searched (e.g., '*.js', 'src/**').",
-					},
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"pattern": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "The regular expression (regex) pattern to search for.",
 				},
-				Required: []string{"pattern"},
-			},
+				"path": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+				},
+				"include": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "Optional: A glob pattern to filter which files are searched (e.g., '*.js', 'src/**').",
+				},
+			}).SetRequired([]string{"pattern"}),
 			false, // isOutputMarkdown
 			false, // canUpdateOutput
 			nil,   // MessageBus
@@ -78,13 +78,23 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	// Compile the regex pattern
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("invalid regex pattern: %w", err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Invalid regex pattern: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("invalid regex pattern: %w", err)
 	}
 
 	// Resolve the search path
 	absSearchPath, err := filepath.Abs(searchPath)
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to resolve absolute path for %s: %v", searchPath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
 	}
 
 	var allMatches []GrepMatch
@@ -102,11 +112,17 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 
 		// Filter by include glob pattern if provided
 		if include != "" {
-			match, err := filepath.Match(include, info.Name())
+			g, err := glob.Compile(include)
 			if err != nil {
-				return fmt.Errorf("invalid include pattern: %w", err)
+				// Log the error and continue without applying the include filter for this file
+				fmt.Printf("Warning: invalid include pattern '%s': %v\n", include, err)
+				return nil
 			}
-			if !match {
+			relPath, err := filepath.Rel(absSearchPath, path)
+			if err != nil {
+				return err
+			}
+			if !g.Match(relPath) {
 				return nil // Skip file if it doesn't match include pattern
 			}
 		}
@@ -143,7 +159,12 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	})
 
 	if err != nil {
-		return types.ToolResult{}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Error walking the path %s: %v", absSearchPath, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
 	}
 
 	if len(allMatches) == 0 {

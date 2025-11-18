@@ -17,38 +17,40 @@ type LsTool struct {
 // NewLsTool creates a new instance of LsTool.
 func NewLsTool() *LsTool {
 	return &LsTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			types.LS_TOOL_NAME,
-			"ls",
-			"Lists the names of files and subdirectories directly within a specified directory path.",
-			types.KindOther,
-			types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]types.JsonSchemaProperty{
-					"path": {
-						Type:        "string",
-						Description: "The absolute path to the directory to list (must be absolute, not relative)",
-					},
-				},
-				Required: []string{"path"},
-			},
-			false, // isOutputMarkdown
-			false, // canUpdateOutput
-			nil,   // MessageBus
-		),
-	}
+				BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+					types.LS_TOOL_NAME,
+					"List Directory Contents",
+					"Lists the contents of a directory.",
+					types.KindOther,
+					(&types.JsonSchemaObject{
+						Type: "object",
+					}).SetProperties(map[string]*types.JsonSchemaProperty{
+						"path": &types.JsonSchemaProperty{
+							Type:        "string",
+							Description: "The path to the directory to list.",
+						},
+					}),
+					false, // isOutputMarkdown
+					false, // canUpdateOutput
+					nil,   // MessageBus
+				),	}
 }
 
 // Execute runs the tool with the given arguments.
 func (t *LsTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	path, ok := args["path"].(string)
 	if !ok || path == "" {
-		return types.ToolResult{Error: &types.ToolError{Message: "path argument is required and must be a string"}}, nil
+		return types.ToolResult{}, fmt.Errorf("path argument is required and must be a string")
 	}
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return types.ToolResult{Error: &types.ToolError{Message: fmt.Sprintf("failed to read directory %s: %v", path, err)}}, nil
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to read directory %s: %v", path, err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to read directory %s: %w", path, err)
 	}
 
 	var fileNames []string

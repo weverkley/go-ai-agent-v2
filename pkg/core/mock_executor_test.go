@@ -261,4 +261,40 @@ func TestMockExecutor(t *testing.T) {
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "CompressChat not implemented in mock")
 	})
+
+	t.Run("GenerateStream should call the provided function", func(t *testing.T) {
+		expectedChan := make(chan any)
+		close(expectedChan)
+		// The mock's GenerateStreamFunc returns <-chan any, so the test should expect that type.
+		expectedReadChan := (<-chan any)(expectedChan)
+		mockExecutor := &core.MockExecutor{
+			GenerateStreamFunc: func(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
+				return expectedReadChan, nil
+			},
+		}
+		respChan, err := mockExecutor.GenerateStream(context.Background())
+		assert.NoError(t, err)
+		assert.Equal(t, expectedReadChan, respChan)
+	})
+
+	t.Run("GenerateStream should return error if function not provided", func(t *testing.T) {
+		mockExecutor := &core.MockExecutor{}
+		respChan, err := mockExecutor.GenerateStream(context.Background())
+		assert.Error(t, err)
+		assert.Nil(t, respChan)
+		assert.Contains(t, err.Error(), "GenerateStream not implemented in mock")
+	})
+
+	t.Run("SetUserConfirmationChannel should set the UserConfirmationChan", func(t *testing.T) {
+		mockExecutor := &core.MockExecutor{}
+		testChan := make(chan bool)
+		mockExecutor.SetUserConfirmationChannel(testChan)
+		assert.Equal(t, testChan, mockExecutor.UserConfirmationChan) // Changed to assert.Equal
+	})
+
+	t.Run("SetUserConfirmationChannel should not return error if function not provided", func(t *testing.T) {
+		mockExecutor := &core.MockExecutor{}
+		// This method does not return an error, so we just ensure it doesn't panic
+		mockExecutor.SetUserConfirmationChannel(make(chan bool))
+	})
 }
