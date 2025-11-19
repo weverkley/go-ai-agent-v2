@@ -14,32 +14,32 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new Go AI Agent project",
-	Long:  `The init command analyzes the project and creates a tailored GEMINI.md file for instructional context.`, //nolint:staticcheck
+	Long:  `The init command analyzes the project and creates a tailored GOAIAGENT.md file for instructional context.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
 		projectRoot, err := os.Getwd()
 		if err != nil {
 			fmt.Printf("Error getting current directory: %v\n", err)
 			return
 		}
-		geminiMdPath := filepath.Join(projectRoot, "GEMINI.md")
+		geminiMdPath := filepath.Join(projectRoot, "GOAIAGENT.md")
 
-		// Check if GEMINI.md already exists
+		// Check if GOAIAGENT.md already exists
 		if _, err := os.Stat(geminiMdPath); !os.IsNotExist(err) {
-			fmt.Printf("A GEMINI.md file already exists in this directory. No changes were made.\n")
+			fmt.Printf("A GOAIAGENT.md file already exists in this directory. No changes were made.\n")
 			return
 		}
 
-		// Create an empty GEMINI.md file
+		// Create an empty GOAIAGENT.md file
 		err = os.WriteFile(geminiMdPath, []byte(""), 0644)
 		if err != nil {
-			fmt.Printf("Error creating GEMINI.md file: %v\n", err)
+			fmt.Printf("Error creating GOAIAGENT.md file: %v\n", err)
 			return
 		}
 
-		fmt.Println("Empty GEMINI.md created. Now analyzing the project to populate it.")
+		fmt.Println("Empty GOAIAGENT.md created. Now analyzing the project to populate it.")
 
 		prompt := `
-You are an AI agent that brings the power of Gemini directly into the terminal. Your task is to analyze the current directory and generate a comprehensive GEMINI.md file to be used as instructional context for future interactions.
+You are an AI agent that brings the power of Gemini directly into the terminal. Your task is to analyze the current directory and generate a comprehensive GOAIAGENT.md file to be used as instructional context for future interactions.
 
 **Analysis Process:**
 
@@ -55,7 +55,7 @@ You are an AI agent that brings the power of Gemini directly into the terminal. 
         *   **Code Project:** Look for clues like 'package.json', 'requirements.txt', 'pom.xml', 'go.mod', 'Cargo.toml', 'build.gradle', or a 'src' directory. If you find them, this is likely a software project.
         *   **Non-Code Project:** If you don't find code-related files, this might be a directory for documentation, research papers, notes, or something else.
 
-**GEMINI.md Content Generation:**
+**GOAIAGENT.md Content Generation:**
 
 **For a Code Project:**
 
@@ -71,7 +71,7 @@ You are an AI agent that brings the power of Gemini directly into the terminal. 
 
 **Final Output:**
 
-Write the complete content to the 'GEMINI.md' file. The output must be well-formatted Markdown.
+Write the complete content to the 'GOAIAGENT.md' file. The output must be well-formatted Markdown.
 `
 
 		resp, err := executor.GenerateContent(
@@ -81,7 +81,7 @@ Write the complete content to the 'GEMINI.md' file. The output must be well-form
 			},
 		)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error generating GEMINI.md content: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error generating GOAIAGENT.md content: %v\n", err)
 			os.Exit(1)
 		}
 
@@ -96,10 +96,10 @@ Write the complete content to the 'GEMINI.md' file. The output must be well-form
 
 		err = os.WriteFile(geminiMdPath, []byte(generatedContent), 0644)
 		if err != nil {
-			fmt.Printf("Error writing generated content to GEMINI.md: %v\n", err)
+			fmt.Printf("Error writing generated content to GOAIAGENT.md: %v\n", err)
 			return
 		}
 
-		fmt.Println("GEMINI.md populated with generated content.")
+		fmt.Println("GOAIAGENT.md populated with generated content.")
 	},
 }

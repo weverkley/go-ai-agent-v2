@@ -89,13 +89,15 @@ func initConfig(
 	telemetrySettings *types.TelemetrySettings,
 	workspaceService *services.WorkspaceService,
 	fileFilteringService *services.FileFilteringService,
+	settingsService *services.SettingsService, // Add settingsService
 ) *config.Config {
 	params := &config.ConfigParameters{
-		DebugMode: false,
+		DebugMode: true, // Enable debug mode
 		ModelName: config.DEFAULT_GEMINI_MODEL,
 		Telemetry: &types.TelemetrySettings{
-			Enabled: false,
-			Outfile: "",
+			Enabled: true,      // Enable telemetry
+			Outfile: "stderr", // Output to stderr for console visibility
+			LogLevel: "debug",  // Set log level to debug
 		},
 		ToolRegistry: toolRegistry,
 	}
@@ -185,7 +187,7 @@ func init() {
 		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
 		toolRegistry := registerTools(FSService, ShellService, SettingsService)
-		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService)
+		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
 
 		executorType = "gemini"
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)

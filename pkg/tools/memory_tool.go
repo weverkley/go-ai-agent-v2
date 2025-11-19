@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	DEFAULT_CONTEXT_FILENAME = "GEMINI.md"
-	MEMORY_SECTION_HEADER    = "## Gemini Added Memories"
+	DEFAULT_CONTEXT_FILENAME = "GOAIAGENT.md"
+	MEMORY_SECTION_HEADER    = "## GO AI Agent Added Memories"
 )
 
 // MemoryTool represents the memory tool.
@@ -44,7 +44,7 @@ func NewMemoryTool() *MemoryTool {
 	}
 }
 
-// getGlobalMemoryFilePath returns the path to the GEMINI.md file.
+// getGlobalMemoryFilePath returns the path to the GOAIAGENT.md file.
 func getGlobalMemoryFilePath() (string, error) {
 	homeDir, err := osUserHomeDir() // Use global variable
 	if err != nil {
