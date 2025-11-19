@@ -7,6 +7,7 @@ import (
 	"path"
 	"time"
 
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -126,30 +127,35 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				{ToolCallID: "mock-39", ToolName: "execute_command", Args: map[string]interface{}{"command": "kill $(lsof -t -i:3000) || true"}},
 			}
 
-			for _, step := range steps {
-				select {
-				case <-ctx.Done():
-					// Context was cancelled, stop streaming
-					eventChan <- types.ErrorEvent{Err: ctx.Err()}
-					return
-				default:
-					eventChan <- types.ThinkingEvent{}
-					time.Sleep(1 * time.Second) // Simulate model thinking time
-
-					eventChan <- step // Emit ToolCallStartEvent
-					result, err := mock.ExecuteTool(ctx, &types.FunctionCall{Name: step.ToolName, Args: step.Args})
-
-					time.Sleep(500 * time.Millisecond) // Simulate tool execution time
-
-					eventChan <- types.ToolCallEndEvent{
-						ToolCallID: step.ToolCallID,
-						ToolName:   step.ToolName,
-						Result:     result.ReturnDisplay,
-						Err:        err,
-					}
-				}
-			}
-
+						for _, step := range steps {
+							telemetry.LogDebugf("MockExecutor: Processing step: %s (%s)", step.ToolCallID, step.ToolName)
+							select {
+							case <-ctx.Done():
+								telemetry.LogDebugf("MockExecutor: Context cancelled, exiting loop.")
+								eventChan <- types.ErrorEvent{Err: ctx.Err()}
+								return
+							default:
+								eventChan <- types.ThinkingEvent{}
+								time.Sleep(100 * time.Millisecond) // Simulate thinking time
+			
+								eventChan <- step // Emit ToolCallStartEvent
+								
+								// Add a small delay to allow the UI to render the start event
+								time.Sleep(100 * time.Millisecond)
+			
+								result, err := mock.ExecuteTool(ctx, &types.FunctionCall{Name: step.ToolName, Args: step.Args})
+			
+								time.Sleep(500 * time.Millisecond) // Simulate tool execution time
+			
+								eventChan <- types.ToolCallEndEvent{
+									ToolCallID: step.ToolCallID,
+									ToolName:   step.ToolName,
+									Result:     result.ReturnDisplay,
+									Err:        err,
+								}
+								telemetry.LogDebugf("MockExecutor: Finished step: %s (%s) with error: %v", step.ToolCallID, step.ToolName, err)
+							}
+						}
 			// Final Response
 			select {
 			case <-ctx.Done():
