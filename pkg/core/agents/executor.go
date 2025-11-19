@@ -12,8 +12,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/telemetry" // Import telemetry package
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/utils"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // AgentExecutor executes an agent loop based on an AgentDefinition.
@@ -43,7 +41,7 @@ func (ae *AgentExecutor) Run(inputs AgentInputs, ctx context.Context) (OutputObj
 		return OutputObject{}, err
 	}
 
-toolsList, err := ae.prepareToolsList()
+	toolsList, err := ae.prepareToolsList()
 	if err != nil {
 		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
 		return OutputObject{}, err
@@ -53,7 +51,7 @@ toolsList, err := ae.prepareToolsList()
 	if ae.Definition.PromptConfig.Query != "" {
 		query = utils.TemplateString(ae.Definition.PromptConfig.Query, inputs)
 	}
-	currentMessage := &genai.Content{Parts: []genai.Part{genai.Text(query)}, Role: "user"}
+	currentMessage := &types.Content{Parts: []types.Part{{Text: query}}, Role: "user"}
 
 MainLoop:
 	for {
@@ -144,13 +142,13 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 
 	startHistory := ae.applyTemplateToInitialMessages(promptConfig.InitialMessages, inputs)
 
-	var systemInstruction *genai.Content
+	var systemInstruction *types.Content
 	if promptConfig.SystemPrompt != "" {
 		instruction, err := ae.buildSystemPrompt(inputs)
 		if err != nil {
 			return nil, fmt.Errorf("failed to build system prompt: %w", err)
 		}
-		systemInstruction = &genai.Content{Parts: []genai.Part{genai.Text(instruction)}}
+		systemInstruction = &types.Content{Parts: []types.Part{{Text: instruction}}}
 	}
 
 	generationConfig := types.GenerateContentConfig{
@@ -163,17 +161,28 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 	}
 
 	if systemInstruction != nil {
-		// This is a simplified way to handle system instructions.
-		// The JS version seems to handle it as part of GenerateContentConfig.
-		// For now, we prepend it to the history.
-		startHistory = append([]*genai.Content{systemInstruction}, startHistory...)
+		// Prepend system instruction to the history.
+		startHistory = append([]*types.Content{systemInstruction}, startHistory...)
 	}
 
-	chat, err := core.NewGoaiagentChat(
-		ae.RuntimeContext,
-		generationConfig,
-		startHistory,
-	)
+	// Determine executor type from model name.
+	var executorType string
+	if strings.HasPrefix(modelConfig.Model, "qwen") {
+		executorType = "qwen"
+	} else {
+		// Default to goaiagent for gemini or other models
+		executorType = "goaiagent"
+	}
+
+	factory, err := core.NewExecutorFactory(executorType, ae.RuntimeContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create executor factory for model %s: %w", modelConfig.Model, err)
+	}
+
+	// The factory needs the specific model, so we update the config for it.
+	modelSpecificConfig := ae.RuntimeContext.WithModel(modelConfig.Model)
+
+	chat, err := factory.NewExecutor(modelSpecificConfig, generationConfig, startHistory)
 	if err != nil {
 		telemetry.GlobalLogger.LogErrorf("Failed to create chat object: %v", err)
 		return nil, fmt.Errorf("failed to create chat object: %w", err)
@@ -186,26 +195,26 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 func (ae *AgentExecutor) applyTemplateToInitialMessages(
 	initialMessages []types.Part,
 	inputs AgentInputs,
-) []*genai.Content {
-	templatedMessages := make([]*genai.Content, len(initialMessages))
+) []*types.Content {
+	templatedMessages := make([]*types.Content, len(initialMessages))
 	for i, part := range initialMessages {
-		var newGenaiParts []genai.Part
+		var newParts []types.Part
 		if part.Text != "" {
-			newGenaiParts = append(newGenaiParts, genai.Text(utils.TemplateString(part.Text, inputs)))
+			newParts = append(newParts, types.Part{Text: utils.TemplateString(part.Text, inputs)})
 		} else if part.FunctionResponse != nil {
-			newGenaiParts = append(newGenaiParts, genai.FunctionResponse{
+			newParts = append(newParts, types.Part{FunctionResponse: &types.FunctionResponse{
 				Name:     part.FunctionResponse.Name,
 				Response: part.FunctionResponse.Response,
-			})
+			}})
 		} else if part.InlineData != nil {
-			newGenaiParts = append(newGenaiParts, genai.Blob{
-				MIMEType: part.InlineData.MimeType,
-				Data:     []byte(part.InlineData.Data),
-			})
+			newParts = append(newParts, types.Part{InlineData: &types.InlineData{
+				MimeType: part.InlineData.MimeType,
+				Data:     part.InlineData.Data,
+			}})
 		} else if part.FileData != nil {
-			newGenaiParts = append(newGenaiParts, genai.Text(fmt.Sprintf("File data: %s (%s)", part.FileData.FileURL, part.FileData.MimeType)))
+			newParts = append(newParts, types.Part{Text: fmt.Sprintf("File data: %s (%s)", part.FileData.FileURL, part.FileData.MimeType)})
 		}
-		templatedMessages[i] = &genai.Content{Parts: newGenaiParts}
+		templatedMessages[i] = &types.Content{Parts: newParts}
 	}
 	return templatedMessages
 }
@@ -237,42 +246,39 @@ Important Rules:
 }
 
 // prepareToolsList prepares the list of tool function declarations to be sent to the model.
-func (ae *AgentExecutor) prepareToolsList() ([]*genai.FunctionDeclaration, error) {
-	toolsList := []*genai.FunctionDeclaration{}
+func (ae *AgentExecutor) prepareToolsList() ([]*types.ToolDefinition, error) {
+	var declarations []*types.FunctionDeclaration
 	toolConfig := ae.Definition.ToolConfig
 	outputConfig := ae.Definition.OutputConfig
 
 	if toolConfig != nil {
 		toolNamesToLoad := toolConfig.Tools
-		// Add schemas from tools that were registered by name.
-		declarations := ae.ToolRegistry.GetFunctionDeclarationsFiltered(toolNamesToLoad)
-		for i := range declarations {
-			toolsList = append(toolsList, &declarations[i])
-		}
+		declarations = ae.ToolRegistry.GetFunctionDeclarationsFiltered(toolNamesToLoad)
 	}
 
-	// Always inject complete_task.
-	completeTool := &genai.FunctionDeclaration{
+	completeTool := &types.FunctionDeclaration{
 		Name:        types.TASK_COMPLETE_TOOL_NAME,
 		Description: "Call this tool to signal that you have completed your task. This is the ONLY way to finish.",
-		Parameters: &genai.Schema{
-			Type:       genai.TypeObject,
-			Properties: make(map[string]*genai.Schema),
+		Parameters: &types.JsonSchemaObject{
+			Type:       "object",
+			Properties: make(map[string]*types.JsonSchemaProperty),
 			Required:   []string{},
 		},
 	}
 
 	if outputConfig != nil {
 		completeTool.Description = "Call this tool to submit your final answer and complete the task. This is the ONLY way to finish."
-		// This is a simplified schema generation. A proper implementation would
-		// convert the Zod-like schema from the definition to a genai.Schema.
-		completeTool.Parameters.Properties[outputConfig.OutputName] = &genai.Schema{Type: genai.TypeString} // Assuming string output for now
+		completeTool.Parameters.Properties[outputConfig.OutputName] = &types.JsonSchemaProperty{Type: "string"}
 		completeTool.Parameters.Required = append(completeTool.Parameters.Required, outputConfig.OutputName)
 	}
 
-	toolsList = append(toolsList, completeTool)
+	declarations = append(declarations, completeTool)
 
-	return toolsList, nil
+	if len(declarations) == 0 {
+		return nil, nil
+	}
+
+	return []*types.ToolDefinition{{FunctionDeclarations: declarations}}, nil
 }
 
 // checkTermination checks if the agent should terminate due to exceeding configured limits.
@@ -296,40 +302,15 @@ func (ae *AgentExecutor) checkTermination(startTime time.Time, turnCounter int) 
 // callModel calls the generative model with the current context and tools.
 func (ae *AgentExecutor) callModel(
 	chat core.Executor,
-	message *genai.Content,
-	tools []*genai.FunctionDeclaration,
+	message *types.Content,
+	tools []*types.ToolDefinition,
 	ctx context.Context,
 	promptId string,
-) ([]*genai.FunctionCall, string, error) {
-	var parts []types.Part
-	for _, p := range message.Parts {
-		if text, ok := p.(genai.Text); ok {
-			parts = append(parts, types.Part{Text: string(text)})
-		} else if fc, ok := p.(genai.FunctionCall); ok {
-			argsMap := make(map[string]interface{})
-			for k, v := range fc.Args {
-				argsMap[k] = v
-			}
-			parts = append(parts, types.Part{FunctionCall: &types.FunctionCall{Name: fc.Name, Args: argsMap}})
-		} else if fr, ok := p.(genai.FunctionResponse); ok {
-			argsMap := make(map[string]interface{})
-			for k, v := range fr.Response {
-				argsMap[k] = v
-			}
-			parts = append(parts, types.Part{FunctionResponse: &types.FunctionResponse{Name: fr.Name, Response: argsMap}})
-		} else if id, ok := p.(genai.Blob); ok { // genai.Blob is used for InlineData
-			parts = append(parts, types.Part{InlineData: &types.InlineData{MimeType: id.MIMEType, Data: string(id.Data)}})
-		} else if fd, ok := p.(genai.FileData); ok {
-			parts = append(parts, types.Part{FileData: &types.FileData{MimeType: fd.MIMEType, FileURL: fd.URI}}) // Changed FileURL to URI
-		}
-	}
-
+) ([]*types.FunctionCall, string, error) {
 	messageParams := types.MessageParams{
-		Message:     parts,
+		Message:     message.Parts,
 		AbortSignal: ctx,
-	}
-	if len(tools) > 0 {
-		messageParams.Tools = []*genai.Tool{{FunctionDeclarations: tools}}
+		Tools:       tools,
 	}
 
 	responseStream, err := chat.SendMessageStream(
@@ -341,7 +322,7 @@ func (ae *AgentExecutor) callModel(
 		return nil, "", fmt.Errorf("failed to send message stream: %w", err)
 	}
 
-	var functionCalls []*genai.FunctionCall
+	var functionCalls []*types.FunctionCall
 	var textResponse strings.Builder
 
 	for resp := range responseStream {
@@ -356,20 +337,20 @@ func (ae *AgentExecutor) callModel(
 			}
 
 			for _, part := range chunk.Candidates[0].Content.Parts {
-				if thought, ok := part.(genai.Text); ok {
-					thoughtResult := utils.ParseThought(string(thought))
+				if part.Thought != "" {
+					thoughtResult := utils.ParseThought(part.Thought)
 					if thoughtResult.Subject != "" {
 						ae.emitActivity("THOUGHT_CHUNK", map[string]interface{}{"text": thoughtResult.Subject})
 					}
 				}
 
-				if fcPart, ok := part.(genai.FunctionCall); ok {
-					functionCalls = append(functionCalls, &fcPart)
+				if part.FunctionCall != nil {
+					functionCalls = append(functionCalls, part.FunctionCall)
 				}
 
-				if txt, ok := part.(genai.Text); ok {
-					if !strings.HasPrefix(string(txt), "**") { // Simple check to filter out thoughts
-						textResponse.WriteString(string(txt))
+				if part.Text != "" {
+					if !strings.HasPrefix(part.Text, "**") { // Simple check to filter out thoughts
+						textResponse.WriteString(part.Text)
 					}
 				}
 			}
@@ -383,10 +364,10 @@ func (ae *AgentExecutor) callModel(
 
 // processFunctionCalls executes function calls requested by the model and returns the results.
 func (ae *AgentExecutor) processFunctionCalls(
-	functionCalls []*genai.FunctionCall,
+	functionCalls []*types.FunctionCall,
 	ctx context.Context,
 	promptId string,
-) (*genai.Content, string, bool, error) {
+) (*types.Content, string, bool, error) {
 	allowedToolNames := make(map[string]bool)
 	for _, name := range ae.ToolRegistry.GetAllToolNames() {
 		allowedToolNames[name] = true
@@ -397,11 +378,11 @@ func (ae *AgentExecutor) processFunctionCalls(
 	taskCompleted := false
 
 	var wg sync.WaitGroup
-	toolResponseChan := make(chan []genai.Part, len(functionCalls))
-	syncResponseParts := make([][]genai.Part, 0)
+	toolResponseChan := make(chan types.Part, len(functionCalls))
+	syncResponseParts := make([]types.Part, 0)
 
 	for i, functionCall := range functionCalls {
-		callId := fmt.Sprintf("%s-%d", promptId, i) // Reintroduce callId
+		callId := fmt.Sprintf("%s-%d", promptId, i)
 		args := functionCall.Args
 
 		ae.emitActivity("TOOL_CALL_START", map[string]interface{}{
@@ -412,10 +393,10 @@ func (ae *AgentExecutor) processFunctionCalls(
 		if functionCall.Name == types.TASK_COMPLETE_TOOL_NAME {
 			if taskCompleted {
 				errorMsg := "Task already marked complete in this turn. Ignoring duplicate call."
-				syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-						Name:     types.TASK_COMPLETE_TOOL_NAME,
-						Response: map[string]interface{}{"error": errorMsg},
-					}})
+				syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
+					Name:     types.TASK_COMPLETE_TOOL_NAME,
+					Response: map[string]interface{}{"error": errorMsg},
+				}})
 				ae.emitActivity("ERROR", map[string]interface{}{
 					"context": "protocol_violation",
 					"name":    functionCall.Name,
@@ -430,17 +411,16 @@ func (ae *AgentExecutor) processFunctionCalls(
 			if outputConfig != nil {
 				outputName := outputConfig.OutputName
 				if outputValue, ok := args[outputName]; ok {
-					// Simplified validation and processing
 					validatedOutput := fmt.Sprintf("%v", outputValue)
 					if ae.Definition.ProcessOutput != nil {
 						submittedOutput = ae.Definition.ProcessOutput(validatedOutput)
 					} else {
 						submittedOutput = validatedOutput
 					}
-					syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-							Name:     types.TASK_COMPLETE_TOOL_NAME,
-							Response: map[string]interface{}{"result": "Output submitted and task completed."},
-						}})
+					syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
+						Name:     types.TASK_COMPLETE_TOOL_NAME,
+						Response: map[string]interface{}{"result": "Output submitted and task completed."},
+					}})
 					ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
 						"name":   functionCall.Name,
 						"output": "Output submitted and task completed.",
@@ -448,10 +428,10 @@ func (ae *AgentExecutor) processFunctionCalls(
 				} else {
 					taskCompleted = false // Revoke completion
 					errorMsg := fmt.Sprintf("Missing required argument '%s' for completion.", outputName)
-					syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-							Name:     types.TASK_COMPLETE_TOOL_NAME,
-							Response: map[string]interface{}{"error": errorMsg},
-						}})
+					syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
+						Name:     types.TASK_COMPLETE_TOOL_NAME,
+						Response: map[string]interface{}{"error": errorMsg},
+					}})
 					ae.emitActivity("ERROR", map[string]interface{}{
 						"context": "tool_call",
 						"name":    functionCall.Name,
@@ -460,11 +440,10 @@ func (ae *AgentExecutor) processFunctionCalls(
 				}
 			} else {
 				submittedOutput = "Task completed successfully."
-				syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-						Name:     types.TASK_COMPLETE_TOOL_NAME,
-						Response: map[string]interface{}{"status": "Task marked complete."},
-					}})
-
+				syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
+					Name:     types.TASK_COMPLETE_TOOL_NAME,
+					Response: map[string]interface{}{"status": "Task marked complete."},
+				}})
 				ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
 					"name":   functionCall.Name,
 					"output": "Task marked complete.",
@@ -475,10 +454,10 @@ func (ae *AgentExecutor) processFunctionCalls(
 
 		if !allowedToolNames[functionCall.Name] {
 			errorMsg := fmt.Sprintf("Unauthorized tool call: '%s' is not available to this agent.", functionCall.Name)
-			syncResponseParts = append(syncResponseParts, []genai.Part{genai.FunctionResponse{
-					Name:     functionCall.Name,
-					Response: map[string]interface{}{"error": errorMsg},
-				}})
+			syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
+				Name:     functionCall.Name,
+				Response: map[string]interface{}{"error": errorMsg},
+			}})
 			ae.emitActivity("ERROR", map[string]interface{}{
 				"context": "tool_call_unauthorized",
 				"name":    functionCall.Name,
@@ -489,7 +468,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 		}
 
 		wg.Add(1)
-		go func(fc *genai.FunctionCall) {
+		go func(fc *types.FunctionCall) {
 			defer wg.Done()
 
 			tool, err := ae.ToolRegistry.GetTool(fc.Name)
@@ -517,9 +496,20 @@ func (ae *AgentExecutor) processFunctionCalls(
 				})
 			}
 
-			// Assuming result.LLMContent is []genai.Part
-			if parts, ok := result.LLMContent.([]genai.Part); ok {
-				toolResponseChan <- parts
+			if result.LLMContent != nil {
+				if contentStr, ok := result.LLMContent.(string); ok {
+					toolResponseChan <- types.Part{FunctionResponse: &types.FunctionResponse{
+						Name:     fc.Name,
+						Response: map[string]interface{}{"content": contentStr},
+					}}
+				} else if contentParts, ok := result.LLMContent.([]types.Part); ok {
+					// This case might need more specific handling depending on what it represents.
+					// For now, we'll just create a response part from it.
+					toolResponseChan <- types.Part{FunctionResponse: &types.FunctionResponse{
+						Name:     fc.Name,
+						Response: map[string]interface{}{"parts": contentParts},
+					}}
+				}
 			}
 		}(functionCall)
 	}
@@ -529,24 +519,20 @@ func (ae *AgentExecutor) processFunctionCalls(
 		close(toolResponseChan)
 	}()
 
-	var asyncResponseParts [][]genai.Part
-	for parts := range toolResponseChan {
-		asyncResponseParts = append(asyncResponseParts, parts)
+	var asyncResponseParts []types.Part
+	for part := range toolResponseChan {
+		asyncResponseParts = append(asyncResponseParts, part)
 	}
 
-	toolResponseParts := make([]genai.Part, 0)
-	for _, p := range syncResponseParts {
-		toolResponseParts = append(toolResponseParts, p...)
-	}
-	for _, p := range asyncResponseParts {
-		toolResponseParts = append(toolResponseParts, p...)
-	}
+	toolResponseParts := make([]types.Part, 0)
+	toolResponseParts = append(toolResponseParts, syncResponseParts...)
+	toolResponseParts = append(toolResponseParts, asyncResponseParts...)
 
 	if len(functionCalls) > 0 && len(toolResponseParts) == 0 && !taskCompleted {
-		toolResponseParts = append(toolResponseParts, genai.Text("All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach."))
+		toolResponseParts = append(toolResponseParts, types.Part{Text: "All tool calls failed or were unauthorized. Please analyze the errors and try an alternative approach."})
 	}
 
-	return &genai.Content{Parts: toolResponseParts, Role: "user"}, submittedOutput, taskCompleted, nil
+	return &types.Content{Parts: toolResponseParts, Role: "user"}, submittedOutput, taskCompleted, nil
 }
 
 // emitActivity emits an activity event to the configured callback.

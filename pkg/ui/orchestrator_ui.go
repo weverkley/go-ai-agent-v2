@@ -15,7 +15,6 @@ import (
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/google/generative-ai-go/genai"
 )
 
 type orchestratorState int
@@ -49,9 +48,9 @@ type OrchestratorModel struct {
 	config       *config.Config
 
 	// Loop State
-	chatHistory      []*genai.Content
+	chatHistory      []*types.Content
 	pendingToolCalls int
-	toolResults      []genai.Part
+	toolResults      []types.Part
 	toolResultsMutex sync.Mutex
 
 	// Context
@@ -84,7 +83,7 @@ func NewOrchestratorModel(executor core.Executor, toolRegistry types.ToolRegistr
 		executor:     executor,
 		toolRegistry: toolRegistry,
 		config:       cfg,
-		chatHistory:  []*genai.Content{},
+		chatHistory:  []*types.Content{},
 		ctx:          ctx,
 		cancelCtx:    cancel,
 	}
@@ -93,25 +92,43 @@ func NewOrchestratorModel(executor core.Executor, toolRegistry types.ToolRegistr
 // --- Tea Commands & Messages ---
 
 type modelResponseMsg struct {
-	response *genai.GenerateContentResponse
+	response *types.GenerateContentResponse
 	err      error
 }
 
 type toolResultMsg struct {
-	result genai.Part
+	result types.Part
 	err    error
 }
 
 func (m *OrchestratorModel) runModel() tea.Cmd {
 	m.addLog("Calling model...", false)
-	tools := m.toolRegistry.GetTools()
+	
+	// Convert []types.Tool to []*types.ToolDefinition for the Executor call
+	var toolDefinitions []*types.ToolDefinition
+	if m.toolRegistry != nil {
+		allTools := m.toolRegistry.GetAllTools()
+		toolDefinitions = make([]*types.ToolDefinition, len(allTools))
+		for i, t := range allTools {
+			toolDefinitions[i] = &types.ToolDefinition{
+				FunctionDeclarations: []*types.FunctionDeclaration{
+					{
+						Name:        t.Name(),
+						Description: t.Description(),
+						Parameters:  t.Parameters(),
+					},
+				},
+			}
+		}
+	}
+
 	return func() tea.Msg {
-		resp, err := m.executor.GenerateContentWithTools(m.ctx, m.chatHistory, tools)
+		resp, err := m.executor.GenerateContentWithTools(m.ctx, m.chatHistory, m.toolRegistry.GetAllTools())
 		return modelResponseMsg{response: resp, err: err}
 	}
 }
 
-func (m *OrchestratorModel) executeTool(fc genai.FunctionCall) tea.Cmd {
+func (m *OrchestratorModel) executeTool(fc *types.FunctionCall) tea.Cmd {
 	return func() tea.Msg {
 		m.addLog(fmt.Sprintf("Executing tool: %s", fc.Name), false)
 
@@ -125,35 +142,27 @@ func (m *OrchestratorModel) executeTool(fc genai.FunctionCall) tea.Cmd {
 		if err != nil {
 			m.addLog(fmt.Sprintf("Tool execution failed for %s: %v", fc.Name, err), true)
 			return toolResultMsg{
-				result: &genai.FunctionResponse{
-					Name:     fc.Name,
-					Response: map[string]interface{}{"error": err.Error()},
+				result: types.Part{
+					FunctionResponse: &types.FunctionResponse{
+						Name:     fc.Name,
+						Response: map[string]interface{}{"error": err.Error()},
+					},
 				},
 				err: err,
 			}
 		}
 
 		response := completedCall.GetResponse()
-		var resultPart genai.Part
+		var resultPart types.Part
 
 		var toolOutputForModel map[string]interface{}
 		if response != nil && response.Error != nil {
 			toolOutputForModel = map[string]interface{}{"error": response.Error.Error()}
 		} else if response != nil && len(response.ResponseParts) > 0 {
-			firstPart := response.ResponseParts[0]
-			if firstPart.Text != "" {
-				toolOutputForModel = map[string]interface{}{"result": firstPart.Text}
-			} else {
-				// This is a simplification for other data types.
-				toolOutputForModel = map[string]interface{}{"result": "Tool returned non-text content."}
-			}
+			resultPart = response.ResponseParts[0] // Use the first part directly
 		} else {
 			toolOutputForModel = map[string]interface{}{"status": "Tool executed successfully with no output."}
-		}
-
-		resultPart = &genai.FunctionResponse{
-			Name:     fc.Name,
-			Response: toolOutputForModel,
+			resultPart = types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: toolOutputForModel}}
 		}
 
 		return toolResultMsg{result: resultPart}
@@ -182,8 +191,8 @@ func (m *OrchestratorModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textarea.Reset()
 				m.state = stateProcessingModel
 				m.addLog("Prompt received. Starting process...", false)
-				m.chatHistory = append(m.chatHistory, &genai.Content{
-					Parts: []genai.Part{genai.Text(prompt)},
+				m.chatHistory = append(m.chatHistory, &types.Content{
+					Parts: []types.Part{{Text: prompt}},
 					Role:  "user",
 				})
 				return m, m.runModel()
@@ -254,7 +263,7 @@ func (m *OrchestratorModel) handleModelResponse(msg modelResponseMsg) (tea.Model
 		return m, tea.Quit
 	}
 
-	if len(msg.response.Candidates) == 0 || msg.response.Candidates[0].Content == nil {
+	if msg.response == nil || len(msg.response.Candidates) == 0 || msg.response.Candidates[0].Content == nil {
 		m.addLog("Model returned no response.", true)
 		m.state = stateError
 		m.err = fmt.Errorf("empty response from model")
@@ -263,17 +272,17 @@ func (m *OrchestratorModel) handleModelResponse(msg modelResponseMsg) (tea.Model
 
 	m.chatHistory = append(m.chatHistory, msg.response.Candidates[0].Content)
 
-	var toolCalls []genai.FunctionCall
+	var toolCalls []*types.FunctionCall
 	for _, part := range msg.response.Candidates[0].Content.Parts {
-		if fc, ok := part.(genai.FunctionCall); ok {
-			toolCalls = append(toolCalls, fc)
+		if part.FunctionCall != nil {
+			toolCalls = append(toolCalls, part.FunctionCall)
 		}
 	}
 
 	if len(toolCalls) > 0 {
 		m.state = stateExecutingTools
 		m.pendingToolCalls = len(toolCalls)
-		m.toolResults = make([]genai.Part, 0, len(toolCalls))
+		m.toolResults = make([]types.Part, 0, len(toolCalls))
 		m.addLog(fmt.Sprintf("Model requested %d tool(s).", len(toolCalls)), false)
 
 		var toolCmds []tea.Cmd
@@ -285,8 +294,8 @@ func (m *OrchestratorModel) handleModelResponse(msg modelResponseMsg) (tea.Model
 
 	m.state = stateDone
 	for _, part := range msg.response.Candidates[0].Content.Parts {
-		if txt, ok := part.(genai.Text); ok {
-			m.finalContent += string(txt)
+		if part.Text != "" {
+			m.finalContent += part.Text
 		}
 	}
 	return m, tea.Quit
@@ -306,7 +315,7 @@ func (m *OrchestratorModel) handleToolResult(msg toolResultMsg) (tea.Model, tea.
 
 	if m.pendingToolCalls == 0 {
 		m.addLog("All tools finished. Resuming model conversation...", false)
-		m.chatHistory = append(m.chatHistory, &genai.Content{
+		m.chatHistory = append(m.chatHistory, &types.Content{
 			Parts: m.toolResults,
 			Role:  "tool",
 		})

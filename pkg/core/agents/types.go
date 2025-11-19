@@ -8,7 +8,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
-
 // SubagentActivityEvent represents an activity event emitted by a subagent.
 type SubagentActivityEvent struct {
 	IsSubagentActivityEvent bool                   `json:"isSubagentActivityEvent"`
@@ -22,16 +21,16 @@ type ActivityCallback func(activity SubagentActivityEvent)
 
 // AgentDefinition defines the structure and behavior of an agent.
 type AgentDefinition struct {
-	Name        string       `json:"name"`
-	DisplayName string       `json:"displayName"`
-	Description string       `json:"description"`
-	InputConfig InputConfig  `json:"inputConfig"`
-	OutputConfig *OutputConfig `json:"outputConfig,omitempty"`
+	Name          string                   `json:"name"`
+	DisplayName   string                   `json:"displayName"`
+	Description   string                   `json:"description"`
+	InputConfig   InputConfig              `json:"inputConfig"`
+	OutputConfig  *OutputConfig            `json:"outputConfig,omitempty"`
 	ProcessOutput func(interface{}) string `json:"-"` // Not directly translatable to JSON
-	ModelConfig  ModelConfig  `json:"modelConfig"`
-	RunConfig    RunConfig    `json:"runConfig"`
-	ToolConfig   *ToolConfig  `json:"toolConfig,omitempty"`
-	PromptConfig PromptConfig `json:"promptConfig"`
+	ModelConfig   ModelConfig              `json:"modelConfig"`
+	RunConfig     RunConfig                `json:"runConfig"`
+	ToolConfig    *ToolConfig              `json:"toolConfig,omitempty"`
+	PromptConfig  PromptConfig             `json:"promptConfig"`
 }
 
 // InputConfig defines the input parameters for an agent.
@@ -46,12 +45,10 @@ type InputParameter struct {
 	Required    bool   `json:"required"`
 }
 
-
-
 // BaseToolInvocation provides common fields and methods for tool invocations.
 type BaseToolInvocation struct {
-	Params      AgentInputs
-	MessageBus  interface{} // Placeholder for MessageBus
+	Params     AgentInputs
+	MessageBus interface{} // Placeholder for MessageBus
 }
 
 // SubagentInvocation represents a validated, executable instance of a subagent tool.
@@ -63,16 +60,16 @@ type SubagentInvocation struct {
 
 // PromptConfig defines the prompting strategy for the agent.
 type PromptConfig struct {
-	SystemPrompt    string   `json:"systemPrompt,omitempty"`
-	InitialMessages []types.Part   `json:"initialMessages,omitempty"`
-	Query           string   `json:"query,omitempty"`
+	SystemPrompt    string       `json:"systemPrompt,omitempty"`
+	InitialMessages []types.Part `json:"initialMessages,omitempty"`
+	Query           string       `json:"query,omitempty"`
 }
 
 // ModelConfig defines the model parameters for the agent.
 type ModelConfig struct {
-	Model        string  `json:"model"`
-	Temperature  float32 `json:"temperature"`
-	TopP         float32 `json:"topP"`
+	Model          string  `json:"model"`
+	Temperature    float32 `json:"temperature"`
+	TopP           float32 `json:"topP"`
 	ThinkingBudget int     `json:"thinkingBudget,omitempty"`
 }
 
@@ -89,7 +86,7 @@ type RunConfig struct {
 
 // OutputConfig defines how the agent's output should be handled.
 type OutputConfig struct {
-	OutputName string `json:"outputName"`	
+	OutputName string `json:"outputName"`
 	// Schema     interface{} `json:"-"` // Placeholder for Zod schema equivalent
 }
 
@@ -98,29 +95,20 @@ type AgentInputs map[string]interface{}
 
 // OutputObject represents the final output of an agent run.
 type OutputObject struct {
-	Result         string             `json:"result"`
+	Result          string                   `json:"result"`
 	TerminateReason types.AgentTerminateMode `json:"terminate_reason"`
 }
 
 // CodebaseInvestigationReportSchema represents the schema for the codebase investigation report.
 type CodebaseInvestigationReportSchema struct {
-	SummaryOfFindings string `json:"SummaryOfFindings"`
-	ExplorationTrace  []string `json:"ExplorationTrace"`	
+	SummaryOfFindings string   `json:"SummaryOfFindings"`
+	ExplorationTrace  []string `json:"ExplorationTrace"`
 	RelevantLocations []struct {
 		FilePath   string   `json:"FilePath"`
 		Reasoning  string   `json:"Reasoning"`
 		KeySymbols []string `json:"KeySymbols"`
 	} `json:"RelevantLocations"`
 }
-
-
-
-
-
-
-
-
-
 
 // AnsiOutput represents ANSI formatted output.
 type AnsiOutput string
@@ -161,13 +149,13 @@ type BaseToolCall struct {
 	Outcome    types.ToolConfirmationOutcome
 }
 
-func (b *BaseToolCall) GetRequest() types.ToolCallRequestInfo { return b.Request }
-func (b *BaseToolCall) GetTool() types.Tool     { return b.Tool }
-func (b *BaseToolCall) GetInvocation() AnyToolInvocation { return b.Invocation }
+func (b *BaseToolCall) GetRequest() types.ToolCallRequestInfo     { return b.Request }
+func (b *BaseToolCall) GetTool() types.Tool                       { return b.Tool }
+func (b *BaseToolCall) GetInvocation() AnyToolInvocation          { return b.Invocation }
 func (b *BaseToolCall) GetOutcome() types.ToolConfirmationOutcome { return b.Outcome }
-func (b *BaseToolCall) GetStartTime() *time.Time { return b.StartTime }
-func (b *BaseToolCall) GetDurationMs() *int64 { return nil } // Default, overridden by completed calls
-func (b *BaseToolCall) GetResponse() *types.ToolCallResponseInfo { return nil } // Default, overridden by completed calls
+func (b *BaseToolCall) GetStartTime() *time.Time                  { return b.StartTime }
+func (b *BaseToolCall) GetDurationMs() *int64                     { return nil } // Default, overridden by completed calls
+func (b *BaseToolCall) GetResponse() *types.ToolCallResponseInfo  { return nil } // Default, overridden by completed calls
 
 // ValidatingToolCall
 type ValidatingToolCall struct {
@@ -186,24 +174,24 @@ func (s *ScheduledToolCall) GetStatus() string { return "scheduled" }
 // ErroredToolCall
 type ErroredToolCall struct {
 	BaseToolCall
-	Response types.ToolCallResponseInfo
+	Response   types.ToolCallResponseInfo
 	DurationMs *int64
 }
 
-func (e *ErroredToolCall) GetStatus() string { return "error" }
+func (e *ErroredToolCall) GetStatus() string                        { return "error" }
 func (e *ErroredToolCall) GetResponse() *types.ToolCallResponseInfo { return &e.Response }
-func (e *ErroredToolCall) GetDurationMs() *int64 { return e.DurationMs }
+func (e *ErroredToolCall) GetDurationMs() *int64                    { return e.DurationMs }
 
 // SuccessfulToolCall
 type SuccessfulToolCall struct {
 	BaseToolCall
-	Response types.ToolCallResponseInfo
+	Response   types.ToolCallResponseInfo
 	DurationMs *int64
 }
 
-func (s *SuccessfulToolCall) GetStatus() string { return "success" }
+func (s *SuccessfulToolCall) GetStatus() string                        { return "success" }
 func (s *SuccessfulToolCall) GetResponse() *types.ToolCallResponseInfo { return &s.Response }
-func (s *SuccessfulToolCall) GetDurationMs() *int64 { return s.DurationMs }
+func (s *SuccessfulToolCall) GetDurationMs() *int64                    { return s.DurationMs }
 
 // ExecutingToolCall
 type ExecutingToolCall struct {
@@ -217,13 +205,13 @@ func (e *ExecutingToolCall) GetStatus() string { return "executing" }
 // CancelledToolCall
 type CancelledToolCall struct {
 	BaseToolCall
-	Response types.ToolCallResponseInfo
+	Response   types.ToolCallResponseInfo
 	DurationMs *int64
 }
 
-func (c *CancelledToolCall) GetStatus() string { return "cancelled" }
+func (c *CancelledToolCall) GetStatus() string                        { return "cancelled" }
 func (c *CancelledToolCall) GetResponse() *types.ToolCallResponseInfo { return &c.Response }
-func (c *CancelledToolCall) GetDurationMs() *int64 { return c.DurationMs }
+func (c *CancelledToolCall) GetDurationMs() *int64                    { return c.DurationMs }
 
 // WaitingToolCall
 type WaitingToolCall struct {

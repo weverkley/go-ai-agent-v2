@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // ExecutorFactory abstracts the creation of different AI executors.
 type ExecutorFactory interface {
-	NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error)
+	NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error)
 }
 
 // GoaiagentExecutorFactory is an ExecutorFactory that creates GoaiagentChat instances.
@@ -20,7 +18,7 @@ type GoaiagentExecutorFactory struct {
 }
 
 // NewExecutor creates a new GeminiChat executor.
-func (f *GoaiagentExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (f *GoaiagentExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
 	// For now, we'll create a simple context. This will need to be updated
 	// to use the actual chat history and user request.
 	routingCtx := &routing.RoutingContext{
@@ -46,7 +44,7 @@ type MockExecutorFactory struct {
 }
 
 // NewExecutor creates a new MockExecutor.
-func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
 	if f.Mock != nil {
 		return f.Mock, nil
 	}
@@ -66,7 +64,7 @@ func (f *MockExecutorFactory) NewExecutor(cfg types.Config, generationConfig typ
 type QwenExecutorFactory struct{}
 
 // NewExecutor creates a new QwenChat executor.
-func (f *QwenExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func (f *QwenExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
 	return NewQwenChat(cfg, generationConfig, startHistory)
 }
 

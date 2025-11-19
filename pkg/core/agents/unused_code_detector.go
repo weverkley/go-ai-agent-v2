@@ -4,9 +4,6 @@ import (
 	"go/ast"
 	"go/parser"
 	"go/token"
-	"os"
-	"path/filepath"
-	"strings"
 )
 
 // UnusedFunction represents an unused function or method.
@@ -100,22 +97,4 @@ func FindUnusedFunctions(dir string) ([]UnusedFunction, error) {
 	}
 
 	return unusedFunctions, nil
-}
-
-// Helper function to get all Go files in a directory.
-func getGoFiles(dir string) ([]string, error) {
-	var goFiles []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".go") {
-			goFiles = append(goFiles, path)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return goFiles, nil
 }

@@ -6,8 +6,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 const WRITE_FILE_TOOL_NAME = "write_file"
@@ -85,9 +83,4 @@ func (t *WriteFileTool) Execute(ctx context.Context, args map[string]any) (types
 		LLMContent:    output,
 		ReturnDisplay: output,
 	}, nil
-}
-
-// Definition returns the Gemini tool definition.
-func (t *WriteFileTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

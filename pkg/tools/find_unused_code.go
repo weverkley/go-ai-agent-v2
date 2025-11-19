@@ -7,8 +7,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 const FIND_UNUSED_CODE_TOOL_NAME = "find_unused_code"
@@ -91,7 +89,3 @@ func (t *FindUnusedCodeTool) Execute(ctx context.Context, args map[string]any) (
 	}, nil
 }
 
-// Definition returns the Gemini tool definition.
-func (t *FindUnusedCodeTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
-}

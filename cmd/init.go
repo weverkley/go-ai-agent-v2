@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/generative-ai-go/genai"
+	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/spf13/cobra"
 )
@@ -75,8 +75,8 @@ Write the complete content to the 'GEMINI.md' file. The output must be well-form
 `
 
 		resp, err := executor.GenerateContent(
-			&genai.Content{
-				Parts: []genai.Part{genai.Text(prompt)},
+			&types.Content{
+				Parts: []types.Part{{Text: prompt}},
 				Role:  "user",
 			},
 		)
@@ -86,9 +86,11 @@ Write the complete content to the 'GEMINI.md' file. The output must be well-form
 		}
 
 		generatedContent := ""
-		for _, part := range resp.Candidates[0].Content.Parts {
-			if text, ok := part.(genai.Text); ok {
-				generatedContent += string(text)
+		if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+			for _, part := range resp.Candidates[0].Content.Parts {
+				if part.Text != "" { // Directly access Text field
+					generatedContent += part.Text
+				}
 			}
 		}
 

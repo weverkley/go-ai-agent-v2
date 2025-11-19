@@ -13,7 +13,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,16 +48,6 @@ func (m *MockToolRegistry) GetTool(name string) (types.Tool, error) {
 	return t, nil
 }
 
-func (m *MockToolRegistry) GetTools() []*genai.Tool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	var genaiTools []*genai.Tool
-	for _, t := range m.tools {
-		genaiTools = append(genaiTools, t.Definition())
-	}
-	return genaiTools
-}
-
 func (m *MockToolRegistry) GetAllTools() []types.Tool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -79,15 +68,17 @@ func (m *MockToolRegistry) GetAllToolNames() []string {
 	return names
 }
 
-func (m *MockToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []genai.FunctionDeclaration {
+func (m *MockToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []*types.FunctionDeclaration {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	var declarations []genai.FunctionDeclaration
+	var declarations []*types.FunctionDeclaration
 	for _, name := range toolNames {
 		if t, ok := m.tools[name]; ok {
-			if t.Definition() != nil && len(t.Definition().FunctionDeclarations) > 0 {
-				declarations = append(declarations, *t.Definition().FunctionDeclarations[0])
-			}
+			declarations = append(declarations, &types.FunctionDeclaration{
+				Name:        t.Name(),
+				Description: t.Description(),
+				Parameters:  t.Parameters(),
+			})
 		}
 	}
 	return declarations
@@ -452,6 +443,8 @@ func findServerStatus(statuses []types.MCPServerStatus, name string) *types.MCPS
 // MockTool implements types.Tool for testing purposes.
 type MockTool struct {
 	name string
+	description string
+	parameters *types.JsonSchemaObject
 }
 
 func (m *MockTool) Name() string {
@@ -459,22 +452,15 @@ func (m *MockTool) Name() string {
 }
 
 func (m *MockTool) Description() string {
-	return "mock tool"
+	return m.description
 }
 
 func (m *MockTool) ServerName() string {
 	return "mock-server"
 }
 
-func (m *MockTool) Definition() *genai.Tool {
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        m.Name(),
-				Description: "mock function",
-			},
-		},
-	}
+func (m *MockTool) Parameters() *types.JsonSchemaObject {
+	return m.parameters
 }
 
 func (m *MockTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {

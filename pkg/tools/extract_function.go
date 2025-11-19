@@ -7,8 +7,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/services" // Added
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 const EXTRACT_FUNCTION_TOOL_NAME = "extract_function"
@@ -131,9 +129,4 @@ func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) 
 		LLMContent:    fmt.Sprintf("Successfully extracted function and wrote to file. New code:\n```go\n%s\n```", extracted.NewCode),
 		ReturnDisplay: fmt.Sprintf("Successfully extracted function and wrote to file. New code:\n```go\n%s\n```", extracted.NewCode),
 	}, nil
-}
-
-// Definition returns the Gemini tool definition.
-func (t *ExtractFunctionTool) Definition() *genai.Tool {
-	return t.BaseDeclarativeTool.Definition()
 }

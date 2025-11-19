@@ -13,7 +13,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/ui"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +59,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 		fmt.Printf("Error creating executor factory: %v\n", err)
 		os.Exit(1)
 	}
-	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
 	if err != nil {
 		fmt.Printf("Error creating executor: %v\n", err)
 		os.Exit(1)

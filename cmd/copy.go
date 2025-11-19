@@ -6,8 +6,6 @@ import (
 	"os/exec"
 	"runtime"
 
-	"github.com/google/generative-ai-go/genai"
-
 	"github.com/spf13/cobra"
 )
 
@@ -29,8 +27,8 @@ var copyCmd = &cobra.Command{
 			item := history[i]
 			if item.Role == "model" {
 				for _, part := range item.Parts {
-					if text, ok := part.(genai.Text); ok {
-						lastAiMessage = string(text)
+					if part.Text != "" { // Directly access the Text field
+						lastAiMessage = part.Text
 						break
 					}
 				}

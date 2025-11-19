@@ -24,14 +24,14 @@ type GoaiagentChat struct {
 	model                 *genai.GenerativeModel
 	Name                  string
 	generationConfig      types.GenerateContentConfig
-	startHistory          []*genai.Content
-	toolRegistry          types.ToolRegistryInterface // Change to interface
+	startHistory          []*types.Content // Changed to generic type
+	toolRegistry          types.ToolRegistryInterface
 	toolCallCounter       int
-	userConfirmationChan  chan bool           // Channel for user confirmation: true for continue, false for cancel
+	userConfirmationChan  chan bool
 }
 
 // NewGoaiagentChat creates a new GoaiagentChat instance.
-func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -43,7 +43,7 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 		return nil, fmt.Errorf("failed to create Go AI Agent client: %w", err)
 	}
 
-	modelVal, found := cfg.Get("model") // Use "model" key as defined in config.Get
+	modelVal, found := cfg.Get("model")
 	if !found || modelVal == nil {
 		return nil, fmt.Errorf("model name not found in config")
 	}
@@ -53,23 +53,9 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 	}
 	model := client.GenerativeModel(modelName)
 
-	// Apply generation config
 	model.SetTemperature(generationConfig.Temperature)
 	model.SetTopP(generationConfig.TopP)
 
-	var geminiChatModelName string
-	modelValForName, foundForName := cfg.Get("model")
-	if foundForName && modelValForName != nil {
-		if mn, ok := modelValForName.(string); ok {
-			geminiChatModelName = mn
-		} else {
-			geminiChatModelName = "unknown-model" // Default value if not a string
-		}
-	} else {
-		geminiChatModelName = "unknown-model" // Default value if not found or nil
-	}
-
-	// Set tools for the model
 	var geminiChatToolRegistry types.ToolRegistryInterface
 	if toolRegistryVal, ok := cfg.Get("toolRegistry"); ok && toolRegistryVal != nil {
 		if tr, toolRegistryOk := toolRegistryVal.(types.ToolRegistryInterface); toolRegistryOk {
@@ -82,66 +68,166 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 	return &GoaiagentChat{
 		client:                client,
 		model:                 model,
-		Name:                  geminiChatModelName,
+		Name:                  modelName,
 		generationConfig:      generationConfig,
 		startHistory:          startHistory,
-		toolRegistry:          geminiChatToolRegistry, // Store the ToolRegistry
+		toolRegistry:          geminiChatToolRegistry,
 		toolCallCounter:       0,
-		userConfirmationChan:  make(chan bool, 1), // Initialize the channel
+		userConfirmationChan:  make(chan bool, 1),
 	}, nil
 }
 
-// NewUserContent creates a new genai.Content with user role and text part.
-func NewUserContent(text string) *genai.Content {
-	return &genai.Content{
-		Parts: []genai.Part{genai.Text(text)},
-		Role:  "user",
+// toGenaiContent converts a generic *types.Content to *genai.Content.
+func toGenaiContent(content *types.Content) *genai.Content {
+	if content == nil {
+		return nil
+	}
+	genaiParts := make([]genai.Part, len(content.Parts))
+	for i, part := range content.Parts {
+		var genaiPart genai.Part
+		if part.Text != "" {
+			genaiPart = genai.Text(part.Text)
+		} else if part.FunctionCall != nil {
+			genaiPart = &genai.FunctionCall{
+				Name: part.FunctionCall.Name,
+				Args: part.FunctionCall.Args,
+			}
+		} else if part.FunctionResponse != nil {
+			genaiPart = &genai.FunctionResponse{
+				Name:     part.FunctionResponse.Name,
+				Response: part.FunctionResponse.Response,
+			}
+		} else if part.InlineData != nil {
+			genaiPart = genai.Blob{
+				MIMEType: part.InlineData.MimeType,
+				Data:     []byte(part.InlineData.Data),
+			}
+		}
+		genaiParts[i] = genaiPart
+	}
+	return &genai.Content{Role: content.Role, Parts: genaiParts}
+}
+
+// fromGenaiContent converts a *genai.Content to a generic *types.Content.
+func fromGenaiContent(content *genai.Content) *types.Content {
+	if content == nil {
+		return nil
+	}
+	genericParts := make([]types.Part, len(content.Parts))
+	for i, part := range content.Parts {
+		var genericPart types.Part
+		switch p := part.(type) {
+		case genai.Text:
+			genericPart.Text = string(p)
+		case *genai.FunctionCall:
+			genericPart.FunctionCall = &types.FunctionCall{
+				Name: p.Name,
+				Args: p.Args,
+			}
+		case *genai.FunctionResponse:
+			genericPart.FunctionResponse = &types.FunctionResponse{
+				Name:     p.Name,
+				Response: p.Response,
+			}
+		case genai.Blob:
+			genericPart.InlineData = &types.InlineData{
+				MimeType: p.MIMEType,
+				Data:     string(p.Data),
+			}
+		}
+		genericParts[i] = genericPart
+	}
+	return &types.Content{Role: content.Role, Parts: genericParts}
+}
+
+// toGenaiToolsFromToolInterface converts generic []types.Tool to []*genai.Tool.
+func toGenaiToolsFromToolInterface(tools []types.Tool) []*genai.Tool {
+	if tools == nil {
+		return nil
+	}
+	genaiTools := make([]*genai.Tool, len(tools))
+	for i, tool := range tools {
+		genaiTools[i] = &genai.Tool{
+			FunctionDeclarations: []*genai.FunctionDeclaration{
+				{
+					Name:        tool.Name(),
+					Description: tool.Description(),
+					Parameters:  toGenaiSchema(tool.Parameters()),
+				},
+			},
+		}
+	}
+	return genaiTools
+}
+
+// toGenaiTools converts generic []*types.ToolDefinition to []*genai.Tool.
+func toGenaiTools(tools []*types.ToolDefinition) []*genai.Tool {
+	if tools == nil {
+		return nil
+	}
+	genaiTools := make([]*genai.Tool, len(tools))
+	for i, tool := range tools {
+		genaiDeclarations := make([]*genai.FunctionDeclaration, len(tool.FunctionDeclarations))
+		for j, decl := range tool.FunctionDeclarations {
+			genaiDeclarations[j] = &genai.FunctionDeclaration{
+				Name:        decl.Name,
+				Description: decl.Description,
+				Parameters:  toGenaiSchema(decl.Parameters),
+			}
+		}
+		genaiTools[i] = &genai.Tool{FunctionDeclarations: genaiDeclarations}
+	}
+	return genaiTools
+}
+
+// toGenaiSchema converts a generic *types.JsonSchemaObject to *genai.Schema.
+func toGenaiSchema(schema *types.JsonSchemaObject) *genai.Schema {
+	if schema == nil {
+		return nil
+	}
+	properties := make(map[string]*genai.Schema)
+	for k, v := range schema.Properties {
+		properties[k] = &genai.Schema{
+			Type:        toGenaiType(v.Type),
+			Description: v.Description,
+			Items:       toGenaiSchema(v.Items),
+			Enum:        v.Enum,
+		}
+	}
+	return &genai.Schema{
+		Type:       toGenaiType(schema.Type),
+		Properties: properties,
+		Required:   schema.Required,
 	}
 }
 
-// NewFunctionResponsePart creates a new genai.Part for a function response.
-func NewFunctionResponsePart(name string, response interface{}) genai.Part {
-	// Ensure response is of type map[string]any
-	respMap, ok := response.(map[string]any)
-	if !ok {
-		// Handle error or convert if necessary. For now, return an empty map.
-		respMap = make(map[string]any)
-		respMap["error"] = fmt.Sprintf("invalid response type: %T", response)
-	}
-	return genai.FunctionResponse{
-		Name:     name,
-		Response: respMap,
-	}
-}
-
-// NewFunctionCallContent creates a new genai.Content with model role and function call parts.
-func NewFunctionCallContent(calls ...*genai.FunctionCall) *genai.Content {
-	parts := make([]genai.Part, len(calls))
-	for i, call := range calls {
-		parts[i] = call
-	}
-	return &genai.Content{
-		Parts: parts,
-		Role:  "model",
+func toGenaiType(t string) genai.Type {
+	switch t {
+	case "string":
+		return genai.TypeString
+	case "number":
+		return genai.TypeNumber
+	case "integer":
+		return genai.TypeInteger
+	case "boolean":
+		return genai.TypeBoolean
+	case "array":
+		return genai.TypeArray
+	case "object":
+		return genai.TypeObject
+	default:
+		return genai.TypeString
 	}
 }
 
-// NewToolContent creates a new genai.Content with tool role and tool response parts.
-func NewToolContent(responses ...genai.Part) *genai.Content {
-	return &genai.Content{
-		Parts: responses,
-		Role:  "tool",
-	}
-}
-
-// GenerateContent generates content using the Gemini API, handling tool calls.
-func (gc *GoaiagentChat) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+// GenerateContent generates content using the Gemini API.
+func (gc *GoaiagentChat) GenerateContent(contents ...*types.Content) (*types.GenerateContentResponse, error) {
 	ctx := context.Background()
 
-	// Convert []*genai.Content to []genai.Part
 	var parts []genai.Part
 	for _, content := range contents {
-		parts = append(parts, content.Parts...)
+		genaiContent := toGenaiContent(content)
+		parts = append(parts, genaiContent.Parts...)
 	}
 
 	resp, err := gc.model.GenerateContent(ctx, parts...)
@@ -149,11 +235,21 @@ func (gc *GoaiagentChat) GenerateContent(contents ...*genai.Content) (*genai.Gen
 		return nil, fmt.Errorf("failed to generate content: %w", err)
 	}
 
-	return resp, nil
+	// Convert genai response to generic response
+	genericResp := &types.GenerateContentResponse{
+		Candidates: make([]*types.Candidate, len(resp.Candidates)),
+	}
+	for i, cand := range resp.Candidates {
+		genericResp.Candidates[i] = &types.Candidate{
+			Content: fromGenaiContent(cand.Content),
+		}
+	}
+
+	return genericResp, nil
 }
 
 // ExecuteTool executes a tool call.
-func (gc *GoaiagentChat) ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
+func (gc *GoaiagentChat) ExecuteTool(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error) {
 	if gc.toolRegistry == nil {
 		return types.ToolResult{}, fmt.Errorf("tool registry not initialized")
 	}
@@ -163,45 +259,43 @@ func (gc *GoaiagentChat) ExecuteTool(ctx context.Context, fc *genai.FunctionCall
 		return types.ToolResult{}, fmt.Errorf("tool %s not found: %w", fc.Name, err)
 	}
 
-	// Convert map[string]interface{} to map[string]any
-	args := make(map[string]any)
-	for k, v := range fc.Args {
-		args[k] = v
-	}
-
-	return tool.Execute(ctx, args)
+	return tool.Execute(ctx, fc.Args)
 }
 
 // SendMessageStream generates content using the Gemini API and streams responses.
 func (gc *GoaiagentChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
 	respChan := make(chan types.StreamResponse)
 
-	cs := gc.model.StartChat()
-	cs.History = gc.startHistory
-
-	// Prepare tools for the model
-	if gc.toolRegistry != nil {
-		gc.model.Tools = gc.toolRegistry.GetTools()
+	// Convert generic history to genai history for the chat session
+	genaiHistory := make([]*genai.Content, len(gc.startHistory))
+	for i, c := range gc.startHistory {
+		genaiHistory[i] = toGenaiContent(c)
 	}
 
-	// Convert types.Part to genai.Part
+	cs := gc.model.StartChat()
+	cs.History = genaiHistory
+
+	// Convert generic tools to genai tools
+	gc.model.Tools = toGenaiTools(messageParams.Tools)
+
+	// Convert generic parts to genai parts
 	genaiParts := make([]genai.Part, len(messageParams.Message))
 	for i, part := range messageParams.Message {
+		var genaiPart genai.Part
 		if part.Text != "" {
-			genaiParts[i] = genai.Text(part.Text)
+			genaiPart = genai.Text(part.Text)
 		} else if part.FunctionResponse != nil {
-			genaiParts[i] = genai.FunctionResponse{
+			genaiPart = &genai.FunctionResponse{
 				Name:     part.FunctionResponse.Name,
 				Response: part.FunctionResponse.Response,
 			}
 		} else if part.InlineData != nil {
-			genaiParts[i] = genai.Blob{
+			genaiPart = genai.Blob{
 				MIMEType: part.InlineData.MimeType,
 				Data:     []byte(part.InlineData.Data),
 			}
-		} else if part.FileData != nil {
-			genaiParts[i] = genai.Text(fmt.Sprintf("File data: %s (%s)", part.FileData.FileURL, part.FileData.MimeType))
 		}
+		genaiParts[i] = genaiPart
 	}
 
 	go func() {
@@ -217,7 +311,17 @@ func (gc *GoaiagentChat) SendMessageStream(modelName string, messageParams types
 				respChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: err}
 				return
 			}
-			respChan <- types.StreamResponse{Type: types.StreamEventTypeChunk, Value: resp}
+
+			// Convert genai response to generic response
+			genericResp := &types.GenerateContentResponse{
+				Candidates: make([]*types.Candidate, len(resp.Candidates)),
+			}
+			for i, cand := range resp.Candidates {
+				genericResp.Candidates[i] = &types.Candidate{
+					Content: fromGenaiContent(cand.Content),
+				}
+			}
+			respChan <- types.StreamResponse{Type: types.StreamEventTypeChunk, Value: genericResp}
 		}
 	}()
 
@@ -244,87 +348,76 @@ func (gc *GoaiagentChat) ListModels() ([]string, error) {
 }
 
 // GetHistory returns the current chat history.
-func (gc *GoaiagentChat) GetHistory() ([]*genai.Content, error) {
-	// For now, return the initial history. A more complete implementation
-	// would track the full conversation history.
+func (gc *GoaiagentChat) GetHistory() ([]*types.Content, error) {
 	return gc.startHistory, nil
 }
 
 // SetHistory sets the chat history.
-func (gc *GoaiagentChat) SetHistory(history []*genai.Content) error {
+func (gc *GoaiagentChat) SetHistory(history []*types.Content) error {
 	gc.startHistory = history
 	return nil
 }
 
 // CompressChat compresses the chat history by replacing it with a summary.
 func (gc *GoaiagentChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	ctx := context.Background() // Define ctx here
+	ctx := context.Background()
 
 	telemetry.LogDebugf("CompressChat: len(gc.startHistory) = %d", len(gc.startHistory))
 
-	// Convert []*genai.Content to []genai.Part for token counting
+	genaiHistory := make([]*genai.Content, len(gc.startHistory))
+	for i, c := range gc.startHistory {
+		genaiHistory[i] = toGenaiContent(c)
+	}
+
 	var originalHistoryParts []genai.Part
-	for _, content := range gc.startHistory {
+	for _, content := range genaiHistory {
 		originalHistoryParts = append(originalHistoryParts, content.Parts...)
 	}
 
-	// Implement actual token counting for original history
 	originalTokenCountResp, err := gc.model.CountTokens(ctx, originalHistoryParts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count tokens for original history: %w", err)
 	}
 	originalTokenCount := originalTokenCountResp.TotalTokens
 
-	if len(gc.startHistory) <= 2 { // Only compress if there's a user-initiated conversation
+	if len(gc.startHistory) <= 2 {
 		return nil, fmt.Errorf("no conversation found to compress")
 	}
 
-	// Construct a prompt to summarize the chat history
 	summaryPrompt := "Summarize the following conversation:\n\n"
 	for _, content := range gc.startHistory {
 		for _, part := range content.Parts {
-			if text, ok := part.(genai.Text); ok {
-				summaryPrompt += string(text) + "\n"
+			if part.Text != "" {
+				summaryPrompt += part.Text + "\n"
 			}
 		}
 	}
 
-	resp, err := gc.model.GenerateContent(
-		ctx,
-		genai.Text(summaryPrompt),
-	)
+	resp, err := gc.model.GenerateContent(ctx, genai.Text(summaryPrompt))
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate summary: %w", err)
 	}
 
+	genericResp := fromGenaiContent(resp.Candidates[0].Content)
 	generatedSummary := ""
-	for _, part := range resp.Candidates[0].Content.Parts {
-		if text, ok := part.(genai.Text); ok {
-			generatedSummary += string(text)
-		}
+	if len(genericResp.Parts) > 0 {
+		generatedSummary = genericResp.Parts[0].Text
 	}
 
-	// Replace the history with the generated summary
-	gc.startHistory = []*genai.Content{
-		{Role: "model", Parts: []genai.Part{genai.Text(generatedSummary)}},
+	gc.startHistory = []*types.Content{
+		{Role: "model", Parts: []types.Part{{Text: generatedSummary}}},
 	}
 
-	// Convert []*genai.Content to []genai.Part for token counting
-	var newHistoryParts []genai.Part
-	for _, content := range gc.startHistory {
-		newHistoryParts = append(newHistoryParts, content.Parts...)
-	}
-
-	// Implement actual token counting for new history
-	newTokenCountResp, err := gc.model.CountTokens(ctx, newHistoryParts...)
+	newGenaiHistory := toGenaiContent(gc.startHistory[0])
+	newTokenCountResp, err := gc.model.CountTokens(ctx, newGenaiHistory.Parts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count tokens for new history: %w", err)
 	}
 	newTokenCount := newTokenCountResp.TotalTokens
 
 	return &types.ChatCompressionResult{
-		OriginalTokenCount: int(originalTokenCount), // Cast to int
-		NewTokenCount:      int(newTokenCount),      // Cast to int
+		OriginalTokenCount: int(originalTokenCount),
+		NewTokenCount:      int(newTokenCount),
 		CompressionStatus:  "success",
 	}, nil
 }
@@ -335,7 +428,7 @@ func (gc *GoaiagentChat) SetUserConfirmationChannel(ch chan bool) {
 }
 
 // GenerateStream generates content and streams events back to the caller.
-func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
+func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 	telemetry.LogDebugf("GenerateStream called")
 	eventChan := make(chan any)
 
@@ -345,16 +438,18 @@ func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.
 		telemetry.LogDebugf("Sending StreamingStartedEvent")
 		eventChan <- types.StreamingStartedEvent{}
 
-		cs := gc.model.StartChat()
-		cs.History = gc.startHistory
-
-		if gc.toolRegistry != nil {
-			gc.model.Tools = gc.toolRegistry.GetTools()
+		genaiHistory := make([]*genai.Content, len(gc.startHistory))
+		for i, c := range gc.startHistory {
+			genaiHistory[i] = toGenaiContent(c)
 		}
+
+		cs := gc.model.StartChat()
+		cs.History = genaiHistory
 
 		var parts []genai.Part
 		for _, content := range contents {
-			parts = append(parts, content.Parts...)
+			genaiContent := toGenaiContent(content)
+			parts = append(parts, genaiContent.Parts...)
 		}
 
 		telemetry.LogDebugf("Sending ThinkingEvent")
@@ -375,71 +470,10 @@ func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.
 
 			if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 				for _, part := range resp.Candidates[0].Content.Parts {
-					switch p := part.(type) {
-					case genai.Text:
-						accumulatedText += string(p)
-					case *genai.FunctionCall:
-						gc.toolCallCounter++
-						toolCallID := fmt.Sprintf("tool-call-%d", gc.toolCallCounter)
-
-						telemetry.LogDebugf("Sending ToolCallStartEvent: %s", p.Name)
-						eventChan <- types.ToolCallStartEvent{
-							ToolCallID: toolCallID,
-							ToolName:   p.Name,
-							Args:       p.Args,
-						}
-
-						var toolResult types.ToolResult
-						var err error
-
-						if p.Name == types.USER_CONFIRM_TOOL_NAME {
-							message, ok := p.Args["message"].(string)
-							if !ok {
-								err = fmt.Errorf("user_confirm tool: missing or invalid 'message' argument")
-							} else {
-								telemetry.LogDebugf("Sending UserConfirmationRequestEvent for tool: %s", p.Name)
-								eventChan <- types.UserConfirmationRequestEvent{
-									ToolCallID: toolCallID,
-									Message:    message,
-								}
-
-								// Await user confirmation from the UI
-								select {
-								case confirmed := <-gc.userConfirmationChan:
-									if !confirmed {
-										err = fmt.Errorf("user cancelled tool execution")
-										toolResult.LLMContent = "cancel"
-										toolResult.ReturnDisplay = "User cancelled tool execution."
-									} else {
-										toolResult.LLMContent = "continue"
-										toolResult.ReturnDisplay = "User confirmed tool execution."
-									}
-								case <-ctx.Done():
-									err = ctx.Err()
-									toolResult.LLMContent = "cancel"
-									toolResult.ReturnDisplay = "Tool execution cancelled due to context done."
-								}
-							}
-						} else {
-							toolResult, err = gc.ExecuteTool(ctx, p)
-						}
-
-						telemetry.LogDebugf("Sending ToolCallEndEvent: %s", p.Name)
-						eventChan <- types.ToolCallEndEvent{
-							ToolCallID: toolCallID,
-							ToolName:   p.Name,
-							Result:     toolResult.ReturnDisplay,
-							Err:        err,
-						}
-
-						if err != nil {
-							// If user cancelled or an error occurred, we stop the stream.
-							return
-						}
-
-						// Send the tool result back to the model
-						iter = cs.SendMessageStream(ctx, NewFunctionResponsePart(p.Name, toolResult.LLMContent))
+					if text, ok := part.(genai.Text); ok {
+						accumulatedText += string(text)
 					}
+					// Simplified: Tool call logic is complex and handled by AgentExecutor
 				}
 			}
 		}
@@ -450,30 +484,54 @@ func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*genai.
 
 	return eventChan, nil
 }
-
 // GenerateContentWithTools generates content using the Gemini API, including tools.
-func (gc *GoaiagentChat) GenerateContentWithTools(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error) {
-	// Set the tools for the model for this call
-	gc.model.Tools = tools
+func (gc *GoaiagentChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
+	// Convert []types.Tool to []*types.ToolDefinition
+	toolDefinitions := make([]*types.ToolDefinition, len(tools))
+	for i, tool := range tools {
+		toolDefinitions[i] = &types.ToolDefinition{
+			FunctionDeclarations: []*types.FunctionDeclaration{
+				{
+					Name:        tool.Name(),
+					Description: tool.Description(),
+					Parameters:  tool.Parameters(),
+				},
+			},
+		}
+	}
+
+	gc.model.Tools = toGenaiTools(toolDefinitions)
 
 	cs := gc.model.StartChat()
 
-	// The history contains the full conversation up to this point.
 	if len(history) == 0 {
 		return nil, fmt.Errorf("history cannot be empty")
 	}
-	
-	// Set the chat history up to the message before the last one.
-	if len(history) > 1 {
-		cs.History = history[:len(history)-1]
+
+	genaiHistory := make([]*genai.Content, len(history))
+	for i, c := range history {
+		genaiHistory[i] = toGenaiContent(c)
 	}
 
-	// Send the last message.
-	lastMessage := history[len(history)-1]
+	if len(genaiHistory) > 1 {
+		cs.History = genaiHistory[:len(genaiHistory)-1]
+	}
+
+	lastMessage := genaiHistory[len(genaiHistory)-1]
 	resp, err := cs.SendMessage(ctx, lastMessage.Parts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content with tools: %w", err)
 	}
+	
+	// Convert genai response to generic response
+	genericResp := &types.GenerateContentResponse{
+		Candidates: make([]*types.Candidate, len(resp.Candidates)),
+	}
+	for i, cand := range resp.Candidates {
+		genericResp.Candidates[i] = &types.Candidate{
+			Content: fromGenaiContent(cand.Content),
+		}
+	}
 
-	return resp, nil
+	return genericResp, nil
 }

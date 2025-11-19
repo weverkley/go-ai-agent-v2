@@ -763,7 +763,11 @@ func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 	return func() tea.Msg {
 		// Create a new context for this streaming session
 		m.cancelCtx, m.cancelFunc = context.WithCancel(context.Background())
-		stream, err := m.executor.GenerateStream(m.cancelCtx, core.NewUserContent(userInput))
+		userContent := &types.Content{
+			Role: "user",
+			Parts: []types.Part{{Text: userInput}},
+		}
+		stream, err := m.executor.GenerateStream(m.cancelCtx, userContent)
 		if err != nil {
 			return streamErrorMsg{err}
 		}

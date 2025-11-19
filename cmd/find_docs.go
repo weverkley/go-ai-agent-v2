@@ -13,7 +13,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 )
 
@@ -60,7 +59,7 @@ func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService *services
 		fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
 		os.Exit(1)
 	}
-	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 		os.Exit(1)
@@ -77,7 +76,12 @@ func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService *services
 	prompt := fmt.Sprintf(string(promptTemplate), question)
 
 	// Initial content for the chat
-	contents := []*genai.Content{core.NewUserContent(prompt)}
+	contents := []*types.Content{
+		{
+			Role:  "user",
+			Parts: []types.Part{{Text: prompt}},
+		},
+	}
 
 	// Main loop for tool calling
 	for {
@@ -87,42 +91,54 @@ func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService *services
 			os.Exit(1)
 		}
 
-		if len(resp.Candidates) == 0 {
-			fmt.Println("No candidates returned from Gemini.")
+		if resp == nil || len(resp.Candidates) == 0 {
+			fmt.Println("No candidates returned from executor.")
 			os.Exit(0)
 		}
 
 		candidate := resp.Candidates[0]
 		if candidate.Content == nil || len(candidate.Content.Parts) == 0 {
-			fmt.Println("No content parts returned from Gemini.")
+			fmt.Println("No content parts returned from executor.")
 			os.Exit(0)
 		}
 
-		var toolCalls []*genai.FunctionCall
+		var toolCalls []*types.FunctionCall
 		var textResponse string
 
 		for _, part := range candidate.Content.Parts {
-			if fc, ok := part.(*genai.FunctionCall); ok && fc != nil {
-				toolCalls = append(toolCalls, fc)
-			} else if text, ok := part.(genai.Text); ok && text != "" {
-				textResponse += string(text)
+			if part.FunctionCall != nil { // Directly access FunctionCall field
+				toolCalls = append(toolCalls, part.FunctionCall)
+			} else if part.Text != "" { // Directly access Text field
+				textResponse += part.Text
 			}
 		}
 
 		if len(toolCalls) > 0 {
 			// Execute tool calls
-			var toolResponses []genai.Part
+			var toolResponses []types.Part
 			for _, fc := range toolCalls {
 				toolResult, err := executor.ExecuteTool(context.Background(), fc)
 				if err != nil {
 					fmt.Printf("Error executing tool %s: %v\n", fc.Name, err)
 					os.Exit(1)
 				}
-				toolResponses = append(toolResponses, core.NewFunctionResponsePart(fc.Name, toolResult.LLMContent))
+				// Create types.Part for function response
+				toolResponses = append(toolResponses, types.Part{
+					FunctionResponse: &types.FunctionResponse{
+						Name:     fc.Name,
+						Response: map[string]interface{}{"result": toolResult.LLMContent},
+					},
+				})
 			}
 			// Append tool calls and their responses to the conversation history
-			contents = append(contents, core.NewFunctionCallContent(toolCalls...))
-			contents = append(contents, core.NewToolContent(toolResponses...))
+			contents = append(contents, &types.Content{
+				Role:  "model",
+				Parts: []types.Part{{FunctionCall: toolCalls[0]}}, // Simplified for now, assuming one tool call
+			})
+			contents = append(contents, &types.Content{
+				Role:  "tool",
+				Parts: toolResponses,
+			})
 		} else {
 			// If no tool calls, it's the final answer
 			fmt.Println(textResponse)

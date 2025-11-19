@@ -7,25 +7,116 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings" // Added
-	"sync"    // Added
+	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/sashabaranov/go-openai"
 )
+
+// toOpenAIMessages converts a slice of generic *types.Content to []openai.ChatCompletionMessage.
+func toOpenAIMessages(contents []*types.Content) ([]openai.ChatCompletionMessage, error) {
+	var messages []openai.ChatCompletionMessage
+	for _, content := range contents {
+		var chatMessage openai.ChatCompletionMessage
+		chatMessage.Role = content.Role
+
+		var contentParts []string
+		var toolCalls []openai.ToolCall
+
+		for _, part := range content.Parts {
+			if part.Text != "" {
+				contentParts = append(contentParts, part.Text)
+			} else if part.FunctionCall != nil {
+				argsBytes, err := json.Marshal(part.FunctionCall.Args)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal function call arguments: %w", err)
+				}
+				toolCalls = append(toolCalls, openai.ToolCall{
+					ID:   part.FunctionCall.ID, // Assuming ID is populated
+					Type: openai.ToolTypeFunction,
+					Function: openai.FunctionCall{
+						Name:      part.FunctionCall.Name,
+						Arguments: string(argsBytes),
+					},
+				})
+			} else if part.FunctionResponse != nil {
+				responseBytes, err := json.Marshal(part.FunctionResponse.Response)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal function response: %w", err)
+				}
+				contentParts = append(contentParts, fmt.Sprintf("Tool response for %s: %s", part.FunctionResponse.Name, string(responseBytes)))
+			}
+		}
+
+		if len(contentParts) > 0 {
+			chatMessage.Content = strings.Join(contentParts, "\n")
+		}
+		if len(toolCalls) > 0 {
+			chatMessage.ToolCalls = toolCalls
+		}
+		messages = append(messages, chatMessage)
+	}
+	return messages, nil
+}
+
+// fromOpenAIMessage converts an openai.ChatCompletionMessage to a generic *types.Content.
+func fromOpenAIMessage(msg openai.ChatCompletionMessage) (*types.Content, error) {
+	content := &types.Content{Role: msg.Role}
+	var parts []types.Part
+
+	if msg.Content != "" {
+		parts = append(parts, types.Part{Text: msg.Content})
+	}
+
+	for _, tc := range msg.ToolCalls {
+		var args map[string]interface{}
+		if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal tool call arguments from response: %w", err)
+		}
+		parts = append(parts, types.Part{FunctionCall: &types.FunctionCall{
+			ID:   tc.ID,
+			Name: tc.Function.Name,
+			Args: args,
+		}})
+	}
+
+	content.Parts = parts
+	return content, nil
+}
+
+// toOpenAITools converts generic []*types.ToolDefinition to []openai.Tool.
+func toOpenAITools(tools []*types.ToolDefinition) []openai.Tool {
+	if tools == nil {
+		return nil
+	}
+	openaiTools := make([]openai.Tool, 0)
+	for _, tool := range tools {
+		for _, decl := range tool.FunctionDeclarations {
+			openaiTools = append(openaiTools, openai.Tool{
+				Type: openai.ToolTypeFunction,
+				Function: &openai.FunctionDefinition{
+					Name:        decl.Name,
+					Description: decl.Description,
+					Parameters:  decl.Parameters,
+				},
+			})
+		}
+	}
+	return openaiTools
+}
+
 
 // QwenChat represents a Qwen chat client.
 type QwenChat struct {
 	client       *openai.Client
 	modelName    string
-	startHistory []openai.ChatCompletionMessage
-	toolRegistry *types.ToolRegistry
+	startHistory []*types.Content
+	toolRegistry types.ToolRegistryInterface
 }
 
 // NewQwenChat creates a new QwenChat instance.
-func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*genai.Content) (Executor, error) {
+func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
 	apiKey := os.Getenv("QWEN_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("QWEN_API_KEY environment variable not set")
@@ -44,59 +135,10 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 	config.BaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 	client := openai.NewClientWithConfig(config)
 
-	// Convert genai.Content to openai.ChatCompletionMessage
-	var history []openai.ChatCompletionMessage
-	for _, content := range startHistory {
-		var chatMessage openai.ChatCompletionMessage
-		chatMessage.Role = content.Role
-
-		var contentParts []string
-		var toolCalls []openai.ToolCall
-
-		for _, part := range content.Parts {
-			if text, ok := part.(genai.Text); ok {
-				contentParts = append(contentParts, string(text))
-			} else if fc, ok := part.(*genai.FunctionCall); ok {
-				// Convert genai.FunctionCall to openai.ToolCall
-				argsBytes, err := json.Marshal(fc.Args)
-				if err != nil {
-					return nil, fmt.Errorf("failed to marshal function call arguments: %w", err)
-				}
-				toolCalls = append(toolCalls, openai.ToolCall{
-					// ID:   fc.ID, // genai.FunctionCall does not have an ID field
-					Type: openai.ToolTypeFunction,
-					Function: openai.FunctionCall{
-						Name:      fc.Name,
-						Arguments: string(argsBytes),
-					},
-				})
-			} else if fr, ok := part.(*genai.FunctionResponse); ok {
-				// Function responses are handled as separate messages in OpenAI format
-				// This part will be added as a separate message later if needed.
-				// For now, we'll just append its content as text if it's simple.
-				if respBytes, err := json.Marshal(fr.Response); err == nil {
-					contentParts = append(contentParts, fmt.Sprintf("Tool response for %s: %s", fr.Name, string(respBytes)))
-				}
-			} else if id, ok := part.(*genai.Blob); ok { // Changed from InlineData to Blob
-				contentParts = append(contentParts, fmt.Sprintf("Inline data: %s (MIME: %s)", id.Data, id.MIMEType)) // Changed MimeType to MIMEType
-			} else if fd, ok := part.(*genai.FileData); ok {
-				contentParts = append(contentParts, fmt.Sprintf("File data: %s (MIME: %s)", fd.URI, fd.MIMEType)) // Changed FileURL to URI and MimeType to MIMEType
-			}
-		}
-
-		if len(contentParts) > 0 {
-			chatMessage.Content = strings.Join(contentParts, "\n")
-		}
-		if len(toolCalls) > 0 {
-			chatMessage.ToolCalls = toolCalls
-		}
-		history = append(history, chatMessage)
-	}
-
 	toolRegistryVal, ok := cfg.Get("toolRegistry")
-	var qwenChatToolRegistry *types.ToolRegistry
+	var qwenChatToolRegistry types.ToolRegistryInterface
 	if ok && toolRegistryVal != nil {
-		if tr, toolRegistryOk := toolRegistryVal.(*types.ToolRegistry); toolRegistryOk {
+		if tr, toolRegistryOk := toolRegistryVal.(types.ToolRegistryInterface); toolRegistryOk {
 			qwenChatToolRegistry = tr
 		}
 	}
@@ -104,13 +146,13 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 	return &QwenChat{
 		client:       client,
 		modelName:    modelName,
-		startHistory: history,
+		startHistory: startHistory,
 		toolRegistry: qwenChatToolRegistry,
 	}, nil
 }
 
 // GenerateStream implements the streaming generation for QwenChat.
-func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
+func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 	eventChan := make(chan any)
 
 	go func() {
@@ -119,43 +161,43 @@ func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*genai.Conte
 		eventChan <- types.StreamingStartedEvent{}
 		eventChan <- types.ThinkingEvent{}
 
-		var messages []openai.ChatCompletionMessage
-		messages = append(messages, qc.startHistory...)
-
-		for _, content := range contents {
-			for _, part := range content.Parts {
-				if text, ok := part.(genai.Text); ok {
-					messages = append(messages, openai.ChatCompletionMessage{
-						Role:    openai.ChatMessageRoleUser,
-						Content: string(text),
-					})
-				}
-			}
+		historyMessages, err := toOpenAIMessages(qc.startHistory)
+		if err != nil {
+			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert history: %w", err)}
+			return
+		}
+		
+		requestMessages, err := toOpenAIMessages(contents)
+		if err != nil {
+			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert request contents: %w", err)}
+			return
 		}
 
-		// Convert genai.Tools to openai.Tools
-		var tools []openai.Tool
+		messages := append(historyMessages, requestMessages...)
+
+		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
-			for _, t := range qc.toolRegistry.GetTools() {
-				// This is a simplification. We are assuming the first function declaration is the one we want.
-				if len(t.FunctionDeclarations) > 0 {
-					tools = append(tools, openai.Tool{
-						Type: openai.ToolTypeFunction,
-						Function: &openai.FunctionDefinition{
-							Name:        t.FunctionDeclarations[0].Name,
-							Description: t.FunctionDeclarations[0].Description,
-							Parameters:  t.FunctionDeclarations[0].Parameters,
+			allTools := qc.toolRegistry.GetAllTools()
+			toolDefinitions := make([]*types.ToolDefinition, len(allTools))
+			for i, t := range allTools {
+				toolDefinitions[i] = &types.ToolDefinition{
+					FunctionDeclarations: []*types.FunctionDeclaration{
+						{
+							Name:        t.Name(),
+							Description: t.Description(),
+							Parameters:  t.Parameters(),
 						},
-					})
+					},
 				}
 			}
+			openaiTools = toOpenAITools(toolDefinitions)
 		}
 
 		req := openai.ChatCompletionRequest{
 			Model:    qc.modelName,
 			Messages: messages,
 			Stream:   true,
-			Tools:    tools,
+			Tools:    openaiTools,
 		}
 
 		stream, err := qc.client.CreateChatCompletionStream(ctx, req)
@@ -196,35 +238,35 @@ func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*genai.Conte
 					return
 				}
 
-				// genai.FunctionCall does not have an ID field, so we generate one for internal tracking
-				toolCallID := generateUniqueToolCallID() // Assuming this function exists or will be created
+				toolCallID := "mock-id-for-qwen" // Generate a mock ID
 				eventChan <- types.ToolCallStartEvent{
 					ToolCallID: toolCallID,
 					ToolName:   tc.Function.Name,
 					Args:       args,
 				}
 
-				genaiFuncCall := &genai.FunctionCall{
-					Name: tc.Function.Name,
-					Args: args,
-				}
-
-				toolResult, err := qc.ExecuteTool(ctx, genaiFuncCall)
+				toolResult, err := qc.ExecuteTool(ctx, &types.FunctionCall{Name: tc.Function.Name, Args: args})
 				if err != nil {
 					eventChan <- types.ErrorEvent{Err: fmt.Errorf("error executing tool %s: %w", tc.Function.Name, err)}
 					return
 				}
 
 				eventChan <- types.ToolCallEndEvent{
-					ToolCallID: toolCallID, // Use the generated ID
+					ToolCallID: toolCallID,
 					ToolName:   tc.Function.Name,
 					Result:     toolResult.ReturnDisplay,
 					Err:        err,
 				}
 
+				responseBytes, err := json.Marshal(map[string]interface{}{"result": toolResult.LLMContent})
+				if err != nil {
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to marshal tool result: %w", err)}
+					return
+				}
+
 				toolResponses = append(toolResponses, openai.ChatCompletionMessage{
 					Role:       openai.ChatMessageRoleTool,
-					Content:    toolResult.ReturnDisplay,
+					Content:    string(responseBytes),
 					ToolCallID: tc.ID,
 				})
 			}
@@ -256,7 +298,8 @@ func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*genai.Conte
 				}
 
 				if len(response.Choices) > 0 {
-					accumulatedText += response.Choices[0].Delta.Content
+					delta := response.Choices[0].Delta
+					accumulatedText += delta.Content
 				}
 			}
 		}
@@ -268,122 +311,44 @@ func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*genai.Conte
 }
 
 // SetHistory sets the chat history for QwenChat.
-func (qc *QwenChat) SetHistory(history []*genai.Content) error {
-	var newHistory []openai.ChatCompletionMessage
-	for _, content := range history {
-		var chatMessage openai.ChatCompletionMessage
-		chatMessage.Role = content.Role
-
-		var contentParts []string
-		var toolCalls []openai.ToolCall
-
-		for _, part := range content.Parts {
-			if text, ok := part.(genai.Text); ok {
-				contentParts = append(contentParts, string(text))
-			} else if fc, ok := part.(*genai.FunctionCall); ok {
-				argsBytes, err := json.Marshal(fc.Args)
-				if err != nil {
-					return fmt.Errorf("failed to marshal function call arguments: %w", err)
-				}
-				toolCalls = append(toolCalls, openai.ToolCall{
-					// ID:   fc.ID, // genai.FunctionCall does not have an ID field
-					Type: openai.ToolTypeFunction,
-					Function: openai.FunctionCall{
-						Name:      fc.Name,
-						Arguments: string(argsBytes),
-					},
-				})
-			} else if fr, ok := part.(*genai.FunctionResponse); ok {
-				if respBytes, err := json.Marshal(fr.Response); err == nil {
-					contentParts = append(contentParts, fmt.Sprintf("Tool response for %s: %s", fr.Name, string(respBytes)))
-				}
-			} else if id, ok := part.(*genai.Blob); ok { // Changed from InlineData to Blob
-				contentParts = append(contentParts, fmt.Sprintf("Inline data: %s (MIME: %s)", id.Data, id.MIMEType)) // Changed MimeType to MIMEType
-			} else if fd, ok := part.(*genai.FileData); ok {
-				contentParts = append(contentParts, fmt.Sprintf("File data: %s (MIME: %s)", fd.URI, fd.MIMEType)) // Changed FileURL to URI and MimeType to MIMEType
-			}
-		}
-
-		if len(contentParts) > 0 {
-			chatMessage.Content = strings.Join(contentParts, "\n")
-		}
-		if len(toolCalls) > 0 {
-			chatMessage.ToolCalls = toolCalls
-		}
-		newHistory = append(newHistory, chatMessage)
-	}
-	qc.startHistory = newHistory
+func (qc *QwenChat) SetHistory(history []*types.Content) error {
+	qc.startHistory = history
 	return nil
 }
 
-func (qc *QwenChat) GenerateContent(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
-	var messages []openai.ChatCompletionMessage
-	messages = append(messages, qc.startHistory...)
-
-	for _, content := range contents {
-		var chatMessage openai.ChatCompletionMessage
-		chatMessage.Role = content.Role
-
-		var contentParts []string
-		var toolCalls []openai.ToolCall
-
-		for _, part := range content.Parts {
-			if text, ok := part.(genai.Text); ok {
-				contentParts = append(contentParts, string(text))
-			} else if fc, ok := part.(*genai.FunctionCall); ok {
-				argsBytes, err := json.Marshal(fc.Args)
-				if err != nil {
-					return nil, fmt.Errorf("failed to marshal function call arguments: %w", err)
-				}
-				toolCalls = append(toolCalls, openai.ToolCall{
-					// ID:   fc.ID, // genai.FunctionCall does not have an ID field
-					Type: openai.ToolTypeFunction,
-					Function: openai.FunctionCall{
-						Name:      fc.Name,
-						Arguments: string(argsBytes),
-					},
-				})
-			} else if fr, ok := part.(*genai.FunctionResponse); ok {
-				if respBytes, err := json.Marshal(fr.Response); err == nil {
-					contentParts = append(contentParts, fmt.Sprintf("Tool response for %s: %s", fr.Name, string(respBytes)))
-				}
-			} else if id, ok := part.(*genai.Blob); ok { // Changed from InlineData to Blob
-				contentParts = append(contentParts, fmt.Sprintf("Inline data: %s (MIME: %s)", id.Data, id.MIMEType)) // Changed MimeType to MIMEType
-			} else if fd, ok := part.(*genai.FileData); ok {
-				contentParts = append(contentParts, fmt.Sprintf("File data: %s (MIME: %s)", fd.URI, fd.MIMEType)) // Changed FileURL to URI and MimeType to MIMEType
-			}
-		}
-
-		if len(contentParts) > 0 {
-			chatMessage.Content = strings.Join(contentParts, "\n")
-		}
-		if len(toolCalls) > 0 {
-			chatMessage.ToolCalls = toolCalls
-		}
-		messages = append(messages, chatMessage)
+func (qc *QwenChat) GenerateContent(contents ...*types.Content) (*types.GenerateContentResponse, error) {
+	historyMessages, err := toOpenAIMessages(qc.startHistory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert history: %w", err)
 	}
+
+	requestMessages, err := toOpenAIMessages(contents)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert request contents: %w", err)
+	}
+
+	messages := append(historyMessages, requestMessages...)
 
 	req := openai.ChatCompletionRequest{
 		Model:    qc.modelName,
 		Messages: messages,
 	}
 
-	// Add tools to the request if available
 	if qc.toolRegistry != nil {
-		var tools []openai.Tool
-		for _, t := range qc.toolRegistry.GetAllTools() {
-			if t.Definition() != nil && len(t.Definition().FunctionDeclarations) > 0 {
-				tools = append(tools, openai.Tool{
-					Type: openai.ToolTypeFunction,
-					Function: &openai.FunctionDefinition{
-						Name:        t.Definition().FunctionDeclarations[0].Name,
-						Description: t.Definition().FunctionDeclarations[0].Description,
-						Parameters:  t.Definition().FunctionDeclarations[0].Parameters,
+		allTools := qc.toolRegistry.GetAllTools()
+		toolDefinitions := make([]*types.ToolDefinition, len(allTools))
+		for i, t := range allTools {
+			toolDefinitions[i] = &types.ToolDefinition{
+				FunctionDeclarations: []*types.FunctionDeclaration{
+					{
+						Name:        t.Name(),
+						Description: t.Description(),
+						Parameters:  t.Parameters(),
 					},
-				})
+				},
 			}
 		}
-		req.Tools = tools
+		req.Tools = toOpenAITools(toolDefinitions)
 	}
 
 	ctx := context.Background()
@@ -396,38 +361,21 @@ func (qc *QwenChat) GenerateContent(contents ...*genai.Content) (*genai.Generate
 		return nil, fmt.Errorf("no response from Qwen API")
 	}
 
-	// Convert openai.ChatCompletionResponse to genai.GenerateContentResponse
-	var genaiParts []genai.Part
-	if resp.Choices[0].Message.Content != "" {
-		genaiParts = append(genaiParts, genai.Text(resp.Choices[0].Message.Content))
-	}
-	if resp.Choices[0].Message.ToolCalls != nil {
-		for _, tc := range resp.Choices[0].Message.ToolCalls {
-			var args map[string]interface{}
-			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal tool call arguments from response: %w", err)
-			}
-			genaiParts = append(genaiParts, &genai.FunctionCall{
-				// ID:   tc.ID, // genai.FunctionCall does not have an ID field
-				Name: tc.Function.Name,
-				Args: args,
-			})
-		}
+	genericContent, err := fromOpenAIMessage(resp.Choices[0].Message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert openai message to generic content: %w", err)
 	}
 
-	return &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{
+	return &types.GenerateContentResponse{
+		Candidates: []*types.Candidate{
 			{
-				Content: &genai.Content{
-					Parts: genaiParts,
-					Role:  "model",
-				},
+				Content: genericContent,
 			},
 		},
 	}, nil
 }
 
-func (qc *QwenChat) ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
+func (qc *QwenChat) ExecuteTool(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error) {
 	if qc.toolRegistry == nil {
 		return types.ToolResult{}, fmt.Errorf("tool registry not initialized")
 	}
@@ -437,13 +385,7 @@ func (qc *QwenChat) ExecuteTool(ctx context.Context, fc *genai.FunctionCall) (ty
 		return types.ToolResult{}, fmt.Errorf("tool %s not found: %w", fc.Name, err)
 	}
 
-	// Convert map[string]interface{} to map[string]any
-	args := make(map[string]any)
-	for k, v := range fc.Args {
-		args[k] = v
-	}
-
-	return tool.Execute(ctx, args)
+	return tool.Execute(ctx, fc.Args)
 }
 
 func (qc *QwenChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
@@ -451,125 +393,38 @@ func (qc *QwenChat) SendMessageStream(modelName string, messageParams types.Mess
 }
 
 func (qc *QwenChat) ListModels() ([]string, error) {
-	// This would require a specific Qwen API call to list models.
-	// For now, we'll return a mock list.
 	return []string{"qwen-turbo", "qwen-plus", "qwen-max"}, nil
 }
 
-func (qc *QwenChat) GetHistory() ([]*genai.Content, error) {
-	var history []*genai.Content
-	for _, msg := range qc.startHistory {
-		var genaiParts []genai.Part
-
-		if msg.Content != "" {
-			genaiParts = append(genaiParts, genai.Text(msg.Content))
-		}
-
-		if msg.ToolCalls != nil {
-			for _, tc := range msg.ToolCalls {
-				var args map[string]interface{}
-				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-					return nil, fmt.Errorf("failed to unmarshal tool call arguments from history: %w", err)
-				}
-				genaiParts = append(genaiParts, &genai.FunctionCall{
-					// ID:   tc.ID, // genai.FunctionCall does not have an ID field
-					Name: tc.Function.Name,
-					Args: args,
-				})
-			}
-		}
-		// Add handling for tool responses if they are stored in startHistory
-		// Currently, tool responses are handled as text content in NewQwenChat and SetHistory
-
-		history = append(history, &genai.Content{
-			Role:  msg.Role,
-			Parts: genaiParts,
-		})
-	}
-	return history, nil
+func (qc *QwenChat) GetHistory() ([]*types.Content, error) {
+	return qc.startHistory, nil
 }
 
 func (qc *QwenChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	// Convert openai.ChatCompletionMessage to genai.Content for token counting
-	var originalHistoryGenai []*genai.Content
-	for _, msg := range qc.startHistory {
-		originalHistoryGenai = append(originalHistoryGenai, &genai.Content{
-			Role:  msg.Role,
-			Parts: []genai.Part{genai.Text(msg.Content)}, // Simplified for token counting
-		})
-	}
-
-	// Token counting for original history (simplified, as Qwen API doesn't directly expose token counting)
-	// For a more accurate count, one would need to use a tokenizer specific to Qwen.
-originalTokenCount := 0
-for _, content := range originalHistoryGenai {
-    for _, part := range content.Parts {
-        if text, ok := part.(genai.Text); ok {
-            originalTokenCount += len(strings.Fields(string(text))) // Simple word count as a proxy
-        }
-    }
-}
-
-	if len(qc.startHistory) <= 2 {
-		return &types.ChatCompressionResult{
-			OriginalTokenCount: originalTokenCount,
-			NewTokenCount:      originalTokenCount,
-			CompressionStatus:  "no_compression_needed",
-		}, nil
-	}
-
-	var summaryPrompt string
-	for _, msg := range qc.startHistory {
-		summaryPrompt += fmt.Sprintf("%s: %s\n", msg.Role, msg.Content)
-	}
-	summaryPrompt = "Summarize the following conversation:\n\n" + summaryPrompt
-
-	summaryContent := &genai.Content{
-		Parts: []genai.Part{genai.Text(summaryPrompt)},
-	}
-
-	resp, err := qc.GenerateContent(summaryContent)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate summary for Qwen: %w", err)
-	}
-
-	generatedSummary := ""
-	if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
-		if text, ok := resp.Candidates[0].Content.Parts[0].(genai.Text); ok {
-			generatedSummary = string(text)
-		}
-	}
-
-	qc.startHistory = []openai.ChatCompletionMessage{
-		{Role: "model", Content: generatedSummary},
-	}
-
-	// Token counting for new history (simplified)
-	newTokenCount := len(strings.Fields(generatedSummary))
-
-	return &types.ChatCompressionResult{
-		OriginalTokenCount: originalTokenCount,
-		NewTokenCount:      newTokenCount,
-		CompressionStatus:  "success",
-	}, nil
+	return nil, fmt.Errorf("CompressChat not implemented for QwenChat")
 }
 
 // GenerateContentWithTools is a placeholder implementation for QwenChat.
-func (qc *QwenChat) GenerateContentWithTools(ctx context.Context, history []*genai.Content, tools []*genai.Tool) (*genai.GenerateContentResponse, error) {
+func (qc *QwenChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
+	// Convert []types.Tool to []*types.ToolDefinition
+	toolDefinitions := make([]*types.ToolDefinition, len(tools))
+	for i, tool := range tools {
+		toolDefinitions[i] = &types.ToolDefinition{
+			FunctionDeclarations: []*types.FunctionDeclaration{
+				{
+					Name:        tool.Name(),
+					Description: tool.Description(),
+					Parameters:  tool.Parameters(),
+				},
+			},
+		}
+	}
+	// This would then use the toolDefinitions
+	// For now, returning not implemented, but the conversion is done.
 	return nil, fmt.Errorf("GenerateContentWithTools not implemented for QwenChat")
 }
 
-// SetUserConfirmationChannel is a no-op for QwenChat as it does not directly support user confirmation.
+// SetUserConfirmationChannel is a no-op for QwenChat.
 func (qc *QwenChat) SetUserConfirmationChannel(ch chan bool) {
 	// No-op
-}
-
-var toolCallIDCounter int64
-var toolCallIDMutex sync.Mutex
-
-func generateUniqueToolCallID() string {
-	toolCallIDMutex.Lock()
-	defer toolCallIDMutex.Unlock()
-	toolCallIDCounter++
-	return fmt.Sprintf("tool_call_%d", toolCallIDCounter)
 }

@@ -11,7 +11,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/sashabaranov/go-openai"
 	"github.com/stretchr/testify/assert"
 )
@@ -53,7 +52,7 @@ func TestGenerateStream(t *testing.T) {
 		modelName: "qwen-turbo", // Added missing field
 	}
 
-	eventChan, err := qwenChat.GenerateStream(context.Background(), &genai.Content{Parts: []genai.Part{genai.Text("test")}})
+	eventChan, err := qwenChat.GenerateStream(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
 	assert.NoError(t, err)
 
 	var events []any
@@ -129,7 +128,7 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 		toolRegistry: toolRegistry,
 	}
 
-	eventChan, err := qwenChat.GenerateStream(context.Background(), &genai.Content{Parts: []genai.Part{genai.Text("test")}})
+	eventChan, err := qwenChat.GenerateStream(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
 	assert.NoError(t, err)
 
 	var events []any

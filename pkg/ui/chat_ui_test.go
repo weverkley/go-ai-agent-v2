@@ -11,7 +11,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/charmbracelet/bubbletea"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -56,7 +55,7 @@ func TestNewChatModel(t *testing.T) {
 func TestUpdate_UserInput(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{
-		GenerateStreamFunc: func(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
+		GenerateStreamFunc: func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 			ch := make(chan any)
 			close(ch)
 			return ch, nil

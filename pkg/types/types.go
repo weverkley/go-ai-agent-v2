@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync" // Add sync import
-
-	"github.com/google/generative-ai-go/genai"
 )
 
 // ApprovalMode defines the approval mode for tool calls.
@@ -109,7 +107,7 @@ type ThinkingConfig struct {
 // MessageParams represents parameters for sending a message.
 type MessageParams struct {
 	Message     []Part
-	Tools       []*genai.Tool
+	Tools       []*ToolDefinition
 	AbortSignal context.Context
 }
 
@@ -121,10 +119,20 @@ const (
 	StreamEventTypeError StreamEventType = "error"
 )
 
+// GenerateContentResponse represents the response from a content generation call.
+type GenerateContentResponse struct {
+	Candidates []*Candidate `json:"candidates"`
+}
+
+// Candidate represents a single candidate response from the model.
+type Candidate struct {
+	Content *Content `json:"content"`
+}
+
 // StreamResponse represents a response from the stream.
 type StreamResponse struct {
 	Type  StreamEventType
-	Value *genai.GenerateContentResponse // Or a custom struct that mirrors it
+	Value *GenerateContentResponse // Or a custom struct that mirrors it
 	Error error
 }
 
@@ -322,6 +330,18 @@ type ToolCallResponseInfo struct {
 	ContentLength int                `json:"contentLength,omitempty"`
 }
 
+// ToolDefinition represents a collection of function declarations that can be used by the model.
+type ToolDefinition struct {
+	FunctionDeclarations []*FunctionDeclaration `json:"functionDeclarations"`
+}
+
+// FunctionDeclaration defines a single function that the model can call.
+type FunctionDeclaration struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Parameters  *JsonSchemaObject `json:"parameters,omitempty"`
+}
+
 // JsonSchemaObject defines the structure for a JSON Schema object.
 type JsonSchemaObject struct {
 	Type       string                        `json:"type"` // "object"
@@ -356,7 +376,7 @@ type Tool interface {
 	Name() string
 	Description() string
 	ServerName() string // Add ServerName to the interface
-	Definition() *genai.Tool
+	Parameters() *JsonSchemaObject
 	Execute(ctx context.Context, args map[string]any) (ToolResult, error)
 }
 
@@ -426,84 +446,9 @@ func (bdt *BaseDeclarativeTool) ServerName() string {
 	return bdt.serverName
 }
 
-// Definition returns the genai.Tool definition for the Gemini API.
-func (bdt *BaseDeclarativeTool) Definition() *genai.Tool {
-	// Convert JsonSchemaObject to genai.Schema
-	properties := make(map[string]*genai.Schema)
-	for k, v := range bdt.parameterSchema.Properties {
-		var propType genai.Type
-		switch v.Type {
-		case "string":
-			propType = genai.TypeString
-		case "number":
-			propType = genai.TypeNumber
-		case "integer":
-			propType = genai.TypeInteger
-		case "boolean":
-			propType = genai.TypeBoolean
-		case "array":
-			propType = genai.TypeArray
-		default:
-			propType = genai.TypeString // Default to string
-		}
-
-		var itemsSchema *genai.Schema
-		if v.Items != nil {
-			// Recursively convert JsonSchemaObject to genai.Schema
-			itemProperties := make(map[string]*genai.Schema)
-			for itemK, itemV := range v.Items.Properties {
-				var itemPropType genai.Type
-				switch itemV.Type {
-				case "string":
-					itemPropType = genai.TypeString
-				case "number":
-					itemPropType = genai.TypeNumber
-				case "integer":
-					itemPropType = genai.TypeInteger
-				case "boolean":
-					itemPropType = genai.TypeBoolean
-				case "array":
-					itemPropType = genai.TypeArray
-				case "object":
-					itemPropType = genai.TypeObject
-				default:
-					itemPropType = genai.TypeString // Default to string
-				}
-				itemProperties[itemK] = &genai.Schema{
-					Type:        itemPropType,
-					Description: itemV.Description,
-					Enum:        itemV.Enum,
-					// Items and Properties for nested objects would require further recursion
-				}
-			}
-			itemsSchema = &genai.Schema{
-				Type:       genai.TypeObject, // Assuming array items are always objects for now
-				Properties: itemProperties,
-				Required:   v.Items.Required,
-			}
-		}
-
-		properties[k] = &genai.Schema{
-			Type:        propType,
-			Description: v.Description,
-			Items:       itemsSchema,
-			Enum:        v.Enum,
-		}
-	}
-
-	return &genai.Tool{
-		FunctionDeclarations: []*genai.FunctionDeclaration{
-			{
-				Name:        bdt.name,
-				Description: bdt.description,
-				Parameters: &genai.Schema{
-					Type:       genai.TypeObject,
-					Properties: properties,
-					Required:   bdt.parameterSchema.Required,
-				},
-			},
-		},
-	}
+// Parameters returns the tool's parameter schema.
+func (bdt *BaseDeclarativeTool) Parameters() *JsonSchemaObject {
+	return bdt.parameterSchema
 }
 
 // Execute is a placeholder and should be implemented by concrete tool types.
@@ -537,10 +482,9 @@ type ToolConfig interface {
 type ToolRegistryInterface interface {
 	Register(t Tool) error
 	GetTool(name string) (Tool, error)
-	GetTools() []*genai.Tool
 	GetAllTools() []Tool
 	GetAllToolNames() []string
-	GetFunctionDeclarationsFiltered(toolNames []string) []genai.FunctionDeclaration
+	GetFunctionDeclarationsFiltered(toolNames []string) []*FunctionDeclaration
 }
 
 // SettingsServiceIface defines the interface for application settings management.
@@ -600,17 +544,10 @@ func (r *ToolRegistry) GetTool(name string) (Tool, error) {
 	return t, nil
 }
 
-// GetTools returns all registered tools as a slice of genai.Tool.
-func (r *ToolRegistry) GetTools() []*genai.Tool {
-	var toolDefs []*genai.Tool
-	for _, t := range r.tools {
-		toolDefs = append(toolDefs, t.Definition())
-	}
-	return toolDefs
-}
-
 // GetAllTools returns all registered tools as a slice of Tool.
 func (r *ToolRegistry) GetAllTools() []Tool {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
 	var registeredTools []Tool
 	for _, t := range r.tools {
 		registeredTools = append(registeredTools, t)
@@ -620,6 +557,8 @@ func (r *ToolRegistry) GetAllTools() []Tool {
 
 // GetAllToolNames returns a slice of all registered tool names.
 func (tr *ToolRegistry) GetAllToolNames() []string {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
 	names := make([]string, 0, len(tr.tools))
 	for name := range tr.tools {
 		names = append(names, name)
@@ -628,17 +567,22 @@ func (tr *ToolRegistry) GetAllToolNames() []string {
 }
 
 // GetFunctionDeclarationsFiltered returns FunctionDeclarations for a given list of tool names.
-func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []genai.FunctionDeclaration {
-	var declarations []genai.FunctionDeclaration
+func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []*FunctionDeclaration {
+	tr.mu.RLock()
+	defer tr.mu.RUnlock()
+	var declarations []*FunctionDeclaration
 	for _, name := range toolNames {
 		if t, ok := tr.tools[name]; ok {
-			if t.Definition() != nil && len(t.Definition().FunctionDeclarations) > 0 {
-				declarations = append(declarations, *t.Definition().FunctionDeclarations[0])
-			}
+			declarations = append(declarations, &FunctionDeclaration{
+				Name:        t.Name(),
+				Description: t.Description(),
+				Parameters:  t.Parameters(),
+			})
 		}
 	}
 	return declarations
 }
+
 
 
 

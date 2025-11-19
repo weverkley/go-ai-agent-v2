@@ -12,7 +12,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/tools"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 )
 
@@ -54,7 +53,7 @@ func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService *services
 		fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
 		os.Exit(1)
 	}
-	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
 		os.Exit(1)
@@ -81,7 +80,13 @@ func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService *services
 
 	finalPrompt := fmt.Sprintf(promptTemplate, pattern, grepOutput)
 
-	resp, err := executor.GenerateContent(core.NewUserContent(finalPrompt))
+	// Direct instantiation of types.Content
+	userContent := &types.Content{
+		Role:  "user",
+		Parts: []types.Part{{Text: finalPrompt}},
+	}
+
+	resp, err := executor.GenerateContent(userContent)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error generating content: %v\n", err)
 		os.Exit(1)
@@ -90,14 +95,11 @@ func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService *services
 	var textResponse string
 	if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 		for _, part := range resp.Candidates[0].Content.Parts {
-			if txt, ok := part.(genai.Text); ok {
-				textResponse += string(txt)
+			// Access Text field directly
+			if part.Text != "" {
+				textResponse += part.Text
 			}
 		}
 	}
 	fmt.Println(textResponse)
-}
-
-func init() {
-	grepCodeCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }

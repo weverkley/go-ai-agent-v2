@@ -10,7 +10,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/services" // Import services
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/spf13/cobra"
 )
 
@@ -51,7 +50,7 @@ func runGenerateCmd(cmd *cobra.Command, args []string, settingsService *services
 		fmt.Printf("Error creating executor factory: %v\n", err)
 		os.Exit(1)
 	}
-	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*genai.Content{})
+	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
 	if err != nil {
 		fmt.Printf("Error creating executor: %v\n", err)
 		os.Exit(1)
@@ -59,7 +58,13 @@ func runGenerateCmd(cmd *cobra.Command, args []string, settingsService *services
 
 	prompt := strings.Join(args, " ")
 
-	resp, err := executor.GenerateContent(core.NewUserContent(prompt))
+	// Direct instantiation of types.Content
+	userContent := &types.Content{
+		Role:  "user",
+		Parts: []types.Part{{Text: prompt}},
+	}
+
+	resp, err := executor.GenerateContent(userContent)
 	if err != nil {
 		fmt.Printf("Error generating content: %v\n", err)
 		os.Exit(1)
@@ -68,8 +73,9 @@ func runGenerateCmd(cmd *cobra.Command, args []string, settingsService *services
 	var textResponse string
 	if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 		for _, part := range resp.Candidates[0].Content.Parts {
-			if txt, ok := part.(genai.Text); ok {
-				textResponse += string(txt)
+			// Access Text field directly
+			if part.Text != "" {
+				textResponse += part.Text
 			}
 		}
 	}

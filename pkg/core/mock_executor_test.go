@@ -1,23 +1,22 @@
 package core_test
 
 import (
-	"context" // New import
+	"context"
 	"os"
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/routing" // Add this line
+	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai"
 	"github.com/stretchr/testify/assert"
 )
 
 // MockConfig implements types.Config for testing purposes.
 type MockConfig struct {
-	ModelName string
-	ToolRegistry *types.ToolRegistry
-	DebugMode bool
+	ModelName                    string
+	ToolRegistry                 types.ToolRegistryInterface
+	DebugMode                    bool
 	CodebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
 }
 
@@ -27,7 +26,7 @@ func (m *MockConfig) WithModel(modelName string) types.Config {
 
 func (m *MockConfig) Get(key string) (interface{}, bool) {
 	switch key {
-	case "model": // Changed from "modelName" to "model"
+	case "model":
 		return m.ModelName, true
 	case "toolRegistry":
 		return m.ToolRegistry, true
@@ -40,10 +39,7 @@ func (m *MockConfig) Get(key string) (interface{}, bool) {
 	}
 }
 
-
-
 func TestNewExecutorFactory(t *testing.T) {
-	// Create a dummy config.Config instance for NewExecutorFactory
 	dummyCfg := &MockConfig{}
 
 	t.Run("should return GoaiagentExecutorFactory for 'goaiagent' type", func(t *testing.T) {
@@ -69,28 +65,27 @@ func TestNewExecutorFactory(t *testing.T) {
 func TestGeminiExecutorFactory_NewExecutor(t *testing.T) {
 	t.Run("should create a GeminiChat instance", func(t *testing.T) {
 		factory := &core.GoaiagentExecutorFactory{
-			Router: routing.NewModelRouterService(&MockConfig{}), // Pass MockConfig here
+			Router: routing.NewModelRouterService(&MockConfig{}),
 		}
 		mockConfig := &MockConfig{ModelName: "gemini-pro"}
-		
-		// Temporarily set GEMINI_API_KEY for this test
+
 		os.Setenv("GEMINI_API_KEY", "test-api-key")
 		defer os.Unsetenv("GEMINI_API_KEY")
 
-		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*types.Content{})
 		assert.NoError(t, err)
 		assert.IsType(t, &core.GoaiagentChat{}, executor)
 	})
 
 	t.Run("should return error if GEMINI_API_KEY is not set", func(t *testing.T) {
 		factory := &core.GoaiagentExecutorFactory{
-			Router: routing.NewModelRouterService(&MockConfig{}), // Pass MockConfig here
+			Router: routing.NewModelRouterService(&MockConfig{}),
 		}
 		mockConfig := &MockConfig{ModelName: "gemini-pro"}
 
-		os.Unsetenv("GEMINI_API_KEY") // Ensure it's unset
+		os.Unsetenv("GEMINI_API_KEY")
 
-		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*types.Content{})
 		assert.Error(t, err)
 		assert.Nil(t, executor)
 		assert.Contains(t, err.Error(), "GEMINI_API_KEY environment variable not set")
@@ -100,23 +95,23 @@ func TestGeminiExecutorFactory_NewExecutor(t *testing.T) {
 func TestMockExecutorFactory_NewExecutor(t *testing.T) {
 	t.Run("should create a new MockExecutor instance", func(t *testing.T) {
 		factory := &core.MockExecutorFactory{}
-		mockConfig := &MockConfig{ModelName: "mock-model"}
+		mockConfig := &MockConfig{ModelName: "mock-model", ToolRegistry: types.NewToolRegistry()}
 
-		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*types.Content{})
 		assert.NoError(t, err)
 		assert.IsType(t, &core.MockExecutor{}, executor)
 	})
 
 	t.Run("should return the provided mock instance if set", func(t *testing.T) {
 		expectedMock := &core.MockExecutor{
-			GenerateContentFunc: func(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
-				return &genai.GenerateContentResponse{}, nil
+			GenerateContentFunc: func(contents ...*types.Content) (*types.GenerateContentResponse, error) {
+				return &types.GenerateContentResponse{}, nil
 			},
 		}
 		factory := &core.MockExecutorFactory{Mock: expectedMock}
 		mockConfig := &MockConfig{ModelName: "mock-model"}
 
-		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*genai.Content{})
+		executor, err := factory.NewExecutor(mockConfig, types.GenerateContentConfig{}, []*types.Content{})
 		assert.NoError(t, err)
 		assert.Same(t, expectedMock, executor)
 	})
@@ -124,9 +119,9 @@ func TestMockExecutorFactory_NewExecutor(t *testing.T) {
 
 func TestMockExecutor(t *testing.T) {
 	t.Run("GenerateContent should call the provided function", func(t *testing.T) {
-		expectedResp := &genai.GenerateContentResponse{}
+		expectedResp := &types.GenerateContentResponse{}
 		mockExecutor := &core.MockExecutor{
-			GenerateContentFunc: func(contents ...*genai.Content) (*genai.GenerateContentResponse, error) {
+			GenerateContentFunc: func(contents ...*types.Content) (*types.GenerateContentResponse, error) {
 				return expectedResp, nil
 			},
 		}
@@ -146,18 +141,18 @@ func TestMockExecutor(t *testing.T) {
 	t.Run("ExecuteTool should call the provided function", func(t *testing.T) {
 		expectedResult := types.ToolResult{ReturnDisplay: "mocked tool result"}
 		mockExecutor := &core.MockExecutor{
-			ExecuteToolFunc: func(ctx context.Context, fc *genai.FunctionCall) (types.ToolResult, error) {
+			ExecuteToolFunc: func(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error) {
 				return expectedResult, nil
 			},
 		}
-		result, err := mockExecutor.ExecuteTool(context.Background(), &genai.FunctionCall{})
+		result, err := mockExecutor.ExecuteTool(context.Background(), &types.FunctionCall{})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedResult, result)
 	})
 
 	t.Run("ExecuteTool should return error if function not provided", func(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
-		result, err := mockExecutor.ExecuteTool(context.Background(), &genai.FunctionCall{})
+		result, err := mockExecutor.ExecuteTool(context.Background(), &types.FunctionCall{})
 		assert.Error(t, err)
 		assert.Equal(t, types.ToolResult{}, result)
 		assert.Contains(t, err.Error(), "ExecuteTool not implemented in mock")
@@ -181,7 +176,7 @@ func TestMockExecutor(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
 		respChan, err := mockExecutor.SendMessageStream("", types.MessageParams{}, "")
 		assert.Error(t, err)
-		assert.NotNil(t, respChan) // Expect a non-nil, but closed channel
+		assert.NotNil(t, respChan)
 		assert.Contains(t, err.Error(), "SendMessageStream not implemented in mock")
 	})
 
@@ -206,9 +201,9 @@ func TestMockExecutor(t *testing.T) {
 	})
 
 	t.Run("GetHistory should call the provided function", func(t *testing.T) {
-		expectedHistory := []*genai.Content{{Role: "user"}}
+		expectedHistory := []*types.Content{{Role: "user"}}
 		mockExecutor := &core.MockExecutor{
-			GetHistoryFunc: func() ([]*genai.Content, error) {
+			GetHistoryFunc: func() ([]*types.Content, error) {
 				return expectedHistory, nil
 			},
 		}
@@ -227,17 +222,17 @@ func TestMockExecutor(t *testing.T) {
 
 	t.Run("SetHistory should call the provided function", func(t *testing.T) {
 		mockExecutor := &core.MockExecutor{
-			SetHistoryFunc: func(history []*genai.Content) error {
+			SetHistoryFunc: func(history []*types.Content) error {
 				return nil
 			},
 		}
-		err := mockExecutor.SetHistory([]*genai.Content{})
+		err := mockExecutor.SetHistory([]*types.Content{})
 		assert.NoError(t, err)
 	})
 
 	t.Run("SetHistory should return error if function not provided", func(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
-		err := mockExecutor.SetHistory([]*genai.Content{})
+		err := mockExecutor.SetHistory([]*types.Content{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "SetHistory not implemented in mock")
 	})
@@ -265,10 +260,9 @@ func TestMockExecutor(t *testing.T) {
 	t.Run("GenerateStream should call the provided function", func(t *testing.T) {
 		expectedChan := make(chan any)
 		close(expectedChan)
-		// The mock's GenerateStreamFunc returns <-chan any, so the test should expect that type.
 		expectedReadChan := (<-chan any)(expectedChan)
 		mockExecutor := &core.MockExecutor{
-			GenerateStreamFunc: func(ctx context.Context, contents ...*genai.Content) (<-chan any, error) {
+			GenerateStreamFunc: func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 				return expectedReadChan, nil
 			},
 		}
@@ -289,12 +283,6 @@ func TestMockExecutor(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
 		testChan := make(chan bool)
 		mockExecutor.SetUserConfirmationChannel(testChan)
-		assert.Equal(t, testChan, mockExecutor.UserConfirmationChan) // Changed to assert.Equal
-	})
-
-	t.Run("SetUserConfirmationChannel should not return error if function not provided", func(t *testing.T) {
-		mockExecutor := &core.MockExecutor{}
-		// This method does not return an error, so we just ensure it doesn't panic
-		mockExecutor.SetUserConfirmationChannel(make(chan bool))
+		assert.Equal(t, testChan, mockExecutor.UserConfirmationChan)
 	})
 }
