@@ -56,35 +56,34 @@ func TestReadManyFilesTool_Execute(t *testing.T) {
 	})
 
 	t.Run("successful read - go files", func(t *testing.T) {
-		result, err := tool.Execute(context.Background(), map[string]any{"paths": []any{"**/*.go"}})
+		result, err := tool.Execute(context.Background(), map[string]any{"paths": []any{"**/*.go", "*.go"}})
 		require.NoError(t, err)
 
-		// Check for content from both files, order-independent
-		assert.Contains(t, result.LLMContent, fmt.Sprintf("---\%s---\\npackage main\\n", mainGoPath))
-		assert.Contains(t, result.LLMContent, fmt.Sprintf("---\%s---\\npackage src\\n", appGoPath))
-		assert.True(t, strings.HasSuffix(result.LLMContent, "\\n--- End of content ---\\n\\n"+result.ReturnDisplay))
+		assert.Contains(t, result.LLMContent, fmt.Sprintf("--- %s ---\npackage main\n", mainGoPath))
+		assert.Contains(t, result.LLMContent, fmt.Sprintf("--- %s ---\npackage src\n", appGoPath))
+		assert.True(t, strings.HasSuffix(result.LLMContent.(string), "\n--- End of content ---\n\n"+result.ReturnDisplay))
 
 		// Check display message
 		assert.Contains(t, result.ReturnDisplay, "Successfully read and concatenated content from **2 file(s)**.")
-		assert.Contains(t, result.ReturnDisplay, fmt.Sprintf("- `\`%s\``", mainGoPath))
-		assert.Contains(t, result.ReturnDisplay, fmt.Sprintf("- `\`%s\``", appGoPath))
+		assert.Contains(t, result.ReturnDisplay, fmt.Sprintf("- `%s`", mainGoPath))
+		assert.Contains(t, result.ReturnDisplay, fmt.Sprintf("- `%s`", appGoPath))
 	})
 
 	t.Run("successful read - with exclude", func(t *testing.T) {
 		result, err := tool.Execute(context.Background(), map[string]any{
-			"paths":   []any{"**/*.go"},
+			"paths":   []any{"**/*.go", "*.go"},
 			"exclude": []any{"src/app.go"},
 		})
 		require.NoError(t, err)
 
 		// Check that only main.go is included
-		assert.Contains(t, result.LLMContent, fmt.Sprintf("---\%s---\\npackage main\\n", mainGoPath))
-		assert.NotContains(t, result.LLMContent, fmt.Sprintf("---\%s---", appGoPath))
+		assert.Contains(t, result.LLMContent, fmt.Sprintf("--- %s ---\npackage main\n", mainGoPath))
+		assert.NotContains(t, result.LLMContent, fmt.Sprintf("--- %s ---", appGoPath))
 
 		// Check display message
 		assert.Contains(t, result.ReturnDisplay, "Successfully read and concatenated content from **1 file(s)**.")
-		assert.Contains(t, result.ReturnDisplay, fmt.Sprintf("- `\`%s\``", mainGoPath))
-		assert.NotContains(t, result.ReturnDisplay, fmt.Sprintf("- `\`%s\``", appGoPath))
+		assert.Contains(t, result.ReturnDisplay, fmt.Sprintf("- `%s`", mainGoPath))
+		assert.NotContains(t, result.ReturnDisplay, fmt.Sprintf("- `%s`", appGoPath))
 	})
 
 	t.Run("no files found", func(t *testing.T) {
@@ -92,7 +91,7 @@ func TestReadManyFilesTool_Execute(t *testing.T) {
 		require.NoError(t, err)
 
 		expectedDisplay := "### ReadManyFiles Result\n\nNo files were read and concatenated based on the criteria.\n"
-		expectedLLMContent := "\n--- End of content ---\\n\n" + expectedDisplay
+		expectedLLMContent := "\n--- End of content ---\n\n" + expectedDisplay
 
 		assert.Equal(t, expectedLLMContent, result.LLMContent)
 		assert.Equal(t, expectedDisplay, result.ReturnDisplay)

@@ -202,11 +202,12 @@ func (t *ReadManyFilesTool) Execute(ctx context.Context, args map[string]any) (t
 	}
 
 	err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
 
-		// Get relative path from the search path
+		if err != nil {
+
+			return err
+
+		} // Get relative path from the search path
 		relPath, err := filepath.Rel(absSearchPath, path)
 		if err != nil {
 			return err
@@ -232,7 +233,7 @@ func (t *ReadManyFilesTool) Execute(ctx context.Context, args map[string]any) (t
 		for _, g := range compiledSearchGlobs {
 			if g.Match(relPath) {
 				allFiles = append(allFiles, path)
-				break // Move to next file once matched
+				break // Found a match, no need to check other search patterns
 			}
 		}
 		return nil
