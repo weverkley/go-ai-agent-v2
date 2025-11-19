@@ -211,6 +211,15 @@ func (em *Manager) UninstallExtension(name string, interactiveConsent bool) erro
 		return fmt.Errorf("failed to save extension status: %w", err)
 	}
 
+	extensionPath := filepath.Join(em.baseDir, ".goaiagent", "extensions", name)
+	if exists, err := em.FSService.PathExists(extensionPath); err != nil {
+		return fmt.Errorf("failed to check if extension directory exists: %w", err)
+	} else if exists {
+		if err := em.FSService.RemoveAll(extensionPath); err != nil {
+			return fmt.Errorf("failed to remove extension directory: %w", err)
+		}
+	}
+
 	return nil
 }
 
