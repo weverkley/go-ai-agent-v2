@@ -2,18 +2,67 @@ package mcp
 
 import (
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/telemetry" // Added
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"os"
 	"os/exec"
-	"sync" // Import sync package
+	"sync"
 	"time"
 )
+
+// McpClientInterface defines the interface for an MCP client, allowing for mocking in tests.
+type McpClientInterface interface {
+	Connect(timeout time.Duration) error
+	Close() error
+	GetTools() ([]types.Tool, error)
+	Name() string
+}
+
+// newMcpClientFactory is a variable that can be overridden for testing purposes.
+// It should return an implementation of McpClientInterface.
+var NewMcpClientFactory func(name, version string, serverConfig types.MCPServerConfig) McpClientInterface
+
+// init function to set the default NewMcpClientFactory.
+func init() {
+	NewMcpClientFactory = func(name, version string, serverConfig types.MCPServerConfig) McpClientInterface {
+		// Call the actual NewMcpClient from client.go and return it as McpClientInterface.
+		return NewMcpClient(name, version, serverConfig)
+	}
+}
+
+// Remove mockableMcpClient as it's not needed in manager.go
+/*
+type mockableMcpClient {
+	name string
+	connectFunc func(timeout time.Duration) error
+	closeFunc func() error
+	getToolsFunc func() ([]types.Tool, error)
+}
+
+func (m *mockableMcpClient) Connect(timeout time.Duration) error {
+	return m.connectFunc(timeout)
+}
+
+func (m *mockableMcpClient) Close() error {
+	if m.closeFunc != nil {
+		return m.closeFunc()
+	}
+	return nil
+}
+
+func (m *mockableMcpClient) GetTools() ([]types.Tool, error) {
+	return m.getToolsFunc()
+}
+
+func (m *mockableMcpClient) Name() string {
+	return m.name
+}
+*/
 
 // McpClientManager manages the lifecycle of multiple MCP clients and local servers.
 type McpClientManager struct {
 	mu             sync.RWMutex // Mutex to protect concurrent access
-	clients        map[string]*McpClient
+	clients        map[string]McpClientInterface // Change type to interface
 	toolRegistry   types.ToolRegistryInterface
 	runningServers map[string]*exec.Cmd // Map to store running local server processes
 }
@@ -21,7 +70,7 @@ type McpClientManager struct {
 // NewMcpClientManager creates a new instance of McpClientManager.
 func NewMcpClientManager(toolRegistry types.ToolRegistryInterface) *McpClientManager {
 	return &McpClientManager{
-		clients: make(map[string]*McpClient),
+		clients: make(map[string]McpClientInterface), // Change type to interface
 		toolRegistry: toolRegistry,
 		runningServers: make(map[string]*exec.Cmd),
 	}
@@ -86,7 +135,7 @@ func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
 
 	for name, serverConfig := range mcpServers {
 		telemetry.LogDebugf("Connecting to MCP server: %s (URL: %s)", name, serverConfig.Url)
-		client := NewMcpClient(name, "v1.0", serverConfig) // Pass serverConfig
+		client := NewMcpClientFactory(name, "v1.0", serverConfig) // Use the mockable NewMcpClientFactory function
 		
 		// Simulate connection
 		if err := client.Connect(5*time.Second); err != nil {
@@ -198,14 +247,14 @@ func (m *McpClientManager) ListServers(cliConfig types.Config) []types.MCPServer
 }
 
 // GetClient returns a client by name for testing purposes.
-func (m *McpClientManager) GetClient(name string) *McpClient {
+func (m *McpClientManager) GetClient(name string) McpClientInterface { // Change return type
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return m.clients[name]
 }
 
 // AddClient adds a client to the manager for testing purposes.
-func (m *McpClientManager) AddClient(name string, client *McpClient) {
+func (m *McpClientManager) AddClient(name string, client McpClientInterface) { // Change client type
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.clients[name] = client

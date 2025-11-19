@@ -1,6 +1,7 @@
 package mcp_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -12,7 +13,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/google/generative-ai-go/genai" // Add genai import
+	"github.com/google/generative-ai-go/genai"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -144,7 +145,46 @@ func (m *MockConfig) Get(key string) (interface{}, bool) {
 	}
 }
 
+// MockMcpClient implements mcp.McpClientInterface for testing purposes.
+type MockMcpClient struct {
+	name         string
+	ConnectFunc  func(timeout time.Duration) error
+	CloseFunc    func() error
+	GetToolsFunc func() ([]types.Tool, error)
+}
+
+func (m *MockMcpClient) Name() string {
+	return m.name
+}
+
+func (m *MockMcpClient) Connect(timeout time.Duration) error {
+	if m.ConnectFunc != nil {
+		return m.ConnectFunc(timeout)
+	}
+	return nil // Default successful connection
+}
+
+func (m *MockMcpClient) Close() error {
+	if m.CloseFunc != nil {
+		return m.CloseFunc()
+	}
+	return nil // Default successful close
+}
+
+func (m *MockMcpClient) GetTools() ([]types.Tool, error) {
+	if m.GetToolsFunc != nil {
+		return m.GetToolsFunc()
+	}
+	return []types.Tool{}, nil // Default no tools
+}
+
 func TestMcpClientManager_DiscoverAllMcpTools(t *testing.T) {
+	// Save original newMcpClientFactory and restore it after the test
+	originalNewMcpClientFactory := mcp.NewMcpClientFactory
+	t.Cleanup(func() {
+		mcp.NewMcpClientFactory = originalNewMcpClientFactory
+	})
+
 	t.Run("should discover and register tools from configured MCP servers", func(t *testing.T) {
 		mockToolRegistry := NewMockToolRegistry()
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
@@ -165,6 +205,30 @@ func TestMcpClientManager_DiscoverAllMcpTools(t *testing.T) {
 			McpServers: mcpServers, // Directly set McpServers
 		}
 
+		// Override newMcpClient to return a mock client
+		mcp.NewMcpClientFactory = func(name, version string, serverConfig types.MCPServerConfig) mcp.McpClientInterface {
+			return &MockMcpClient{
+				name: name,
+				ConnectFunc: func(timeout time.Duration) error {
+					return nil // Simulate successful connection
+				},
+				GetToolsFunc: func() ([]types.Tool, error) {
+					// Simulate returning some tools
+					if name == "server1" {
+						return []types.Tool{
+															&MockTool{name: "toolA"},
+															&MockTool{name: "toolB"},							}, nil
+					}
+				if name == "server2" {
+						return []types.Tool{
+								&MockTool{name: "toolC"},
+							}, nil
+					}
+					return []types.Tool{}, nil
+				},
+			}
+		}
+
 		err := manager.DiscoverAllMcpTools(mockConfig)
 		assert.NoError(t, err)
 
@@ -177,8 +241,8 @@ func TestMcpClientManager_DiscoverAllMcpTools(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Verify clients are stored
-		// assert.NotNil(t, manager.GetClient("server1"))
-		// assert.NotNil(t, manager.GetClient("server2"))
+		assert.NotNil(t, manager.GetClient("server1"))
+		assert.NotNil(t, manager.GetClient("server2"))
 	})
 
 	t.Run("should handle no configured MCP servers gracefully", func(t *testing.T) {
@@ -219,8 +283,8 @@ func TestMcpClientManager_StartServer(t *testing.T) {
 		time.Sleep(100 * time.Millisecond)
 
 		// Verify the server is running
-		// assert.NotNil(t, manager.GetRunningServer("test-server"))
-		// assert.NotNil(t, manager.GetRunningServer("test-server").Process)
+		assert.NotNil(t, manager.GetRunningServer("test-server"))
+		assert.NotNil(t, manager.GetRunningServer("test-server").Process)
 
 		// Clean up
 		err = manager.Stop()
@@ -262,14 +326,14 @@ func TestMcpClientManager_Stop(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // Give it time to start
 
 		// Add a dummy client
-		// manager.AddClient("dummy-client", mcp.NewMcpClient("dummy-client", "v1.0", types.MCPServerConfig{}))
+		manager.AddClient("dummy-client", &MockMcpClient{name: "dummy-client"})
 
 		err = manager.Stop()
 		assert.NoError(t, err)
 
 		// Verify no running servers or clients
-		// assert.Nil(t, manager.GetRunningServer("test-server"))
-		// assert.Nil(t, manager.GetClient("dummy-client"))
+		assert.Nil(t, manager.GetRunningServer("test-server"))
+		assert.Nil(t, manager.GetClient("dummy-client"))
 	})
 
 	t.Run("should handle errors during client close or process kill", func(t *testing.T) {
@@ -277,9 +341,10 @@ func TestMcpClientManager_Stop(t *testing.T) {
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
 
 		// Add a client that returns an error on Close
-		mockClient := mcp.NewMcpClient("error-client", "v1.0", types.MCPServerConfig{})
-		mockClient.ConnectFunc = func(timeout time.Duration) error { return nil } // Mock Connect
-		mockClient.CloseFunc = func() error { return errors.New("mock close error") }
+		mockClient := &MockMcpClient{
+			name: "error-client",
+			CloseFunc: func() error { return errors.New("mock close error") },
+		}
 		manager.AddClient("error-client", mockClient)
 
 		err := manager.Stop()
@@ -289,6 +354,12 @@ func TestMcpClientManager_Stop(t *testing.T) {
 }
 
 func TestMcpClientManager_ListServers(t *testing.T) {
+	// Save original newMcpClientFactory and restore it after the test
+	originalNewMcpClientFactory := mcp.NewMcpClientFactory
+	t.Cleanup(func() {
+		mcp.NewMcpClientFactory = originalNewMcpClientFactory
+	})
+
 	t.Run("should list configured MCP servers with their status", func(t *testing.T) {
 		mockToolRegistry := NewMockToolRegistry()
 		manager := mcp.NewMcpClientManager(mockToolRegistry)
@@ -323,7 +394,7 @@ func TestMcpClientManager_ListServers(t *testing.T) {
 		time.Sleep(100 * time.Millisecond) // Give it time to start
 
 		// Simulate a connected remote client
-		manager.AddClient("server2", mcp.NewMcpClient("server2", "v1.0", mcpServers["server2"]))
+		manager.AddClient("server2", &MockMcpClient{name: "server2"})
 
 		statuses := manager.ListServers(mockConfig)
 		assert.Len(t, statuses, 2)
@@ -378,4 +449,34 @@ func findServerStatus(statuses []types.MCPServerStatus, name string) *types.MCPS
 	return nil
 }
 
+// MockTool implements types.Tool for testing purposes.
+type MockTool struct {
+	name string
+}
 
+func (m *MockTool) Name() string {
+	return m.name
+}
+
+func (m *MockTool) Description() string {
+	return "mock tool"
+}
+
+func (m *MockTool) ServerName() string {
+	return "mock-server"
+}
+
+func (m *MockTool) Definition() *genai.Tool {
+	return &genai.Tool{
+		FunctionDeclarations: []*genai.FunctionDeclaration{
+			{
+				Name:        m.Name(),
+				Description: "mock function",
+			},
+		},
+	}
+}
+
+func (m *MockTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
+	return types.ToolResult{LLMContent: "mock result", ReturnDisplay: "mock result"}, nil
+}

@@ -55,6 +55,11 @@ func (c *McpClient) Close() error {
 	return c.CloseFunc()
 }
 
+// Name returns the name of the client.
+func (c *McpClient) Name() string {
+	return c.name
+}
+
 // GetTools simulates retrieving tools from the MCP server.
 func (c *McpClient) GetTools() ([]types.Tool, error) {
 	var tools []types.Tool
