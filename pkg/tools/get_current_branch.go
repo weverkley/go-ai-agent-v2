@@ -15,7 +15,7 @@ type GetCurrentBranchTool struct {
 }
 
 // NewGetCurrentBranchTool creates a new GetCurrentBranchTool.
-func NewGetCurrentBranchTool() *GetCurrentBranchTool {
+func NewGetCurrentBranchTool(gitService services.GitService) *GetCurrentBranchTool {
 	return &GetCurrentBranchTool{
 	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 		types.GET_CURRENT_BRANCH_TOOL_NAME,
@@ -29,7 +29,7 @@ func NewGetCurrentBranchTool() *GetCurrentBranchTool {
 		false, // canUpdateOutput
 		nil,   // MessageBus
 	),
-		gitService: services.NewGitService(),
+		gitService: gitService,
 	}
 }
 
@@ -37,7 +37,12 @@ func NewGetCurrentBranchTool() *GetCurrentBranchTool {
 func (t *GetCurrentBranchTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	dir, ok := args["dir"].(string)
 	if !ok || dir == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'dir' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'dir' argument")
 	}
 
 	branch, err := t.gitService.GetCurrentBranch(dir)

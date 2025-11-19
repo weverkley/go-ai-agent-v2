@@ -261,7 +261,7 @@ type ChatModel struct {
 
 		router     *routing.ModelRouterService
 
-		shellService *services.ShellExecutionService // New field
+		shellService services.ShellExecutionService // New field
 
 	
 
@@ -309,7 +309,7 @@ type ChatModel struct {
 	historyIndex   int      // Current position in command history
 }
 
-func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService *services.ShellExecutionService) *ChatModel {
+func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService services.ShellExecutionService) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
 	ta.Focus()

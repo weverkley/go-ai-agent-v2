@@ -29,7 +29,7 @@ var chatCmd = &cobra.Command{
 }
 
 // runChatCmd contains the logic for the chat command, accepting necessary services.
-func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService *services.ShellExecutionService) {
+func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
 	modelVal, ok := settingsService.Get("model")
 	if !ok {
 		fmt.Printf("Error: 'model' setting not found.\n")
@@ -48,7 +48,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 	}
 	executorType, ok := executorVal.(string)
 	if !ok {
-		fmt.Printf("Error: 'executor' setting is not a string.\n")
+		fmt.Printf("Error: 'executor' setting is not a string.\n\n")
 		os.Exit(1)
 	}
 

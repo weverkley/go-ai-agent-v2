@@ -15,7 +15,7 @@ type GetRemoteURLTool struct {
 }
 
 // NewGetRemoteURLTool creates a new GetRemoteURLTool.
-func NewGetRemoteURLTool() *GetRemoteURLTool {
+func NewGetRemoteURLTool(gitService services.GitService) *GetRemoteURLTool {
 	return &GetRemoteURLTool{
 		        BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 		            "get_remote_url",
@@ -34,7 +34,7 @@ func NewGetRemoteURLTool() *GetRemoteURLTool {
 		            false,
 		            false,
 		            nil,
-		        ),		gitService: services.NewGitService(),
+		        ),		gitService: gitService,
 	}
 }
 
@@ -42,7 +42,12 @@ func NewGetRemoteURLTool() *GetRemoteURLTool {
 func (t *GetRemoteURLTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	dir, ok := args["dir"].(string)
 	if !ok || dir == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'dir' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'dir' argument")
 	}
 
 	remoteURL, err := t.gitService.GetRemoteURL(dir)

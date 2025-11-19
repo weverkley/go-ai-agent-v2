@@ -41,8 +41,8 @@ func NewWebFetchTool() *WebFetchTool {
 
 // extractUrls finds all URLs in a given text.
 func extractUrls(text string) []string {
-	// A simple regex to find URLs. This can be improved.
-	re := regexp.MustCompile(`https?://[^\n]+`)
+	// A simple regex to find URLs, stopping at whitespace or newline.
+	re := regexp.MustCompile(`https?://[^\s\n]+`)
 	return re.FindAllString(text, -1)
 }
 
@@ -52,7 +52,7 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (types.
 	if !ok || prompt == "" {
 		return types.ToolResult{
 			Error: &types.ToolError{
-				Message: "Invalid or missing 'prompt' argument",
+				Message: "invalid or missing 'prompt' argument",
 				Type:    types.ToolErrorTypeExecutionFailed,
 			},
 		}, fmt.Errorf("invalid or missing 'prompt' argument")
@@ -69,26 +69,34 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (types.
 	var results strings.Builder
 	results.WriteString("Web Fetch Results:\n")
 
-	var fetchErrors []error
+	var fetchErrorStrings []string
+	var returnErr error
+
 	for _, url := range urls {
+		// Clean trailing characters that might be part of surrounding text
+		url = strings.TrimRight(url, `.,;:)!?'"`)
+
 		resp, err := http.Get(url)
 		if err != nil {
-			fetchErrors = append(fetchErrors, fmt.Errorf("error fetching %s: %w", url, err))
-			results.WriteString(fmt.Sprintf("Error fetching %s: %v\n", url, err))
+			errorMsg := fmt.Sprintf("Error fetching %s: %v", url, err)
+			fetchErrorStrings = append(fetchErrorStrings, errorMsg)
+			results.WriteString(errorMsg + "\n")
 			continue
 		}
 		defer resp.Body.Close()
 
 		if resp.StatusCode != http.StatusOK {
-			fetchErrors = append(fetchErrors, fmt.Errorf("error fetching %s: Status %d", url, resp.StatusCode))
-			results.WriteString(fmt.Sprintf("Error fetching %s: Status %d\n", url, resp.StatusCode))
+			errorMsg := fmt.Sprintf("Error fetching %s: Status %d", url, resp.StatusCode)
+			fetchErrorStrings = append(fetchErrorStrings, errorMsg)
+			results.WriteString(errorMsg + "\n")
 			continue
 		}
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
-			fetchErrors = append(fetchErrors, fmt.Errorf("error reading body from %s: %w", url, err))
-			results.WriteString(fmt.Sprintf("Error reading body from %s: %v\n", url, err))
+			errorMsg := fmt.Sprintf("Error reading body from %s: %v", url, err)
+			fetchErrorStrings = append(fetchErrorStrings, errorMsg)
+			results.WriteString(errorMsg + "\n")
 			continue
 		}
 
@@ -99,11 +107,13 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (types.
 	}
 
 	var toolError *types.ToolError
-	if len(fetchErrors) > 0 {
+	if len(fetchErrorStrings) > 0 {
+		errorSummary := strings.Join(fetchErrorStrings, "; ")
 		toolError = &types.ToolError{
-			Message: fmt.Sprintf("Multiple errors occurred during web fetch: %v", fetchErrors),
+			Message: fmt.Sprintf("Multiple errors occurred during web fetch: %s", errorSummary),
 			Type:    types.ToolErrorTypeExecutionFailed,
 		}
+		returnErr = fmt.Errorf("multiple errors occurred during web fetch")
 	}
 
 	resultMessage := results.String()
@@ -111,6 +121,6 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (types.
 		LLMContent:    resultMessage,
 		ReturnDisplay: resultMessage,
 		Error:         toolError,
-	}, nil
+	}, returnErr
 }
 

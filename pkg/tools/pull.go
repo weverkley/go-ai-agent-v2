@@ -15,7 +15,7 @@ type PullTool struct {
 }
 
 // NewPullTool creates a new PullTool.
-func NewPullTool() *PullTool {
+func NewPullTool(gitService services.GitService) *PullTool {
 	return &PullTool{
 	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 		types.PULL_TOOL_NAME,
@@ -38,7 +38,7 @@ func NewPullTool() *PullTool {
 		false, // canUpdateOutput
 		nil,   // MessageBus
 	),
-		gitService: services.NewGitService(),
+		gitService: gitService,
 	}
 }
 

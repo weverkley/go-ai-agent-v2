@@ -1,0 +1,161 @@
+package tools
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+
+	"go-ai-agent-v2/go-cli/pkg/types"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestWriteTodosTool_Execute(t *testing.T) {
+	tool := NewWriteTodosTool()
+
+	tests := []struct {
+		name          string
+		args          map[string]any
+		setupMock     func(tempDir string)
+		expectedLLMContent string
+		expectedReturnDisplay string
+		expectedError string
+	}{
+		{
+			name:          "missing todos argument",
+			args:          map[string]any{},
+			setupMock:     func(tempDir string) {},
+			expectedError: "invalid or missing 'todos' argument",
+		},
+		{
+			name:          "invalid todo item format",
+			args:          map[string]any{"todos": []any{"not a map"}},
+			setupMock:     func(tempDir string) {},
+			expectedError: "invalid todo item format",
+		},
+		{
+			name:          "todo with empty description",
+			args:          map[string]any{"todos": []any{map[string]any{"description": "", "status": "pending"}}},
+			setupMock:     func(tempDir string) {},
+			expectedError: "each todo must have a non-empty description",
+		},
+		{
+			name:          "todo with invalid status",
+			args:          map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "invalid"}}},
+			setupMock:     func(tempDir string) {},
+			expectedError: "invalid todo status: invalid",
+		},
+		{
+			name:          "multiple in_progress tasks",
+			args:          map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "in_progress"}, map[string]any{"description": "Task 2", "status": "in_progress"}}},
+			setupMock:     func(tempDir string) {},
+			expectedError: "only one task can be \"in_progress\" at a time",
+		},
+		{
+			name: "get user home dir fails",
+			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
+			setupMock: func(tempDir string) {
+				mockUserHomeDir = func() (string, error) { return "", fmt.Errorf("home dir error") }
+			},
+			expectedError: "failed to get user home directory: home dir error",
+		},
+		{
+			name: "create todos directory fails",
+			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
+			setupMock: func(tempDir string) {
+				mockUserHomeDir = func() (string, error) { return tempDir, nil }
+				mockMkdirAll = func(path string, perm os.FileMode) error { return fmt.Errorf("mkdir error") }
+			},
+			expectedError: "failed to create todos directory: mkdir error",
+		},
+		{
+			name: "write todos file fails",
+			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
+			setupMock: func(tempDir string) {
+				mockUserHomeDir = func() (string, error) { return tempDir, nil }
+				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				mockWriteFile = func(name string, data []byte, perm os.FileMode) error { return fmt.Errorf("write file error") }
+			},
+			expectedError: "failed to write todos file: write file error",
+		},
+		{
+			name: "successful write - empty todos",
+			args: map[string]any{"todos": []any{}},
+			setupMock: func(tempDir string) {
+				mockUserHomeDir = func() (string, error) { return tempDir, nil }
+				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+					assert.Equal(t, "", string(data))
+					return nil
+				}
+			},
+			expectedLLMContent:    "Successfully cleared the todo list.",
+			expectedReturnDisplay: "Successfully cleared the todo list.",
+		},
+		{
+			name: "successful write - single todo",
+			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
+			setupMock: func(tempDir string) {
+				mockUserHomeDir = func() (string, error) { return tempDir, nil }
+				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+					expectedContent := "# ToDo List\n\n1. [pending] Task 1\n"
+					assert.Equal(t, expectedContent, string(data))
+					return nil
+				}
+			},
+			expectedLLMContent:    "Successfully updated the todo list. The current list is now:\n# ToDo List\n\n1. [pending] Task 1\n",
+			expectedReturnDisplay: "Successfully updated the todo list. The current list is now:\n# ToDo List\n\n1. [pending] Task 1\n",
+		},
+		{
+			name: "successful write - multiple todos",
+			args: map[string]any{"todos": []any{
+				map[string]any{"description": "Task 1", "status": "completed"},
+				map[string]any{"description": "Task 2", "status": "in_progress"},
+			}},
+			setupMock: func(tempDir string) {
+				mockUserHomeDir = func() (string, error) { return tempDir, nil }
+				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+					expectedContent := "# ToDo List\n\n1. [completed] Task 1\n2. [in_progress] Task 2\n"
+					assert.Equal(t, expectedContent, string(data))
+					return nil
+				}
+			},
+			expectedLLMContent:    "Successfully updated the todo list. The current list is now:\n# ToDo List\n\n1. [completed] Task 1\n2. [in_progress] Task 2\n",
+			expectedReturnDisplay: "Successfully updated the todo list. The current list is now:\n# ToDo List\n\n1. [completed] Task 1\n2. [in_progress] Task 2\n",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Reset mocks to nil before each test run to prevent state leakage
+			mockUserHomeDir = nil
+			mockMkdirAll = nil
+			mockWriteFile = nil
+
+			tempDir := t.TempDir()
+			// Set up specific mocks for this test case
+			tt.setupMock(tempDir)
+
+			// Apply the configured mocks to the global variables
+			setupMemoryToolMocks() // Reusing mocks from memory_tool_test.go
+			t.Cleanup(teardownMemoryToolMocks)
+
+			result, err := tool.Execute(context.Background(), tt.args)
+
+			if tt.expectedError != "" {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), tt.expectedError)
+				if result.Error != nil {
+					assert.Equal(t, types.ToolErrorTypeExecutionFailed, result.Error.Type)
+				}
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedLLMContent, result.LLMContent)
+				assert.Equal(t, tt.expectedReturnDisplay, result.ReturnDisplay)
+			}
+		})
+	}
+}

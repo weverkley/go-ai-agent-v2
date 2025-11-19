@@ -72,7 +72,7 @@ type FileInfo struct {
 // Execute performs a glob search.
 func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	pattern, ok := args["pattern"].(string)
-	if !ok {
+	if !ok || pattern == "" {
 		return types.ToolResult{
 			Error: &types.ToolError{
 				Message: "Invalid or missing 'pattern' argument",
@@ -112,11 +112,24 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		}, fmt.Errorf("failed to resolve absolute path for %s: %w", searchPath, err)
 	}
 
-	// Compile the glob pattern
+	// Compile the main glob pattern
 	compiledPattern := pattern
 	if !caseSensitive {
 		compiledPattern = strings.ToLower(pattern)
 	}
+
+	// If the pattern contains "**", we need to modify the pattern to also match files directly in the current directory.
+	// For example, "**/*.go" should match "main.go" and "src/app.go".
+	// The glob "**/*.go" typically matches "src/app.go" but not "main.go".
+	// So, we transform "**/*.go" to "{*.go,**/*.go}".
+	if strings.Contains(pattern, "**") {
+		rootPattern := filepath.Base(pattern)
+		if !caseSensitive {
+			rootPattern = strings.ToLower(rootPattern)
+		}
+		compiledPattern = fmt.Sprintf("{%s,%s}", rootPattern, compiledPattern)
+	}
+
 	g, err := glob.Compile(compiledPattern)
 	if err != nil {
 		return types.ToolResult{
@@ -168,7 +181,10 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 			}
 		}
 
-		if g.Match(matchPath) {
+		// Check against main glob pattern
+		isMatched := g.Match(matchPath)
+
+		if isMatched {
 			matchedFiles = append(matchedFiles, FileInfo{
 				Path:    path,
 				ModTime: info.ModTime(),
@@ -176,7 +192,6 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		}
 		return nil
 	})
-
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{

@@ -8,13 +8,32 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
-	"go-ai-agent-v2/go-cli/pkg/services" // New import
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/charmbracelet/bubbletea"
 	"github.com/google/generative-ai-go/genai"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
+
+// MockShellExecutionService is a mock implementation of services.ShellExecutionService
+type MockShellExecutionService struct {
+	mock.Mock
+}
+
+func (m *MockShellExecutionService) ExecuteCommand(ctx context.Context, command string, dir string) (string, string, error) {
+	args := m.Called(ctx, command, dir)
+	return args.String(0), args.String(1), args.Error(2)
+}
+
+func (m *MockShellExecutionService) ExecuteCommandInBackground(command string, dir string) (int, error) {
+	args := m.Called(command, dir)
+	return args.Int(0), args.Error(1)
+}
+
+func (m *MockShellExecutionService) KillAllProcesses() {
+	m.Called()
+}
 
 func TestNewChatModel(t *testing.T) {
 	executor := &core.MockExecutor{}
@@ -22,7 +41,7 @@ func TestNewChatModel(t *testing.T) {
 	dummyCommandExecutor := func(args []string) (string, error) {
 		return "command executed", nil
 	}
-	dummyShellService := &services.ShellExecutionService{} // Create a dummy shell service
+	dummyShellService := new(MockShellExecutionService) // Create a dummy shell service
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
 	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
@@ -46,7 +65,7 @@ func TestUpdate_UserInput(t *testing.T) {
 	dummyCommandExecutor := func(args []string) (string, error) {
 		return "command executed", nil
 	}
-	dummyShellService := &services.ShellExecutionService{}
+	dummyShellService := new(MockShellExecutionService)
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
 	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
@@ -76,7 +95,7 @@ func TestUpdate_SlashCommand_Clear(t *testing.T) {
 	dummyCommandExecutor := func(args []string) (string, error) {
 		return "command executed", nil
 	}
-	dummyShellService := &services.ShellExecutionService{}
+	dummyShellService := new(MockShellExecutionService)
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
 	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
@@ -100,7 +119,7 @@ func TestUpdate_SlashCommand_Quit(t *testing.T) {
 	dummyCommandExecutor := func(args []string) (string, error) {
 		return "command executed", nil
 	}
-	dummyShellService := &services.ShellExecutionService{}
+	dummyShellService := new(MockShellExecutionService)
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
 	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
@@ -121,7 +140,7 @@ func TestUpdate_StreamingEvents(t *testing.T) {
 	dummyCommandExecutor := func(args []string) (string, error) {
 		return "command executed", nil
 	}
-	dummyShellService := &services.ShellExecutionService{}
+	dummyShellService := new(MockShellExecutionService)
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
 	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
@@ -204,7 +223,7 @@ func TestUpdate_UserConfirmationFlow(t *testing.T) {
 	dummyCommandExecutor := func(args []string) (string, error) {
 		return "command executed", nil
 	}
-	dummyShellService := &services.ShellExecutionService{}
+	dummyShellService := new(MockShellExecutionService)
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 	router := routing.NewModelRouterService(appConfig)
 

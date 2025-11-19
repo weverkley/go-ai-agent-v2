@@ -39,7 +39,7 @@ var SessionStartTime time.Time                  // Declare sessionStartTime
 var SettingsService *services.SettingsService   // Declare package-level settingsService
 
 var FSService services.FileSystemService // Declare package-level FileSystemService
-var ShellService *services.ShellExecutionService   // Declare package-level ShellExecutionService
+var ShellService services.ShellExecutionService   // Declare package-level ShellExecutionService
 var extensionsCliCommand *commands.ExtensionsCommand // Declare package-level extensionsCliCommand
 
 func Execute() {
@@ -56,7 +56,7 @@ func initSessionStartTime() {
 func initServices(projectRoot string) (
 	*services.WorkspaceService,
 	services.FileSystemService,
-	*services.ShellExecutionService,
+	services.ShellExecutionService, // Changed to interface
 	*extension.Manager,
 	*services.SettingsService,
 	*services.FileFilteringService,
@@ -80,7 +80,7 @@ func getTelemetrySettings(settingsService *services.SettingsService) *types.Tele
 	return settingsService.GetTelemetrySettings()
 }
 
-func registerTools(fsService services.FileSystemService, shellService *services.ShellExecutionService, settingsService *services.SettingsService) *types.ToolRegistry {
+func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService *services.SettingsService) *types.ToolRegistry {
 	return tools.RegisterAllTools(fsService, shellService, settingsService)
 }
 

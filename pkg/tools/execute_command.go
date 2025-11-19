@@ -12,11 +12,11 @@ import (
 // ExecuteCommandTool implements the Tool interface for executing shell commands.
 type ExecuteCommandTool struct {
 	*types.BaseDeclarativeTool
-	shellService *services.ShellExecutionService
+	shellService services.ShellExecutionService
 }
 
 // NewExecuteCommandTool creates a new ExecuteCommandTool.
-func NewExecuteCommandTool(shellService *services.ShellExecutionService) *ExecuteCommandTool {
+func NewExecuteCommandTool(shellService services.ShellExecutionService) *ExecuteCommandTool {
 	return &ExecuteCommandTool{
 	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 		types.EXECUTE_COMMAND_TOOL_NAME,
@@ -48,7 +48,12 @@ func NewExecuteCommandTool(shellService *services.ShellExecutionService) *Execut
 func (t *ExecuteCommandTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	command, ok := args["command"].(string)
 	if !ok || command == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'command' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'command' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'command' argument")
 	}
 
 	dir := "."

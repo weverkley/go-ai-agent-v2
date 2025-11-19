@@ -45,9 +45,18 @@ func NewMemoryTool() *MemoryTool {
 	}
 }
 
+// Global variables for os functions to allow mocking in tests
+var (
+	osUserHomeDir = os.UserHomeDir
+	osMkdirAll    = os.MkdirAll
+	osReadFile    = os.ReadFile
+	osWriteFile   = os.WriteFile
+	osIsNotExist  = os.IsNotExist
+)
+
 // getGlobalMemoryFilePath returns the path to the GEMINI.md file.
 func getGlobalMemoryFilePath() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	homeDir, err := osUserHomeDir() // Use global variable
 	if err != nil {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
@@ -60,9 +69,9 @@ func readMemoryFileContent() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	data, err := os.ReadFile(memoryFilePath)
+	data, err := osReadFile(memoryFilePath) // Use global variable
 	if err != nil {
-		if os.IsNotExist(err) {
+		if osIsNotExist(err) { // Use global variable
 			return "", nil // File doesn't exist, return empty content
 		}
 		return "", fmt.Errorf("failed to read memory file: %w", err)
@@ -85,7 +94,8 @@ func ensureNewlineSeparation(currentContent string) string {
 }
 
 // computeNewContent computes the new content that would result from adding a memory entry.
-func computeNewContent(currentContent, fact string) string {
+// It returns the new content and a boolean indicating if the content was changed.
+func computeNewContent(currentContent, fact string) (string, bool) {
 	processedText := strings.TrimSpace(fact)
 	processedText = strings.TrimPrefix(processedText, "- ") // Remove leading hyphen if present
 	newMemoryItem := fmt.Sprintf("- %s", processedText)
@@ -95,31 +105,47 @@ func computeNewContent(currentContent, fact string) string {
 	if headerIndex == -1 {
 		// Header not found, append header and then the entry
 		separator := ensureNewlineSeparation(currentContent)
-		return currentContent + separator + MEMORY_SECTION_HEADER + "\n" + newMemoryItem + "\n"
-	} else {
-		// Header found, find where to insert the new memory entry
-		startOfSectionContent := headerIndex + len(MEMORY_SECTION_HEADER)
-		endOfSectionIndex := strings.Index(currentContent[startOfSectionContent:], "\n## ")
-		if endOfSectionIndex == -1 {
-			endOfSectionIndex = len(currentContent) // End of file
-		} else {
-			endOfSectionIndex += startOfSectionContent
-		}
-
-		beforeSectionMarker := strings.TrimRight(currentContent[:startOfSectionContent], " \t\n\r")
-		sectionContent := strings.TrimRight(currentContent[startOfSectionContent:endOfSectionIndex], " \t\n\r")
-		afterSectionMarker := currentContent[endOfSectionIndex:]
-
-		sectionContent += "\n" + newMemoryItem
-		return strings.TrimRight(beforeSectionMarker+"\n"+strings.TrimLeft(sectionContent, " \t\n\r")+"\n"+afterSectionMarker, " \t\n\r") + "\n"
+		return currentContent + separator + MEMORY_SECTION_HEADER + "\n" + newMemoryItem + "\n", true
 	}
+
+	// Header found, find the section content
+	startOfSectionContent := headerIndex + len(MEMORY_SECTION_HEADER)
+	endOfSectionIndex := strings.Index(currentContent[startOfSectionContent:], "\n## ")
+	if endOfSectionIndex == -1 {
+		endOfSectionIndex = len(currentContent) // End of file
+	} else {
+		endOfSectionIndex += startOfSectionContent
+	}
+	sectionItself := currentContent[startOfSectionContent:endOfSectionIndex]
+
+	// Check if the item already exists in the section.
+	lines := strings.Split(sectionItself, "\n")
+	for _, line := range lines {
+		if strings.TrimSpace(line) == newMemoryItem {
+			return currentContent, false // Fact already exists, do nothing.
+		}
+	}
+
+	// Fact does not exist, reuse the original insertion logic
+	beforeSectionMarker := strings.TrimRight(currentContent[:startOfSectionContent], " \t\n\r")
+	sectionContent := strings.TrimRight(currentContent[startOfSectionContent:endOfSectionIndex], " \t\n\r")
+	afterSectionMarker := currentContent[endOfSectionIndex:]
+
+	sectionContent += "\n" + newMemoryItem
+	newContent := strings.TrimRight(beforeSectionMarker+"\n"+strings.TrimLeft(sectionContent, " \t\n\r")+"\n"+afterSectionMarker, " \t\n\r") + "\n"
+	return newContent, true
 }
 
 // Execute saves a fact to long-term memory.
 func (t *MemoryTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	fact, ok := args["fact"].(string)
 	if !ok || fact == "" {
-		return types.ToolResult{}, fmt.Errorf("invalid or missing 'fact' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "invalid or missing 'fact' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("invalid or missing 'fact' argument")
 	}
 
 	memoryFilePath, err := getGlobalMemoryFilePath()
@@ -132,7 +158,7 @@ func (t *MemoryTool) Execute(ctx context.Context, args map[string]any) (types.To
 		}, err
 	}
 
-	err = os.MkdirAll(filepath.Dir(memoryFilePath), 0755)
+	err = osMkdirAll(filepath.Dir(memoryFilePath), 0755) // Use global variable
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
@@ -152,9 +178,17 @@ func (t *MemoryTool) Execute(ctx context.Context, args map[string]any) (types.To
 		}, err
 	}
 
-	newContent := computeNewContent(currentContent, fact)
+	newContent, changed := computeNewContent(currentContent, fact)
 
-	err = os.WriteFile(memoryFilePath, []byte(newContent), 0644)
+	if !changed {
+		successMessage := fmt.Sprintf("I already know that: \"%s\"", fact)
+		return types.ToolResult{
+			LLMContent:    successMessage,
+			ReturnDisplay: successMessage,
+		}, nil
+	}
+
+	err = osWriteFile(memoryFilePath, []byte(newContent), 0644) // Use global variable
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{

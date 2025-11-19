@@ -28,9 +28,12 @@ This command acts as a specialized AI prompt to help new engineers understand th
 }
 
 // runCodeGuideCmd contains the logic for the code-guide command, accepting necessary services.
-func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService *services.ShellExecutionService) {
-	// Initialize the ToolRegistry
-	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
+func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
+	// Initialize FileSystemService and GitService
+	fsService := services.NewFileSystemService()
+
+	// Register tools
+	toolRegistry := tools.RegisterAllTools(fsService, shellService, settingsService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {

@@ -15,7 +15,7 @@ type CheckoutBranchTool struct {
 }
 
 // NewCheckoutBranchTool creates a new CheckoutBranchTool.
-func NewCheckoutBranchTool() *CheckoutBranchTool {
+func NewCheckoutBranchTool(gitService services.GitService) *CheckoutBranchTool {
 	return &CheckoutBranchTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			types.CHECKOUT_BRANCH_TOOL_NAME,
@@ -34,7 +34,7 @@ func NewCheckoutBranchTool() *CheckoutBranchTool {
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
-		gitService: services.NewGitService(),
+		gitService: gitService,
 	}
 }
 
@@ -42,11 +42,21 @@ func NewCheckoutBranchTool() *CheckoutBranchTool {
 func (t *CheckoutBranchTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	dir, ok := args["dir"].(string)
 	if !ok || dir == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'dir' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'dir' argument")
 	}
 	branchName, ok := args["branch_name"].(string)
 	if !ok || branchName == "" {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'branch_name' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'branch_name' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'branch_name' argument")
 	}
 
 	err := t.gitService.CheckoutBranch(dir, branchName)

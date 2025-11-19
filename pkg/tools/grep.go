@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort" // Added
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -61,8 +62,13 @@ type GrepMatch struct {
 func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	// Extract arguments
 	pattern, ok := args["pattern"].(string)
-	if !ok {
-		return types.ToolResult{}, fmt.Errorf("invalid or missing 'pattern' argument")
+	if !ok || pattern == "" { // Added check for empty pattern
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "Invalid or missing 'pattern' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("invalid or missing 'pattern' argument")
 	}
 
 	searchPath := "." // Default to current directory
@@ -167,6 +173,13 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		}, fmt.Errorf("error walking the path %s: %w", absSearchPath, err)
 	}
 
+	// Sort files by file path for consistent output
+	var sortedFilePaths []string
+	for filePath := range matchesByFile {
+		sortedFilePaths = append(sortedFilePaths, filePath)
+	}
+	sort.Strings(sortedFilePaths)
+
 	if len(allMatches) == 0 {
 		return types.ToolResult{
 			LLMContent:    fmt.Sprintf("No matches found for pattern \"%s\" in path \"%s\"", pattern, searchPath),
@@ -175,15 +188,20 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	}
 
 	var llmContent strings.Builder
-	llmContent.WriteString(fmt.Sprintf("Found %d matches for pattern \"%s\" in path \"%s\":\n---\n", len(allMatches), pattern, searchPath))
+	llmContent.WriteString(fmt.Sprintf("Found %d matches for pattern \"%s\" in path \"%s\":\n", len(allMatches), pattern, searchPath))
+	llmContent.WriteString("---\n") // Add the initial "---" once here
 
-	for filePath, matches := range matchesByFile {
+	for i, filePath := range sortedFilePaths {
 		llmContent.WriteString(fmt.Sprintf("File: %s\n", filePath))
-		for _, match := range matches {
+		for _, match := range matchesByFile[filePath] {
 			llmContent.WriteString(fmt.Sprintf("L%d: %s\n", match.LineNumber, strings.TrimSpace(match.Line)))
 		}
-		llmContent.WriteString("---\n\n")
+		llmContent.WriteString("---\n") // This is the "---" after each file's matches
+		if i < len(sortedFilePaths)-1 {
+			llmContent.WriteString("\n\n") // Add two newlines between file blocks
+		}
 	}
+	llmContent.WriteString("\n") // Add a final newline at the end
 
 	return types.ToolResult{
 		LLMContent:    llmContent.String(),

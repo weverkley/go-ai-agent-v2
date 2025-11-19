@@ -9,7 +9,7 @@ import (
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(fs services.FileSystemService, shellService *services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
+func RegisterAllTools(fs services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
@@ -45,16 +45,16 @@ func RegisterAllTools(fs services.FileSystemService, shellService *services.Shel
 	if err := registry.Register(NewListDirectoryTool(fs)); err != nil {
 		telemetry.LogErrorf("Error registering ListDirectoryTool: %v", err)
 	}
-	if err := registry.Register(NewGetCurrentBranchTool()); err != nil {
+	if err := registry.Register(NewGetCurrentBranchTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering GetCurrentBranchTool: %v", err)
 	}
-	if err := registry.Register(NewGetRemoteURLTool()); err != nil {
+	if err := registry.Register(NewGetRemoteURLTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering GetRemoteURLTool: %v", err)
 	}
-	if err := registry.Register(NewCheckoutBranchTool()); err != nil {
+	if err := registry.Register(NewCheckoutBranchTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering NewCheckoutBranchTool: %v", err)
 	}
-	if err := registry.Register(NewPullTool()); err != nil {
+	if err := registry.Register(NewPullTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering PullTool: %v", err)
 	}
 	if err := registry.Register(NewExecuteCommandTool(shellService)); err != nil {

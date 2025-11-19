@@ -44,8 +44,13 @@ func NewFindUnusedCodeTool() *FindUnusedCodeTool {
 // Execute implements the Tool interface.
 func (t *FindUnusedCodeTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	directory, ok := args["directory"].(string)
-	if !ok {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'directory' argument")
+	if !ok || directory == "" {
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'directory' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'directory' argument")
 	}
 
 	// Resolve the absolute path

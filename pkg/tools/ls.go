@@ -38,16 +38,22 @@ func NewLsTool() *LsTool {
 
 // Execute runs the tool with the given arguments.
 func (t *LsTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
+	// Extract arguments
 	path, ok := args["path"].(string)
 	if !ok || path == "" {
-		return types.ToolResult{}, fmt.Errorf("path argument is required and must be a string")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "path argument is required and must be a string",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("path argument is required and must be a string")
 	}
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
-				Message: fmt.Sprintf("Failed to read directory %s: %v", path, err),
+				Message: fmt.Sprintf("failed to read directory %s: %v", path, err),
 				Type:    types.ToolErrorTypeExecutionFailed,
 			},
 		}, fmt.Errorf("failed to read directory %s: %w", path, err)

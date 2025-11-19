@@ -65,24 +65,44 @@ func NewExtractFunctionTool(fileSystemService services.FileSystemService) *Extra
 func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	filePath, ok := args["filePath"].(string)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'filePath' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'filePath' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'filePath' argument")
 	}
 
 	startLineFloat, ok := args["startLine"].(float64)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'startLine' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'startLine' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'startLine' argument")
 	}
 	startLine := int(startLineFloat)
 
 	endLineFloat, ok := args["endLine"].(float64)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'endLine' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'endLine' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'endLine' argument")
 	}
 	endLine := int(endLineFloat)
 
 	newFunctionName, ok := args["newFunctionName"].(string)
 	if !ok {
-		return types.ToolResult{}, fmt.Errorf("missing or invalid 'newFunctionName' argument")
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: "missing or invalid 'newFunctionName' argument",
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("missing or invalid 'newFunctionName' argument")
 	}
 
 	receiver, _ := args["receiver"].(string) // Optional, can be empty

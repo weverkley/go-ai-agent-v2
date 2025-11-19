@@ -29,7 +29,7 @@ var generateCmd = &cobra.Command{
 }
 
 // runGenerateCmd contains the logic for the generate command, accepting necessary services.
-func runGenerateCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService *services.ShellExecutionService) {
+func runGenerateCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
 	modelVal, ok := settingsService.Get("model")
 	if !ok {
 		fmt.Printf("Error: 'model' setting not found.\n")

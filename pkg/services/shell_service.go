@@ -10,21 +10,28 @@ import (
 )
 
 // ShellExecutionService provides functionality to execute shell commands.
-type ShellExecutionService struct {
+type ShellExecutionService interface {
+	ExecuteCommand(ctx context.Context, command string, workingDir string) (string, string, error)
+	ExecuteCommandInBackground(command string, workingDir string) (int, error)
+	KillAllProcesses()
+}
+
+// shellExecutionServiceImpl is the concrete implementation of ShellExecutionService.
+type shellExecutionServiceImpl struct {
 	backgroundProcesses map[int]*os.Process
 	mutex               sync.Mutex
 }
 
 // NewShellExecutionService creates a new instance of ShellExecutionService.
-func NewShellExecutionService() *ShellExecutionService {
-	return &ShellExecutionService{
+func NewShellExecutionService() ShellExecutionService { // Return interface
+	return &shellExecutionServiceImpl{ // Instantiate implementation
 		backgroundProcesses: make(map[int]*os.Process),
 	}
 }
 
 // ExecuteCommand executes a given shell command in the specified working directory.
 // It is a blocking call and can be cancelled via the provided context.
-func (s *ShellExecutionService) ExecuteCommand(ctx context.Context, command string, workingDir string) (string, string, error) {
+func (s *shellExecutionServiceImpl) ExecuteCommand(ctx context.Context, command string, workingDir string) (string, string, error) {
 	cmd := exec.CommandContext(ctx, "bash", "-c", command)
 	if workingDir != "" {
 		cmd.Dir = workingDir
@@ -40,7 +47,7 @@ func (s *ShellExecutionService) ExecuteCommand(ctx context.Context, command stri
 }
 
 // ExecuteCommandInBackground executes a command in the background and tracks its PID.
-func (s *ShellExecutionService) ExecuteCommandInBackground(command string, workingDir string) (int, error) {
+func (s *shellExecutionServiceImpl) ExecuteCommandInBackground(command string, workingDir string) (int, error) {
 	cmd := exec.Command("bash", "-c", command)
 	if workingDir != "" {
 		cmd.Dir = workingDir
@@ -63,7 +70,7 @@ func (s *ShellExecutionService) ExecuteCommandInBackground(command string, worki
 }
 
 // KillAllProcesses iterates over the tracked background processes and terminates them.
-func (s *ShellExecutionService) KillAllProcesses() {
+func (s *shellExecutionServiceImpl) KillAllProcesses() {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
