@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -62,7 +61,7 @@ func NewWriteTodosTool() *WriteTodosTool {
 
 // getTodosFilePath returns the path to the TODOS.md file.
 func getTodosFilePath() (string, error) {
-	homeDir, err := os.UserHomeDir()
+	homeDir, err := osUserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get user home directory: %w", err)
 	}
@@ -108,7 +107,7 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 					},
 				}, fmt.Errorf("each todo must have a non-empty description")
 			}
-		if !isValidTodoStatus(todo.Status) {
+		if !t.isValidTodoStatus(todo.Status) { // Call isValidTodoStatus as a method
 			return types.ToolResult{
 				Error: &types.ToolError{
 					Message: fmt.Sprintf("Invalid todo status: %s", todo.Status),
@@ -140,7 +139,7 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 		}, err
 	}
 
-	err = os.MkdirAll(filepath.Dir(todosFilePath), 0755)
+	err = osMkdirAll(filepath.Dir(todosFilePath), 0755)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
@@ -159,7 +158,7 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 		}
 	}
 
-	err = os.WriteFile(todosFilePath, []byte(todoListBuilder.String()), 0644)
+	err = osWriteFile(todosFilePath, []byte(todoListBuilder.String()), 0644)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
@@ -179,10 +178,12 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 	return types.ToolResult{
 		LLMContent:    llmContent,
 		ReturnDisplay: llmContent,
-	}, nil
+	},
+	nil
 }
 
-func isValidTodoStatus(status string) bool {
+// isValidTodoStatus checks if the given status is a valid todo status.
+func (t *WriteTodosTool) isValidTodoStatus(status string) bool {
 	for _, s := range []string{"pending", "in_progress", "completed", "cancelled"} {
 		if s == status {
 			return true

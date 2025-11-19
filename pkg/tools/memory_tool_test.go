@@ -11,33 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Mock functions for os operations
-var (
-	mockUserHomeDir func() (string, error)
-	mockMkdirAll    func(path string, perm os.FileMode) error
-	mockReadFile    func(name string) ([]byte, error)
-	mockWriteFile   func(name string, data []byte, perm os.FileMode) error
-	mockIsNotExist  func(err error) bool
-)
-
-func setupMemoryToolMocks() {
-	// Assign mock implementations to the global variables in memory_tool.go
-	osUserHomeDir = mockUserHomeDir
-	osMkdirAll = mockMkdirAll
-	osReadFile = mockReadFile
-	osWriteFile = mockWriteFile
-	osIsNotExist = mockIsNotExist
-}
-
-func teardownMemoryToolMocks() {
-	// Restore original os functions
-	osUserHomeDir = os.UserHomeDir
-	osMkdirAll = os.MkdirAll
-	osReadFile = os.ReadFile
-	osWriteFile = os.WriteFile
-	osIsNotExist = os.IsNotExist
-}
-
 func TestMemoryTool_Execute(t *testing.T) {
 	tool := NewMemoryTool()
 
@@ -65,7 +38,7 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "get user home dir fails",
 			args: map[string]any{"fact": "test fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return "", fmt.Errorf("home dir error") }
+				testMockUserHomeDir = func() (string, error) { return "", fmt.Errorf("home dir error") }
 			},
 			expectedError: "failed to get user home directory: home dir error",
 		},
@@ -73,8 +46,8 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "create memory directory fails",
 			args: map[string]any{"fact": "test fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return fmt.Errorf("mkdir error") }
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return fmt.Errorf("mkdir error") }
 			},
 			expectedError: "failed to create memory directory: mkdir error",
 		},
@@ -82,10 +55,10 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "read memory file fails",
 			args: map[string]any{"fact": "test fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) { return nil, fmt.Errorf("read file error") }
-				mockIsNotExist = func(err error) bool { return false }
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) { return nil, fmt.Errorf("read file error") }
+				testMockIsNotExist = func(err error) bool { return false }
 			},
 			expectedError: "failed to read memory file: read file error",
 		},
@@ -93,11 +66,11 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "write memory file fails",
 			args: map[string]any{"fact": "test fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) { return nil, os.ErrNotExist }
-				mockIsNotExist = func(err error) bool { return err == os.ErrNotExist }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error { return fmt.Errorf("write file error") }
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) { return nil, os.ErrNotExist }
+				testMockIsNotExist = func(err error) bool { return err == os.ErrNotExist }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error { return fmt.Errorf("write file error") }
 			},
 			expectedError: "failed to write memory file: write file error",
 		},
@@ -105,11 +78,11 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "successful save - new file",
 			args: map[string]any{"fact": "test fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) { return nil, os.ErrNotExist }
-				mockIsNotExist = func(err error) bool { return err == os.ErrNotExist }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) { return nil, os.ErrNotExist }
+				testMockIsNotExist = func(err error) bool { return err == os.ErrNotExist }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := fmt.Sprintf("%s\n- test fact\n", MEMORY_SECTION_HEADER)
 					assert.Equal(t, expectedContent, string(data))
 					return nil
@@ -122,13 +95,13 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "successful save - append to existing file",
 			args: map[string]any{"fact": "another fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) {
 					return []byte(fmt.Sprintf("%s\n- existing fact\n", MEMORY_SECTION_HEADER)), nil
 				}
-				mockIsNotExist = func(err error) bool { return false }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockIsNotExist = func(err error) bool { return false }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := fmt.Sprintf("%s\n- existing fact\n- another fact\n", MEMORY_SECTION_HEADER)
 					assert.Equal(t, expectedContent, string(data))
 					return nil
@@ -141,13 +114,13 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "fact already exists",
 			args: map[string]any{"fact": "existing fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) {
 					return []byte(fmt.Sprintf("%s\n- existing fact\n", MEMORY_SECTION_HEADER)), nil
 				}
-				mockIsNotExist = func(err error) bool { return false }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockIsNotExist = func(err error) bool { return false }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					t.Error("os.WriteFile should not be called when fact exists")
 					return nil
 				}
@@ -159,13 +132,13 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "successful save - append to existing file without header",
 			args: map[string]any{"fact": "another fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) {
 					return []byte("Some initial content.\n"), nil
 				}
-				mockIsNotExist = func(err error) bool { return false }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockIsNotExist = func(err error) bool { return false }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := "Some initial content.\n\n" + MEMORY_SECTION_HEADER + "\n- another fact\n"
 					assert.Equal(t, expectedContent, string(data))
 					return nil
@@ -178,11 +151,11 @@ func TestMemoryTool_Execute(t *testing.T) {
 			name: "successful save - fact with leading hyphen",
 			args: map[string]any{"fact": "- test fact"},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockReadFile = func(name string) ([]byte, error) { return nil, os.ErrNotExist }
-				mockIsNotExist = func(err error) bool { return err == os.ErrNotExist }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockReadFile = func(name string) ([]byte, error) { return nil, os.ErrNotExist }
+				testMockIsNotExist = func(err error) bool { return err == os.ErrNotExist }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := fmt.Sprintf("%s\n- test fact\n", MEMORY_SECTION_HEADER)
 					assert.Equal(t, expectedContent, string(data))
 					return nil
@@ -196,12 +169,12 @@ func TestMemoryTool_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			// First, set up the specific mocks for this test case.
+			// Set up specific mocks for this test case.
 			tt.setupMock(tempDir)
 
-			// Then, apply the configured mocks to the package variables.
-			setupMemoryToolMocks()
-			t.Cleanup(teardownMemoryToolMocks)
+			// Apply the configured mocks to the package variables.
+			setupOsMocks()
+			t.Cleanup(teardownOsMocks)
 
 			result, err := tool.Execute(context.Background(), tt.args)
 

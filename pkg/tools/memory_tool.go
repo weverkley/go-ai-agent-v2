@@ -3,7 +3,6 @@ package tools
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -44,15 +43,6 @@ func NewMemoryTool() *MemoryTool {
 		),
 	}
 }
-
-// Global variables for os functions to allow mocking in tests
-var (
-	osUserHomeDir = os.UserHomeDir
-	osMkdirAll    = os.MkdirAll
-	osReadFile    = os.ReadFile
-	osWriteFile   = os.WriteFile
-	osIsNotExist  = os.IsNotExist
-)
 
 // getGlobalMemoryFilePath returns the path to the GEMINI.md file.
 func getGlobalMemoryFilePath() (string, error) {

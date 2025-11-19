@@ -56,7 +56,7 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 			name: "get user home dir fails",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return "", fmt.Errorf("home dir error") }
+				testMockUserHomeDir = func() (string, error) { return "", fmt.Errorf("home dir error") }
 			},
 			expectedError: "failed to get user home directory: home dir error",
 		},
@@ -64,8 +64,8 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 			name: "create todos directory fails",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return fmt.Errorf("mkdir error") }
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return fmt.Errorf("mkdir error") }
 			},
 			expectedError: "failed to create todos directory: mkdir error",
 		},
@@ -73,9 +73,9 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 			name: "write todos file fails",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error { return fmt.Errorf("write file error") }
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error { return fmt.Errorf("write file error") }
 			},
 			expectedError: "failed to write todos file: write file error",
 		},
@@ -83,9 +83,9 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 			name: "successful write - empty todos",
 			args: map[string]any{"todos": []any{}},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					assert.Equal(t, "", string(data))
 					return nil
 				}
@@ -97,9 +97,9 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 			name: "successful write - single todo",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := "# ToDo List\n\n1. [pending] Task 1\n"
 					assert.Equal(t, expectedContent, string(data))
 					return nil
@@ -115,9 +115,9 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 				map[string]any{"description": "Task 2", "status": "in_progress"},
 			}},
 			setupMock: func(tempDir string) {
-				mockUserHomeDir = func() (string, error) { return tempDir, nil }
-				mockMkdirAll = func(path string, perm os.FileMode) error { return nil }
-				mockWriteFile = func(name string, data []byte, perm os.FileMode) error {
+				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
+				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := "# ToDo List\n\n1. [completed] Task 1\n2. [in_progress] Task 2\n"
 					assert.Equal(t, expectedContent, string(data))
 					return nil
@@ -130,18 +130,13 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Reset mocks to nil before each test run to prevent state leakage
-			mockUserHomeDir = nil
-			mockMkdirAll = nil
-			mockWriteFile = nil
-
 			tempDir := t.TempDir()
-			// Set up specific mocks for this test case
+			// First, set up the specific mocks for this test case.
 			tt.setupMock(tempDir)
 
-			// Apply the configured mocks to the global variables
-			setupMemoryToolMocks() // Reusing mocks from memory_tool_test.go
-			t.Cleanup(teardownMemoryToolMocks)
+			// Then, apply the configured mocks to the package variables.
+			setupOsMocks()
+			t.Cleanup(teardownOsMocks)
 
 			result, err := tool.Execute(context.Background(), tt.args)
 
