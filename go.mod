@@ -4,7 +4,6 @@ go 1.24.3
 
 require (
 	github.com/alecthomas/chroma/v2 v2.20.0
-	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/charmbracelet/bubbles v0.21.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0

@@ -180,66 +180,72 @@ func (t *ReadManyFilesTool) Execute(ctx context.Context, args map[string]any) (t
 		compiledExcludeGlobs = append(compiledExcludeGlobs, g)
 	}
 
-	for _, searchPattern := range searchPatterns {
-		absSearchPath, err := filepath.Abs(".")
+	var compiledSearchGlobs []glob.Glob
+	for _, p := range searchPatterns {
+		g, err := glob.Compile(p)
 		if err != nil {
-			return types.ToolResult{
-				Error: &types.ToolError{
-					Message: fmt.Sprintf("Failed to get absolute path: %v", err),
-					Type:    types.ToolErrorTypeExecutionFailed,
-				},
-			}, fmt.Errorf("failed to get absolute path: %w", err)
+			// Log the error and continue without adding this search pattern
+			fmt.Printf("Warning: failed to compile search pattern %s: %v\n", p, err)
+			continue
+		}
+		compiledSearchGlobs = append(compiledSearchGlobs, g)
+	}
+
+	absSearchPath, err := filepath.Abs(".")
+	if err != nil {
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Failed to get absolute path: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("failed to get absolute path: %w", err)
+	}
+
+	err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
 		}
 
-		err = filepath.Walk(absSearchPath, func(path string, info os.FileInfo, err error) error {
-			if err != nil {
-				return err
-			}
+		// Get relative path from the search path
+		relPath, err := filepath.Rel(absSearchPath, path)
+		if err != nil {
+			return err
+		}
 
-			// Get relative path from the search path
-			relPath, err := filepath.Rel(absSearchPath, path)
-			if err != nil {
-				return err
-			}
-
-			// Check against ignore patterns
-			for _, excludeG := range compiledExcludeGlobs {
-				if excludeG.Match(relPath) {
-					if info.IsDir() {
-						return filepath.SkipDir
-					}
-					return nil // Skip this file
-				}
-			}
-
-			if info.IsDir() {
-				if !recursive && path != absSearchPath {
+		// Check against ignore patterns
+		for _, excludeG := range compiledExcludeGlobs {
+			if excludeG.Match(relPath) {
+				if info.IsDir() {
 					return filepath.SkipDir
 				}
-				return nil
+				return nil // Skip this file
 			}
+		}
 
-			g, err := glob.Compile(searchPattern)
-			if err != nil {
-				// Log the error and continue without applying this search pattern
-				fmt.Printf("Warning: failed to compile search pattern %s: %v\n", searchPattern, err)
-				return nil
-			}
-
-			if g.Match(relPath) {
-				allFiles = append(allFiles, path)
+		if info.IsDir() {
+			if !recursive && path != absSearchPath {
+				return filepath.SkipDir
 			}
 			return nil
-		})
+		}
 
-			if err != nil {
-				return types.ToolResult{
-					Error: &types.ToolError{
-						Message: fmt.Sprintf("Error walking path for pattern %s: %v", searchPattern, err),
-						Type:    types.ToolErrorTypeExecutionFailed,
-					},
-				}, fmt.Errorf("error walking path for pattern %s: %w", searchPattern, err)
-			}	}
+		for _, g := range compiledSearchGlobs {
+			if g.Match(relPath) {
+				allFiles = append(allFiles, path)
+				break // Move to next file once matched
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return types.ToolResult{
+			Error: &types.ToolError{
+				Message: fmt.Sprintf("Error walking path: %v", err),
+				Type:    types.ToolErrorTypeExecutionFailed,
+			},
+		}, fmt.Errorf("error walking path: %w", err)
+	}
 
 	uniqueFiles := make(map[string]bool)
 	for _, file := range allFiles {
