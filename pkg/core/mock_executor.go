@@ -3,9 +3,10 @@ package core
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
 	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -39,7 +40,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 		return tool.Execute(ctx, fc.Args)
 	}
 
-	// Mock GenerateStream to follow a simplified realistic script.
+	// Mock GenerateStream to follow a realistic script of events and execute real tools.
 	mock.GenerateStreamFunc = func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 		eventChan := make(chan any)
 
@@ -47,36 +48,118 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 			defer close(eventChan)
 			eventChan <- types.StreamingStartedEvent{}
 
-			telemetry.LogDebugf("MockExecutor: Starting mock script")
-			eventChan <- types.ThinkingEvent{}
-			time.Sleep(200 * time.Millisecond) // Simulate thinking
-
-			// Simulate a tool call
-			toolCall := types.ToolCallStartEvent{
-				ToolCallID: "mock-1",
-				ToolName:   "ls",
-				Args:       map[string]interface{}{"path": "."},
+			// Get current working directory for absolute paths
+			cwd, err := os.Getwd()
+			if err != nil {
+				eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to get current working directory: %w", err)}
+				return
 			}
-			eventChan <- toolCall
-			telemetry.LogDebugf("MockExecutor: Executing tool %s", toolCall.ToolName)
+			todoAPIPath := path.Join(cwd, "todo-api")
+			todoAPIIndexPath := path.Join(todoAPIPath, "index.js")
 
-			result, err := mock.ExecuteTool(ctx, &types.FunctionCall{Name: toolCall.ToolName, Args: toolCall.Args})
-			time.Sleep(200 * time.Millisecond) // Simulate execution
+			steps := []types.ToolCallStartEvent{
+				// Phase 1: Project Setup and Basic Server
+				{ToolCallID: "mock-1", ToolName: "execute_command", Args: map[string]interface{}{"command": "mkdir todo-api"}},
+				{ToolCallID: "mock-2", ToolName: "execute_command", Args: map[string]interface{}{"command": "cd todo-api && npm init -y"}},
+				{ToolCallID: "mock-3", ToolName: "execute_command", Args: map[string]interface{}{"command": "cd todo-api && npm install express body-parser"}},
+				{ToolCallID: "mock-4", ToolName: "write_file", Args: map[string]interface{}{"file_path": todoAPIIndexPath, "content": "const express = require('express');\nconst bodyParser = require('body-parser');\nconst app = express();\nconst port = 3000;\n\napp.use(bodyParser.json());\n\nlet todos = []; // In-memory storage for todos\n\napp.get('/', (req, res) => {\n  res.send('Todo API is running!');\n});\n\napp.listen(port, () => {\n  console.log(`Todo API listening on port ${port}`);\n});"}},
+				{ToolCallID: "mock-5", ToolName: "read_file", Args: map[string]interface{}{"file_path": todoAPIIndexPath}},
+				{ToolCallID: "mock-6", ToolName: "user_confirm", Args: map[string]interface{}{"message": "Please run 'cd todo-api && node index.js &' in another terminal. Press 'continue' once the server is running."}},
 
-			eventChan <- types.ToolCallEndEvent{
-				ToolCallID: toolCall.ToolCallID,
-				ToolName:   toolCall.ToolName,
-				Result:     result.ReturnDisplay,
-				Err:        err,
+				{ToolCallID: "mock-7", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000"}},
+
+				// Phase 2: Implement Todo Routes
+				{ToolCallID: "mock-8", ToolName: "smart_edit", Args: map[string]interface{}{
+					"file_path":   todoAPIIndexPath,
+					"instruction": "Add GET all todos route",
+					"old_string":  "app.get('/', (req, res) => {\n  res.send('Todo API is running!');\n});",
+					"new_string":  "app.get('/', (req, res) => {\n  res.send('Todo API is running!');\n});\n\n// GET all todos\napp.get('/todos', (req, res) => {\n  res.json(todos);\n});",
+				}},
+				{ToolCallID: "mock-9", ToolName: "smart_edit", Args: map[string]interface{}{
+					"file_path":   todoAPIIndexPath,
+					"instruction": "Add POST new todo route",
+					"old_string":  "app.get('/todos', (req, res) => {\n  res.json(todos);\n});",
+					"new_string":  "app.get('/todos', (req, res) => {\n  res.json(todos);\n});\n\n// POST a new todo\napp.post('/todos', (req, res) => {\n  const newTodo = { id: todos.length + 1, title: req.body.title, completed: false };\n  todos.push(newTodo);\n  res.status(201).json(newTodo);\n});",
+				}},
+				{ToolCallID: "mock-10", ToolName: "smart_edit", Args: map[string]interface{}{
+					"file_path":   todoAPIIndexPath,
+					"instruction": "Add GET todo by ID route",
+					"old_string":  "app.post('/todos', (req, res) => {\n  const newTodo = { id: todos.length + 1, title: req.body.title, completed: false };\n  todos.push(newTodo);\n  res.status(201).json(newTodo);\n});",
+					"new_string":  "app.post('/todos', (req, res) => {\n  const newTodo = { id: todos.length + 1, title: req.body.title, completed: false };\n  todos.push(newTodo);\n  res.status(201).json(newTodo);\n});\n\n// GET todo by ID\napp.get('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n  res.json(todo);\n});",
+				}},
+				{ToolCallID: "mock-11", ToolName: "smart_edit", Args: map[string]interface{}{
+				    "file_path":   todoAPIIndexPath,					"instruction": "Add PUT update todo route",
+					"old_string":  "app.get('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n  res.json(todo);\n});",
+					"new_string":  "app.get('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n  res.json(todo);\n});\n\n// PUT update todo\napp.put('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n\n  todo.title = req.body.title !== undefined ? req.body.title : todo.title;\n  todo.completed = req.body.completed !== undefined ? req.body.completed : todo.completed;\n  res.json(todo);\n});",
+				}},
+				{ToolCallID: "mock-12", ToolName: "smart_edit", Args: map[string]interface{}{
+					"file_path":   todoAPIIndexPath,
+					"instruction": "Add DELETE todo route",
+					"old_string":  "app.put('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n\n  todo.title = req.body.title !== undefined ? req.body.title : todo.title;\n  todo.completed = req.body.completed !== undefined ? req.body.completed : todo.completed;\n  res.json(todo);\n});",
+					"new_string":  "app.put('/todos/:id', (req, res) => {\n  const todo = todos.find(t => t.id === parseInt(req.params.id));\n  if (!todo) return res.status(404).send('Todo not found');\n\n  todo.title = req.body.title !== undefined ? req.body.title : todo.title;\n  todo.completed = req.body.completed !== undefined ? req.body.completed : todo.completed;\n  res.json(todo);\n});\n\n// DELETE a todo\napp.delete('/todos/:id', (req, res) => {\n  const index = todos.findIndex(t => t.id === parseInt(req.params.id));\n  if (index === -1) return res.status(404).send('Todo not found');\n\n  const deletedTodo = todos.splice(index, 1);\n  res.json(deletedTodo);\n});",
+				}},
+				{ToolCallID: "mock-13", ToolName: "read_file", Args: map[string]interface{}{"file_path": todoAPIIndexPath}},
+
+				// Phase 3: Testing and Validation (using other tools)
+				{ToolCallID: "mock-14", ToolName: "execute_command", Args: map[string]interface{}{"command": "kill $(lsof -t -i:3000) || true"}},
+				{ToolCallID: "mock-15", ToolName: "user_confirm", Args: map[string]interface{}{"message": "The todo-api server was killed. Please restart it by running 'cd todo-api && node index.js &' in another terminal. Press 'continue' once the server is running."}},
+
+				{ToolCallID: "mock-16", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos"}}, // GET all - should be empty array
+				{ToolCallID: "mock-17", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos", "method": "POST", "body": `{"title": "Learn Go AI Agent"}`}}, // add a todo
+				{ToolCallID: "mock-18", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos"}}, // GET all - should have one todo
+				{ToolCallID: "mock-19", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos/1"}}, // GET todo by ID
+				{ToolCallID: "mock-20", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos/1", "method": "PUT", "body": `{"completed": true}`}}, // update todo
+				{ToolCallID: "mock-21", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos/1"}}, // GET todo by ID - verify update
+				{ToolCallID: "mock-22", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos/1", "method": "DELETE"}}, // delete todo
+				{ToolCallID: "mock-23", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000/todos"}}, // GET all - should be empty again
+				{ToolCallID: "mock-24", ToolName: "grep", Args: map[string]interface{}{"pattern": "app.get", "path": "todo-api", "include": "*.js"}},
+				{ToolCallID: "mock-25", ToolName: "glob", Args: map[string]interface{}{"pattern": "**/*.js", "path": "todo-api"}},
+				{ToolCallID: "mock-26", ToolName: "list_directory", Args: map[string]interface{}{"path": "todo-api"}},
+				{ToolCallID: "mock-27", ToolName: "read_many_files", Args: map[string]interface{}{"paths": []string{path.Join(todoAPIPath, "**", "*.js")}}},
+				{ToolCallID: "mock-28", ToolName: "save_memory", Args: map[string]interface{}{"fact": "Todo API development started"}},
+				{ToolCallID: "mock-29", ToolName: "write_todos", Args: map[string]interface{}{"todos": []any{map[string]any{"description": "Implement user authentication", "status": "pending"}, map[string]any{"description": "Add database integration", "status": "pending"}}}},
+				{ToolCallID: "mock-34", ToolName: "find_unused_code", Args: map[string]interface{}{"directory": todoAPIPath}},
+				{ToolCallID: "mock-35", ToolName: "extract_function", Args: map[string]interface{}{"filePath": todoAPIIndexPath, "startLine": 10, "endLine": 15, "newFunctionName": "handleRoot"}},
+				{ToolCallID: "mock-36", ToolName: "web_search", Args: map[string]interface{}{"query": "express.js best practices for todo api"}},
+				{ToolCallID: "mock-37", ToolName: "web_fetch", Args: map[string]interface{}{"prompt": "summarize https://expressjs.com/en/guide/routing.html"}},
+				{ToolCallID: "mock-38", ToolName: "ls", Args: map[string]interface{}{"path": todoAPIPath, "long": true}},
+				{ToolCallID: "mock-39", ToolName: "execute_command", Args: map[string]interface{}{"command": "kill $(lsof -t -i:3000) || true"}},
 			}
-			telemetry.LogDebugf("MockExecutor: Finished tool %s", toolCall.ToolName)
 
+			for _, step := range steps {
+				select {
+				case <-ctx.Done():
+					// Context was cancelled, stop streaming
+					eventChan <- types.ErrorEvent{Err: ctx.Err()}
+					return
+				default:
+					eventChan <- types.ThinkingEvent{}
+					time.Sleep(1 * time.Second) // Simulate model thinking time
+
+					eventChan <- step // Emit ToolCallStartEvent
+					result, err := mock.ExecuteTool(ctx, &types.FunctionCall{Name: step.ToolName, Args: step.Args})
+
+					time.Sleep(500 * time.Millisecond) // Simulate tool execution time
+
+					eventChan <- types.ToolCallEndEvent{
+						ToolCallID: step.ToolCallID,
+						ToolName:   step.ToolName,
+						Result:     result.ReturnDisplay,
+						Err:        err,
+					}
+				}
+			}
 
 			// Final Response
-			eventChan <- types.ThinkingEvent{}
-			time.Sleep(200 * time.Millisecond)
-			eventChan <- types.FinalResponseEvent{Content: "Mock execution finished successfully."}
-			telemetry.LogDebugf("MockExecutor: Finished mock script")
+			select {
+			case <-ctx.Done():
+				eventChan <- types.ErrorEvent{Err: ctx.Err()}
+				return
+			default:
+				eventChan <- types.ThinkingEvent{}
+				time.Sleep(1 * time.Second)
+				eventChan <- types.FinalResponseEvent{Content: "I have created the Express API in `todo-api/index.js` and verified the contents of the files."}
+			}
 		}()
 
 		return eventChan, nil

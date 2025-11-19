@@ -172,31 +172,27 @@ func registerCommands() {
 }
 
 func init() {
-	initSessionStartTime()
+	RootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+		initSessionStartTime()
 
+		projectRoot, err := os.Getwd()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+			os.Exit(1)
+		}
+
+		var fileFilteringService *services.FileFilteringService
+		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService = initServices(projectRoot)
+		telemetrySettings := getTelemetrySettings(SettingsService)
+		toolRegistry := registerTools(FSService, ShellService, SettingsService)
+		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService)
+
+		executorType = "gemini"
+		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
+		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
+	}
 	RootCmd.Run = func(cmd *cobra.Command, args []string) {
 		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
 	}
-
-	projectRoot, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
-		os.Exit(1)
-	}
-
-	WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService := initServices(projectRoot)
-	telemetrySettings := getTelemetrySettings(SettingsService)
-	toolRegistry := registerTools(FSService, ShellService, SettingsService)
-	Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService)
-
-	// Set the executorType to "gemini" as it's the factory type, not the model name
-	executorType = "gemini"
-
-	// Initialize the global telemetry logger
-	telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
-
-	// Initialize extensionsCliCommand here
-	extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
-
 	registerCommands()
 }
