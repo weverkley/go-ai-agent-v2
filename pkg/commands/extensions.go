@@ -89,19 +89,19 @@ func (c *ExtensionsCommand) Install(args extension.InstallArgs) error {
 		fmt.Println("Skipping interactive consent for now. Proceeding with installation.")
 	}
 
-	name, err := c.extensionManager.InstallOrUpdateExtension(installMetadata, args.Force)
+	extName, err := c.extensionManager.InstallOrUpdateExtension(installMetadata, args.Force)
 	if err != nil {
 		return fmt.Errorf("failed to install/update extension: %w", err)
 	}
 
-	fmt.Printf("Extension \"%s\" installed successfully and enabled.\n", name)
+	fmt.Printf("Extension \"%s\" installed successfully and enabled.\n", extName)
 	return nil
 }
 
 // Uninstall uninstalls an extension.
-func (c *ExtensionsCommand) Uninstall(name string) error {
+func (c *ExtensionsCommand) Uninstall(name string, interactiveConsent bool) error {
 	var err error
-	err = c.extensionManager.UninstallExtension(name, false) // false for no interactive consent for now
+	err = c.extensionManager.UninstallExtension(name, interactiveConsent)
 	if err != nil {
 		return fmt.Errorf("failed to uninstall extension: %w", err)
 	}
