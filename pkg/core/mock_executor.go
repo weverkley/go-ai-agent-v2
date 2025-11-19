@@ -129,32 +129,53 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 
 						for _, step := range steps {
 							telemetry.LogDebugf("MockExecutor: Processing step: %s (%s)", step.ToolCallID, step.ToolName)
-							select {
-							case <-ctx.Done():
+							if ctx.Done() != nil {
 								telemetry.LogDebugf("MockExecutor: Context cancelled, exiting loop.")
 								eventChan <- types.ErrorEvent{Err: ctx.Err()}
 								return
-							default:
-								eventChan <- types.ThinkingEvent{}
-								time.Sleep(100 * time.Millisecond) // Simulate thinking time
-			
-								eventChan <- step // Emit ToolCallStartEvent
-								
-								// Add a small delay to allow the UI to render the start event
-								time.Sleep(100 * time.Millisecond)
-			
-								result, err := mock.ExecuteTool(ctx, &types.FunctionCall{Name: step.ToolName, Args: step.Args})
-			
-								time.Sleep(500 * time.Millisecond) // Simulate tool execution time
-			
-								eventChan <- types.ToolCallEndEvent{
-									ToolCallID: step.ToolCallID,
-									ToolName:   step.ToolName,
-									Result:     result.ReturnDisplay,
-									Err:        err,
-								}
-								telemetry.LogDebugf("MockExecutor: Finished step: %s (%s) with error: %v", step.ToolCallID, step.ToolName, err)
 							}
+							
+							eventChan <- types.ThinkingEvent{}
+							time.Sleep(100 * time.Millisecond) // Simulate thinking time
+
+							eventChan <- step // Emit ToolCallStartEvent
+							
+							// Add a small delay to allow the UI to render the start event
+							time.Sleep(100 * time.Millisecond)
+
+							var result types.ToolResult
+							var err error
+
+							if step.ToolName == types.USER_CONFIRM_TOOL_NAME {
+								// Simulate user confirming immediately
+								result = types.ToolResult{
+									LLMContent:    "continue",
+									ReturnDisplay: "User confirmed tool execution (mock).",
+								}
+								err = nil // No error
+							} else if step.ToolName == types.WEB_FETCH_TOOL_NAME {
+								if prompt, ok := step.Args["prompt"].(string); ok && prompt == "http://localhost:3000" {
+									result = types.ToolResult{
+										LLMContent:    "Mock server is running.",
+										ReturnDisplay: "Mock server is running.",
+									}
+									err = nil
+								} else {
+									result, err = mock.ExecuteTool(ctx, &types.FunctionCall{Name: step.ToolName, Args: step.Args})
+								}
+							} else {
+								result, err = mock.ExecuteTool(ctx, &types.FunctionCall{Name: step.ToolName, Args: step.Args})
+							}
+
+							time.Sleep(500 * time.Millisecond) // Simulate tool execution time
+
+							eventChan <- types.ToolCallEndEvent{
+								ToolCallID: step.ToolCallID,
+								ToolName:   step.ToolName,
+								Result:     result.ReturnDisplay,
+								Err:        err,
+							}
+							telemetry.LogDebugf("MockExecutor: Finished step: %s (%s) with error: %v", step.ToolCallID, step.ToolName, err)
 						}
 			// Final Response
 			select {
