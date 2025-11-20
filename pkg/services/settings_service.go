@@ -242,15 +242,15 @@ func (ss *SettingsService) GetTavilySettings() *types.TavilySettings {
 func (ss *SettingsService) GetTelemetryLogPath() string {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	if ss.settings.Telemetry != nil && ss.settings.Telemetry.Outfile != "" {
-		return ss.settings.Telemetry.Outfile
+	if ss.settings.Telemetry != nil && ss.settings.Telemetry.OutDir != "" {
+		return filepath.Join(ss.settings.Telemetry.OutDir, "go-ai-agent.log")
 	}
 	// Fallback to a default path if not explicitly configured
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "" // Handle error or return a more robust default
 	}
-	return filepath.Join(homeDir, ".goaiagent", "logs", "telemetry.log")
+	return filepath.Join(homeDir, ".goaiagent", "logs", "go-ai-agent.log")
 }
 
 // Set sets the value of a specific setting.

@@ -4,7 +4,7 @@ import (
 	"bufio" // New import
 	"context"
 	"fmt"
-	"os" // New import
+	"os"            // New import
 	"path/filepath" // New import
 	"sort"
 	"strings"
@@ -233,6 +233,13 @@ type streamEventMsg struct{ event any }
 type streamErrorMsg struct{ err error }
 type streamFinishMsg struct{}
 
+// commandFinishedMsg is sent when a slash command has finished executing.
+type commandFinishedMsg struct {
+	output string
+	err    error
+	args   []string // Keep track of the command that was run
+}
+
 type userConfirmationMsg struct {
 	toolCallID string
 	response   string // "continue" or "cancel"
@@ -241,6 +248,15 @@ type userConfirmationMsg struct {
 func userConfirmationCmd(toolCallID, response string) tea.Cmd {
 	return func() tea.Msg {
 		return userConfirmationMsg{toolCallID: toolCallID, response: response}
+	}
+}
+
+// executeCommandCmd runs the commandExecutor in a goroutine and returns a
+// commandFinishedMsg when done.
+func executeCommandCmd(executor func(args []string) (string, error), args []string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := executor(args)
+		return commandFinishedMsg{output: output, err: err, args: args}
 	}
 }
 
@@ -259,19 +275,17 @@ type ChatModel struct {
 
 	config types.Config
 
-		router     *routing.ModelRouterService
+	router *routing.ModelRouterService
 
-		shellService services.ShellExecutionService // New field
+	shellService services.ShellExecutionService // New field
 
-	
+	streamCh <-chan any
 
-		streamCh    <-chan any
+	isStreaming bool
 
-		isStreaming bool
+	cancelCtx context.Context // New field
 
-		cancelCtx   context.Context    // New field
-
-		cancelFunc  context.CancelFunc // New field
+	cancelFunc context.CancelFunc // New field
 
 	status string
 
@@ -299,10 +313,10 @@ type ChatModel struct {
 
 	suggestionStyle lipgloss.Style
 
-	logFile *os.File
+	logFile   *os.File
 	logWriter *bufio.Writer
 
-	awaitingConfirmation bool // New field to indicate if user confirmation is pending
+	awaitingConfirmation         bool      // New field to indicate if user confirmation is pending
 	userConfirmationResponseChan chan bool // Channel to send user confirmation back to executor
 
 	commandHistory []string // Stores previous commands
@@ -329,13 +343,25 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
-	// Determine the log file path
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		telemetry.LogErrorf("Error getting user home directory: %v", err)
-		// Handle error, perhaps return nil or a model with a disabled logger
+	// Determine the log file path from telemetry settings
+	logDirPath := ""
+	telemetrySettingsVal, ok := config.Get("telemetry")
+	if ok {
+		if telemetrySettings, ok := telemetrySettingsVal.(*types.TelemetrySettings); ok && telemetrySettings.Enabled && telemetrySettings.OutDir != "" {
+			logDirPath = telemetrySettings.OutDir
+		}
 	}
-	logDirPath := filepath.Join(homeDir, ".goaiagent", "tmp")
+
+	// Fallback to default if not specified in telemetry
+	if logDirPath == "" {
+		homeDir, err := os.UserHomeDir()
+		if err != nil {
+			telemetry.LogErrorf("Error getting user home directory for chat log: %v", err)
+			// Handle error, perhaps return nil or a model with a disabled logger
+		}
+		logDirPath = filepath.Join(homeDir, ".goaiagent", "tmp")
+	}
+
 	logFilePath := filepath.Join(logDirPath, "chat-ui.log")
 
 	// Ensure the log directory exists
@@ -353,32 +379,32 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 	logWriter := bufio.NewWriter(logFile)
 
 	model := &ChatModel{
-		viewport:        vp,
-		textarea:        ta,
-		spinner:         s,
-		messages:        []Message{},
-		executor:        executor,
-		executorType:    executorType,
-		config:          config,
-		router:          router,
-		shellService:    shellService, // Initialize new field
-		isStreaming:     false,
-		status:          "Ready",
-		title:           "Go AI Agent Chat",
-		commandExecutor: commandExecutor, // Initialize the new field
-		activeToolCalls: make(map[string]*ToolCallStatus),
-		senderStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("5")),              // User
-		botStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("6")),              // Bot
-		toolStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
-		errorStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
-		statusStyle:     lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		titleStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
-		suggestionStyle: lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
-		logFile:         logFile,
-		logWriter:       logWriter,
+		viewport:                     vp,
+		textarea:                     ta,
+		spinner:                      s,
+		messages:                     []Message{},
+		executor:                     executor,
+		executorType:                 executorType,
+		config:                       config,
+		router:                       router,
+		shellService:                 shellService, // Initialize new field
+		isStreaming:                  false,
+		status:                       "Ready",
+		title:                        "Go AI Agent Chat",
+		commandExecutor:              commandExecutor, // Initialize the new field
+		activeToolCalls:              make(map[string]*ToolCallStatus),
+		senderStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("5")),              // User
+		botStyle:                     lipgloss.NewStyle().Foreground(lipgloss.Color("6")),              // Bot
+		toolStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
+		errorStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+		statusStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		titleStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
+		suggestionStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		logFile:                      logFile,
+		logWriter:                    logWriter,
 		userConfirmationResponseChan: make(chan bool, 1), // Initialize the channel
-		commandHistory:  []string{},
-		historyIndex:    0,
+		commandHistory:               []string{},
+		historyIndex:                 0,
 	}
 
 	// Pass the confirmation channel to the executor
@@ -428,47 +454,48 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		if m.awaitingConfirmation {
 			switch msg.String() {
-							case "c", "C": // Continue
-								// Find the active user_confirm tool call
-								var toolCallID string
-								for id, tc := range m.activeToolCalls {
-									if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
-										toolCallID = id
-										break
-									}
-								}
-								if toolCallID != "" {
-									m.awaitingConfirmation = false
-									m.status = "User confirmed. Resuming..."
-									// Directly send the confirmation message
-									return m, userConfirmationCmd(toolCallID, "continue")
-								}
-							case "x", "X": // Cancel
-								// Find the active user_confirm tool call
-								var toolCallID string
-								for id, tc := range m.activeToolCalls {
-									if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
-										toolCallID = id
-										break
-									}
-								}
-								if toolCallID != "" {
-									m.awaitingConfirmation = false
-									m.status = "User cancelled."
-									// Directly send the cancellation message
-									return m, userConfirmationCmd(toolCallID, "cancel")
-								}			}
+			case "c", "C": // Continue
+				// Find the active user_confirm tool call
+				var toolCallID string
+				for id, tc := range m.activeToolCalls {
+					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
+						toolCallID = id
+						break
+					}
+				}
+				if toolCallID != "" {
+					m.awaitingConfirmation = false
+					m.status = "User confirmed. Resuming..."
+					// Directly send the confirmation message
+					return m, userConfirmationCmd(toolCallID, "continue")
+				}
+			case "x", "X": // Cancel
+				// Find the active user_confirm tool call
+				var toolCallID string
+				for id, tc := range m.activeToolCalls {
+					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
+						toolCallID = id
+						break
+					}
+				}
+				if toolCallID != "" {
+					m.awaitingConfirmation = false
+					m.status = "User cancelled."
+					// Directly send the cancellation message
+					return m, userConfirmationCmd(toolCallID, "cancel")
+				}
+			}
 			return m, nil // Consume key presses while awaiting confirmation
 		}
 
 		switch msg.Type {
 		case tea.KeyEsc: // Handle ESC for cancellation
 			if m.isStreaming && m.cancelFunc != nil {
-				m.cancelFunc() // Signal cancellation
+				m.cancelFunc()                    // Signal cancellation
 				m.shellService.KillAllProcesses() // Kill any background shell processes
 				m.status = "Cancelling..."
-				m.isStreaming = false // Stop streaming immediately in UI
-				m.streamCh = nil      // Clear stream channel
+				m.isStreaming = false                                // Stop streaming immediately in UI
+				m.streamCh = nil                                     // Clear stream channel
 				m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
 				return m, nil
 			}
@@ -519,7 +546,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// If at the last history item and pressing down, clear the input
 				m.historyIndex = len(m.commandHistory)
 				m.textarea.SetValue("")
-			}		}
+			}
+		}
 
 	// --- Streaming messages ---
 	case streamChannelMsg:
@@ -623,8 +651,47 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Ready"
 		m.streamCh = nil
 		m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
-		m.cancelFunc = nil // Clear cancel function
-		m.cancelCtx = nil  // Clear context
+		m.cancelFunc = nil                                   // Clear cancel function
+		m.cancelCtx = nil                                    // Clear context
+		return m, nil
+
+	case commandFinishedMsg:
+		m.isStreaming = false
+		m.status = "Ready"
+
+		telemetry.LogDebugf("Command execution finished. Error: %v, Output: %s", msg.err, msg.output)
+
+		if msg.err != nil {
+			errMsg := ErrorMessage{Err: msg.err}
+			m.messages = append(m.messages, errMsg)
+			m.logMessage(errMsg)
+		}
+
+		if msg.output != "" {
+			botMsg := BotMessage{Content: msg.output}
+			m.messages = append(m.messages, botMsg)
+			m.logMessage(botMsg)
+		} else if msg.err == nil {
+			botMsg := BotMessage{Content: "Command executed successfully."}
+			m.messages = append(m.messages, botMsg)
+			m.logMessage(botMsg)
+		}
+
+		// Handle specific commands that might require UI changes
+		if len(msg.args) > 0 {
+			switch msg.args[0] {
+			case "clear":
+				m.messages = []Message{}
+			case "quit", "exit":
+				return m, tea.Quit
+			case "settings":
+				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
+					m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
+				}
+			}
+		}
+
+		m.updateViewport()
 		return m, nil
 
 	case userConfirmationMsg:
@@ -699,48 +766,11 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	}
 	// --- End Safety Check ---
 
-	telemetry.LogDebugf("Executing command: %s with args: %v", commandString, args)
+	telemetry.LogDebugf("Executing command asynchronously: %s with args: %v", commandString, args)
+	m.status = fmt.Sprintf("Executing `/%s`...", commandString)
+	m.isStreaming = true // Use the spinner to indicate the command is running
 
-	output, err := m.commandExecutor(args)
-
-	telemetry.LogDebugf("Command execution error: %v", err)
-	telemetry.LogDebugf("Captured output: %s", output)
-
-	if err != nil {
-		errMsg := ErrorMessage{Err: err}
-		m.messages = append(m.messages, errMsg)
-		m.logMessage(errMsg) // Log error message
-	}
-
-	if output != "" {
-		botMsg := BotMessage{Content: output}
-		m.messages = append(m.messages, botMsg)
-		m.logMessage(botMsg) // Log bot message
-	} else if err == nil {
-		botMsg := BotMessage{Content: "Command executed successfully."}
-		m.messages = append(m.messages, botMsg)
-		m.logMessage(botMsg) // Log bot message
-	}
-
-	// Handle specific commands that might require UI changes
-	if len(args) > 0 {
-		switch args[0] {
-		case "clear":
-			m.messages = []Message{}
-		case "quit", "exit":
-			return m, tea.Quit
-		case "settings":
-			if len(args) > 1 && (args[1] == "set" || args[1] == "reset") {
-				m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
-			}
-		case "generate", "code-guide", "find-docs":
-			// The output is already captured and displayed
-		}
-	}
-
-	m.textarea.Reset()
-	m.updateViewport()
-	return m, nil
+	return m, executeCommandCmd(m.commandExecutor, args)
 }
 
 // --- Commands ---
@@ -764,7 +794,7 @@ func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 		// Create a new context for this streaming session
 		m.cancelCtx, m.cancelFunc = context.WithCancel(context.Background())
 		userContent := &types.Content{
-			Role: "user",
+			Role:  "user",
 			Parts: []types.Part{{Text: userInput}},
 		}
 		stream, err := m.executor.GenerateStream(m.cancelCtx, userContent)

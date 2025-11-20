@@ -91,19 +91,23 @@ func initConfig(
 	fileFilteringService *services.FileFilteringService,
 	settingsService *services.SettingsService, // Add settingsService
 ) *config.Config {
-	params := &config.ConfigParameters{
-		DebugMode: true, // Enable debug mode
-		ModelName: config.DEFAULT_GEMINI_MODEL,
-		Telemetry: &types.TelemetrySettings{
-			Enabled: true,      // Enable telemetry
-			Outfile: "stderr", // Output to stderr for console visibility
-			LogLevel: "debug",  // Set log level to debug
-		},
-		ToolRegistry: toolRegistry,
+	debugModeVal, _ := settingsService.Get("debugMode")
+	debugMode, ok := debugModeVal.(bool)
+	if !ok {
+		debugMode = false // Fallback if type assertion fails or not found
 	}
 
-	if telemetrySettings != nil {
-		params.Telemetry = telemetrySettings
+	modelNameVal, _ := settingsService.Get("model")
+	modelName, ok := modelNameVal.(string)
+	if !ok {
+		modelName = config.DEFAULT_GEMINI_MODEL // Fallback
+	}
+
+	params := &config.ConfigParameters{
+		DebugMode:    debugMode,
+		ModelName:    modelName,
+		Telemetry:    telemetrySettings,
+		ToolRegistry: toolRegistry,
 	}
 
 	cfg := config.NewConfig(params)

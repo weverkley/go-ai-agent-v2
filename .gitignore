@@ -6,4 +6,3 @@ vendor
 .goaiagent/tmp/
 todo-api/
 chat_log.txt
-goaiagent-debug.log

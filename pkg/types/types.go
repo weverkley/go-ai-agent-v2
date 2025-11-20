@@ -639,7 +639,7 @@ type TelemetrySettings struct {
 	OtlpEndpoint string `json:"otlpEndpoint,omitempty"`
 	OtlpProtocol string `json:"otlpProtocol,omitempty"`
 	LogPrompts   bool   `json:"logPrompts,omitempty"`
-	Outfile      string `json:"outfile,omitempty"`
+	OutDir       string `json:"outdir,omitempty"`
 	UseCollector bool   `json:"useCollector,omitempty"`
 	LogLevel     string `json:"logLevel,omitempty"`
 }

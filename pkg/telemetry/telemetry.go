@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath" // Import filepath package
 	"sync"
 	"time"
 
@@ -196,8 +197,16 @@ func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
 		return &noopTelemetryLogger{}
 	}
 
-	if settings.Outfile != "" {
-		return NewFileTelemetryLogger(settings.Outfile, true, settings.LogLevel)
+	if settings.OutDir != "" {
+		// Ensure the directory exists
+		if err := os.MkdirAll(settings.OutDir, 0755); err != nil {
+			// Log error to stderr as the logger isn't initialized yet
+			fmt.Fprintf(os.Stderr, "Error creating telemetry output directory %s: %v\n", settings.OutDir, err)
+			// Fallback to no-op logger
+			return &noopTelemetryLogger{}
+		}
+		logFilePath := filepath.Join(settings.OutDir, "go-ai-agent.log")
+		return NewFileTelemetryLogger(logFilePath, true, settings.LogLevel)
 	}
 
 	// Default to no-op logger if no specific logger is configured
