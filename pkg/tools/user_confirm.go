@@ -35,22 +35,14 @@ func NewUserConfirmTool() *UserConfirmTool {
 	}
 }
 
-// Execute performs the user_confirm operation.
+// Execute is not intended to be called directly in an interactive flow.
+// The executor should intercept the 'user_confirm' tool call and handle it via the UI.
 func (t *UserConfirmTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
-	message, ok := args["message"].(string)
-	if !ok || message == "" {
-		return types.ToolResult{
-			Error: &types.ToolError{
-				Message: "Missing or invalid 'message' argument",
-				Type:    types.ToolErrorTypeExecutionFailed,
-			},
-		}, fmt.Errorf("missing or invalid 'message' argument")
-	}
-
-	// For the mock executor, we'll simulate a "continue" response.
-	// This will be replaced with actual UI interaction later.
+	err := fmt.Errorf("the 'user_confirm' tool should not be executed directly in interactive mode; it must be handled by the executor")
 	return types.ToolResult{
-		LLMContent:    "continue",
-		ReturnDisplay: fmt.Sprintf("User confirmation requested: %s. (Simulated 'continue' for mock executor)", message),
-	}, nil
+		Error: &types.ToolError{
+			Message: err.Error(),
+			Type:    types.ToolErrorTypeExecutionFailed,
+		},
+	}, err
 }

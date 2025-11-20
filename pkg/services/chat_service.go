@@ -1,244 +1,196 @@
 package services
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
-	"os"
-	"path/filepath"
-	"sort"
 	"strings"
-	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/core" // Import core package
+	"go-ai-agent-v2/go-cli/pkg/core"
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
-
-	"github.com/google/generative-ai-go/genai"
 )
 
-const (
-	checkpointFilePrefix = "checkpoint-"
-	checkpointFileSuffix = ".json"
-)
-
-// ChatService provides methods for managing chat checkpoints.
+// ChatService orchestrates the interactive chat session, handling the tool-calling loop.
 type ChatService struct {
-	config   types.GoaiagentDirProvider
-	executor core.Executor // Add executor field
+	executor             core.Executor
+	toolRegistry         types.ToolRegistryInterface
+	history              []*types.Content
+	userConfirmationChan chan bool
+	toolCallCounter      int
 }
 
-// NewChatService creates a new ChatService instance.
-func NewChatService(cfg types.GoaiagentDirProvider, executor core.Executor) *ChatService {
-	return &ChatService{config: cfg, executor: executor}
-}
+// NewChatService creates a new ChatService.
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, initialHistory []*types.Content) *ChatService {
+	confirmationChan := make(chan bool, 1)
+	executor.SetUserConfirmationChannel(confirmationChan)
 
-// ChatDetail represents details of a saved chat checkpoint.
-type ChatDetail struct {
-	Name  string    `json:"name"`
-	Mtime time.Time `json:"mtime"`
-}
-
-// SerializablePart represents a serializable part of a genai.Content.
-type SerializablePart struct {
-	Text             string                 `json:"text,omitempty"`
-	FunctionCall     *genai.FunctionCall    `json:"functionCall,omitempty"`
-	FunctionResponse *genai.FunctionResponse `json:"functionResponse,omitempty"`
-	InlineData       *genai.Blob            `json:"inlineData,omitempty"` // Changed to genai.Blob
-	FileData         *genai.FileData        `json:"fileData,omitempty"`
-}
-
-// SerializableContent represents a serializable genai.Content.
-type SerializableContent struct {
-	Parts []SerializablePart `json:"parts,omitempty"`
-	Role  string             `json:"role,omitempty"`
-}
-
-// getProjectTempDir returns the project's temporary directory.
-func (cs *ChatService) getProjectTempDir() (string, error) {
-	geminiDir := cs.config.GetGoaiagentDir()
-	return filepath.Join(geminiDir, "checkpoints"), nil
-}
-
-// GetSavedChatTags retrieves details of all saved chat checkpoints.
-func (cs *ChatService) GetSavedChatTags(mtSortDesc bool) ([]ChatDetail, error) {
-	geminiDir, err := cs.getProjectTempDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
+	return &ChatService{
+		executor:             executor,
+		toolRegistry:         toolRegistry,
+		history:              initialHistory,
+		userConfirmationChan: confirmationChan,
 	}
-
-	// Ensure the directory exists
-	if _, err := os.Stat(geminiDir); os.IsNotExist(err) {
-		return []ChatDetail{}, nil // No directory, no checkpoints
-	}
-
-	files, err := os.ReadDir(geminiDir)
-	if err != nil {
-		return nil, fmt.Errorf("could not read chat checkpoint directory '%s': %w", geminiDir, err)
-	}
-
-	chatDetails := []ChatDetail{}
-	for _, file := range files {
-		if file.IsDir() {
-			continue
-		}
-		fileName := file.Name()
-		if !strings.HasPrefix(fileName, checkpointFilePrefix) || !strings.HasSuffix(fileName, checkpointFileSuffix) {
-			continue
-		}
-
-		filePath := filepath.Join(geminiDir, fileName)
-		info, err := file.Info()
-		if err != nil {
-			// Log error but continue with other files
-			fmt.Printf("Warning: failed to get file info for %s: %v\n", filePath, err)
-			continue
-		}
-
-		tagName := fileName[len(checkpointFilePrefix) : len(fileName)-len(checkpointFileSuffix)]
-		chatDetails = append(chatDetails, ChatDetail{
-			Name:  tagName,
-			Mtime: info.ModTime(),
-		})
-	}
-
-	sort.Slice(chatDetails, func(i, j int) bool {
-		if mtSortDesc {
-			return chatDetails[i].Mtime.After(chatDetails[j].Mtime)
-		}
-		return chatDetails[i].Mtime.Before(chatDetails[j].Mtime)
-	})
-
-	return chatDetails, nil
 }
 
-// SaveCheckpoint saves the given history as a checkpoint with the specified tag.
-func (cs *ChatService) SaveCheckpoint(history []*genai.Content, tag string) error {
-	geminiDir, err := cs.getProjectTempDir()
-	if err != nil {
-		return fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
+// SendMessage starts the conversation loop for a user's message and returns a channel of events.
+func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-chan any, error) {
+	eventChan := make(chan any)
+
+	// The user's message is the first turn in this conversation sequence
+	currentContent := &types.Content{
+		Role:  "user",
+		Parts: []types.Part{{Text: userInput}},
 	}
+	cs.history = append(cs.history, currentContent)
 
-	// Ensure the directory exists
-	if err := os.MkdirAll(geminiDir, 0755); err != nil {
-		return fmt.Errorf("could not create checkpoint directory '%s': %w", geminiDir, err)
-	}
+	go func() {
+		defer close(eventChan)
 
-	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
+		eventChan <- types.StreamingStartedEvent{}
 
-	// Convert []*genai.Content to []*SerializableContent
-	serializableHistory := make([]*SerializableContent, len(history))
-	for i, content := range history {
-		serializableParts := make([]SerializablePart, len(content.Parts))
-		for j, part := range content.Parts {
-			if text, ok := part.(genai.Text); ok {
-				serializableParts[j].Text = string(text)
-			} else if fc, ok := part.(*genai.FunctionCall); ok {
-				serializableParts[j].FunctionCall = fc
-			} else if fr, ok := part.(*genai.FunctionResponse); ok {
-				serializableParts[j].FunctionResponse = fr
-			} else if id, ok := part.(*genai.Blob); ok { // Changed to genai.Blob
-				serializableParts[j].InlineData = id
-			} else if fd, ok := part.(*genai.FileData); ok {
-				serializableParts[j].FileData = fd
+		for {
+			// Check for cancellation at the start of each turn
+			select {
+			case <-ctx.Done():
+				telemetry.LogDebugf("Context cancelled before calling executor.")
+				eventChan <- types.ErrorEvent{Err: ctx.Err()}
+				return
+			default:
+			}
+
+			eventChan <- types.ThinkingEvent{}
+
+			// Call the executor to get the model's response stream
+			stream, err := cs.executor.StreamContent(ctx, cs.history...)
+			if err != nil {
+				eventChan <- types.ErrorEvent{Err: err}
+				return
+			}
+
+			var functionCalls []*types.FunctionCall
+			var textResponse strings.Builder
+			var modelResponseParts []types.Part
+
+			// Process all events from the stream for this turn
+			for event := range stream {
+				// Pass the event through to the UI
+				eventChan <- event
+
+				switch e := event.(type) {
+				case types.Part:
+					modelResponseParts = append(modelResponseParts, e)
+					if e.FunctionCall != nil {
+						functionCalls = append(functionCalls, e.FunctionCall)
+					}
+					if e.Text != "" {
+						textResponse.WriteString(e.Text)
+					}
+				case types.ErrorEvent:
+					// If the stream returns an error, stop processing
+					return
+				}
+			}
+
+			// After the stream is done, decide what to do next
+			if len(functionCalls) > 0 {
+				telemetry.LogDebugf("ChatService: Received %d tool call(s) from model.", len(functionCalls))
+				
+				// Add the model's response (containing the tool calls) to history
+				cs.history = append(cs.history, &types.Content{Role: "model", Parts: modelResponseParts})
+				
+				var toolResponseParts []types.Part
+
+				// Execute all tool calls
+				for _, fc := range functionCalls {
+					cs.toolCallCounter++
+					toolCallID := fmt.Sprintf("tool-call-%d", cs.toolCallCounter)
+
+					// Intercept user_confirm before execution
+					if fc.Name == types.USER_CONFIRM_TOOL_NAME {
+						message := "Confirmation required."
+						if msg, ok := fc.Args["message"].(string); ok {
+							message = msg
+						}
+
+						telemetry.LogDebugf("ChatService: Emitting UserConfirmationRequestEvent for tool call %s", toolCallID)
+						eventChan <- types.UserConfirmationRequestEvent{ToolCallID: toolCallID, Message: message}
+
+						confirmed := <-cs.userConfirmationChan
+						telemetry.LogDebugf("ChatService: Received user confirmation response: %t", confirmed)
+						
+						result := "cancel"
+						if confirmed {
+							result = "continue"
+						}
+
+						toolResponseParts = append(toolResponseParts, types.Part{
+							FunctionResponse: &types.FunctionResponse{
+								Name:     fc.Name,
+								Response: map[string]any{"result": result},
+							},
+						})
+						continue // Go to next tool call
+					}
+
+					// For all other tools, execute them
+					eventChan <- types.ToolCallStartEvent{ToolCallID: toolCallID, ToolName: fc.Name, Args: fc.Args}
+					
+					tool, err := cs.toolRegistry.GetTool(fc.Name)
+					if err != nil {
+						telemetry.LogErrorf("Tool %s not found: %v", fc.Name, err)
+						eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Err: err}
+						toolResponseParts = append(toolResponseParts, types.Part{
+							FunctionResponse: &types.FunctionResponse{
+								Name: fc.Name,
+								Response: map[string]any{"error": "Tool not found"},
+							},
+						})
+						continue
+					}
+
+					result, err := tool.Execute(ctx, fc.Args)
+					if err != nil {
+						telemetry.LogErrorf("Error executing tool %s: %v", fc.Name, err)
+					}
+					
+					eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Result: result.ReturnDisplay, Err: err}
+
+					toolResponseParts = append(toolResponseParts, types.Part{
+						FunctionResponse: &types.FunctionResponse{
+							Name:     fc.Name,
+							Response: map[string]any{"result": result.LLMContent, "error": err},
+						},
+					})
+				}
+				
+				// Add the collected tool responses to history for the next turn
+				cs.history = append(cs.history, &types.Content{Role: "user", Parts: toolResponseParts})
+
+			} else { // No tool calls, this is the final answer
+				telemetry.LogDebugf("ChatService: Received final text response.")
+				// The final text is already composed of the text parts sent to the UI
+				// We just need to add the complete response to history
+				cs.history = append(cs.history, &types.Content{Role: "model", Parts: modelResponseParts})
+				eventChan <- types.FinalResponseEvent{Content: textResponse.String()}
+				return // Exit the loop
 			}
 		}
-		serializableHistory[i] = &SerializableContent{
-			Parts: serializableParts,
-			Role:  content.Role,
-		}
-	}
+	}()
 
-	data, err := json.MarshalIndent(serializableHistory, "", "  ")
-	if err != nil {
-		return fmt.Errorf("could not prepare chat history for saving: %w", err)
-	}
-
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return fmt.Errorf("could not write checkpoint file '%s': %w", filePath, err)
-	}
-
-	return nil
+	return eventChan, nil
 }
 
-// LoadCheckpoint loads a checkpoint with the specified tag.
-func (cs *ChatService) LoadCheckpoint(tag string) ([]*genai.Content, error) {
-	geminiDir, err := cs.getProjectTempDir()
-	if err != nil {
-		return nil, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
-	}
-
-	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
-
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read checkpoint file '%s': %w", filePath, err)
-	}
-
-	var serializableHistory []*SerializableContent
-	if err := json.Unmarshal(data, &serializableHistory); err != nil {
-		return nil, fmt.Errorf("could not parse chat history from '%s': %w", filePath, err)
-	}
-
-	// Convert []*SerializableContent back to []*genai.Content
-	history := make([]*genai.Content, len(serializableHistory))
-	for i, sContent := range serializableHistory {
-		genaiParts := make([]genai.Part, len(sContent.Parts))
-		for j, sPart := range sContent.Parts {
-			if sPart.Text != "" {
-				genaiParts[j] = genai.Text(sPart.Text)
-			} else if sPart.FunctionCall != nil {
-				genaiParts[j] = sPart.FunctionCall
-			} else if sPart.FunctionResponse != nil {
-				genaiParts[j] = sPart.FunctionResponse
-			} else if sPart.InlineData != nil {
-				genaiParts[j] = sPart.InlineData
-			} else if sPart.FileData != nil {
-				genaiParts[j] = sPart.FileData
-			}
-		}
-		history[i] = &genai.Content{
-			Parts: genaiParts,
-			Role:  sContent.Role,
-		}
-	}
-
-	return history, nil
+// GetHistory returns the current chat history.
+func (cs *ChatService) GetHistory() []*types.Content {
+	return cs.history
 }
 
-// CheckpointExists checks if a checkpoint with the given tag already exists.
-func (cs *ChatService) CheckpointExists(tag string) (bool, error) {
-	geminiDir, err := cs.getProjectTempDir()
-	if err != nil {
-		return false, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
-	}
-
-	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
-
-	_, err = os.Stat(filePath)
-	if err == nil {
-		return true, nil
-	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, fmt.Errorf("could not determine if checkpoint '%s' exists: %w", tag, err)
+// ClearHistory resets the chat history.
+func (cs *ChatService) ClearHistory() {
+	cs.history = []*types.Content{}
 }
 
-// DeleteCheckpoint deletes a checkpoint with the specified tag.
-func (cs *ChatService) DeleteCheckpoint(tag string) (bool, error) {
-	geminiDir, err := cs.getProjectTempDir()
-	if err != nil {
-		return false, fmt.Errorf("could not access temporary directory for chat checkpoints: %w", err)
-	}
-
-	filePath := filepath.Join(geminiDir, fmt.Sprintf("%s%s%s", checkpointFilePrefix, tag, checkpointFileSuffix))
-
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		return false, nil // Checkpoint does not exist
-	}
-
-	if err := os.Remove(filePath); err != nil {
-		return false, fmt.Errorf("could not delete checkpoint file '%s': %w", filePath, err)
-	}
-
-	return true, nil
+// GetUserConfirmationChannel returns the channel used for user confirmation responses.
+func (cs *ChatService) GetUserConfirmationChannel() chan bool {
+	return cs.userConfirmationChan
 }

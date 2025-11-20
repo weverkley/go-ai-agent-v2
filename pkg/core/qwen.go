@@ -151,8 +151,8 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 	}, nil
 }
 
-// GenerateStream implements the streaming generation for QwenChat.
-func (qc *QwenChat) GenerateStream(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
+// StreamContent implements the streaming generation for QwenChat.
+func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 	eventChan := make(chan any)
 
 	go func() {

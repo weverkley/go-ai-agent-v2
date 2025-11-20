@@ -427,62 +427,109 @@ func (gc *GoaiagentChat) SetUserConfirmationChannel(ch chan bool) {
 	gc.userConfirmationChan = ch
 }
 
-// GenerateStream generates content and streams events back to the caller.
-func (gc *GoaiagentChat) GenerateStream(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
-	telemetry.LogDebugf("GenerateStream called")
+func toGenaiParts(parts []types.Part) []genai.Part {
+	genaiParts := make([]genai.Part, len(parts))
+	for i, part := range parts {
+		var genaiPart genai.Part
+		if part.Text != "" {
+			genaiPart = genai.Text(part.Text)
+		} else if part.FunctionCall != nil {
+			genaiPart = &genai.FunctionCall{
+				Name: part.FunctionCall.Name,
+				Args: part.FunctionCall.Args,
+			}
+		} else if part.FunctionResponse != nil {
+			genaiPart = &genai.FunctionResponse{
+				Name:     part.FunctionResponse.Name,
+				Response: part.FunctionResponse.Response,
+			}
+		} else if part.InlineData != nil {
+			genaiPart = genai.Blob{
+				MIMEType: part.InlineData.MimeType,
+				Data:     []byte(part.InlineData.Data),
+			}
+		}
+		genaiParts[i] = genaiPart
+	}
+	return genaiParts
+}
+
+// toGenaiContents converts a slice of generic *types.Content to []*genai.Content.
+func toGenaiContents(contents []*types.Content) []*genai.Content {
+	genaiContents := make([]*genai.Content, len(contents))
+	for i, c := range contents {
+		genaiContents[i] = toGenaiContent(c)
+	}
+	return genaiContents
+}
+
+// fromGenaiFunctionCall converts a *genai.FunctionCall to a generic *types.FunctionCall.
+func fromGenaiFunctionCall(fc *genai.FunctionCall) *types.FunctionCall {
+	if fc == nil {
+		return nil
+	}
+	return &types.FunctionCall{
+		Name: fc.Name,
+		Args: fc.Args,
+	}
+}
+
+// StreamContent sends the chat history to the model and streams back response parts.
+func (gc *GoaiagentChat) StreamContent(ctx context.Context, history ...*types.Content) (<-chan any, error) {
+	telemetry.LogDebugf("GoaiagentChat.StreamContent called")
 	eventChan := make(chan any)
 
 	go func() {
 		defer close(eventChan)
 
-		telemetry.LogDebugf("Sending StreamingStartedEvent")
-		eventChan <- types.StreamingStartedEvent{}
-
-		genaiHistory := make([]*genai.Content, len(gc.startHistory))
-		for i, c := range gc.startHistory {
-			genaiHistory[i] = toGenaiContent(c)
-		}
-
 		cs := gc.model.StartChat()
-		cs.History = genaiHistory
+		cs.History = toGenaiContents(history[:len(history)-1])
+		lastMessage := history[len(history)-1]
 
-		var parts []genai.Part
-		for _, content := range contents {
-			genaiContent := toGenaiContent(content)
-			parts = append(parts, genaiContent.Parts...)
-		}
+		iter := cs.SendMessageStream(ctx, toGenaiParts(lastMessage.Parts)...)
 
-		telemetry.LogDebugf("Sending ThinkingEvent")
-		eventChan <- types.ThinkingEvent{}
-		iter := cs.SendMessageStream(ctx, parts...)
-
-		var accumulatedText string
 		for {
 			resp, err := iter.Next()
 			if err == iterator.Done {
 				break
 			}
 			if err != nil {
-				telemetry.LogDebugf("Sending ErrorEvent: %v", err)
+				telemetry.LogErrorf("Error receiving from Gemini stream: %v", err)
 				eventChan <- types.ErrorEvent{Err: err}
 				return
 			}
 
-			if len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 				for _, part := range resp.Candidates[0].Content.Parts {
-					if text, ok := part.(genai.Text); ok {
-						accumulatedText += string(text)
-					}
-					// Simplified: Tool call logic is complex and handled by AgentExecutor
+					eventChan <- fromGenaiPart(part)
 				}
 			}
 		}
-
-		telemetry.LogDebugf("Sending FinalResponseEvent")
-		eventChan <- types.FinalResponseEvent{Content: accumulatedText}
 	}()
 
 	return eventChan, nil
+}
+
+// fromGenaiPart converts a single genai.Part to a types.Part.
+func fromGenaiPart(part genai.Part) types.Part {
+	var genericPart types.Part
+	switch p := part.(type) {
+	case genai.Text:
+		genericPart.Text = string(p)
+	case *genai.FunctionCall:
+		genericPart.FunctionCall = fromGenaiFunctionCall(p)
+	case *genai.FunctionResponse:
+		genericPart.FunctionResponse = &types.FunctionResponse{
+			Name:     p.Name,
+			Response: p.Response,
+		}
+	case genai.Blob:
+		genericPart.InlineData = &types.InlineData{
+			MimeType: p.MIMEType,
+			Data:     string(p.Data),
+		}
+	}
+	return genericPart
 }
 // GenerateContentWithTools generates content using the Gemini API, including tools.
 func (gc *GoaiagentChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {

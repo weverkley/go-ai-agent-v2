@@ -9,8 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
@@ -241,17 +239,6 @@ type commandFinishedMsg struct {
 	args   []string // Keep track of the command that was run
 }
 
-type userConfirmationMsg struct {
-	toolCallID string
-	response   string // "continue" or "cancel"
-}
-
-func userConfirmationCmd(toolCallID, response string) tea.Cmd {
-	return func() tea.Msg {
-		return userConfirmationMsg{toolCallID: toolCallID, response: response}
-	}
-}
-
 // executeCommandCmd runs the commandExecutor in a goroutine and returns a
 // commandFinishedMsg when done.
 func executeCommandCmd(executor func(args []string) (string, error), args []string) tea.Cmd {
@@ -270,13 +257,11 @@ type ChatModel struct {
 
 	messages []Message
 
-	executor core.Executor
+	chatService *services.ChatService
 
 	executorType string
 
 	config types.Config
-
-	router *routing.ModelRouterService
 
 	shellService services.ShellExecutionService // New field
 
@@ -318,13 +303,12 @@ type ChatModel struct {
 	logWriter *bufio.Writer
 
 	awaitingConfirmation         bool      // New field to indicate if user confirmation is pending
-	userConfirmationResponseChan chan bool // Channel to send user confirmation back to executor
 
 	commandHistory []string // Stores previous commands
 	historyIndex   int      // Current position in command history
 }
 
-func NewChatModel(executor core.Executor, executorType string, config types.Config, router *routing.ModelRouterService, commandExecutor func(args []string) (string, error), shellService services.ShellExecutionService) *ChatModel {
+func NewChatModel(chatService *services.ChatService, executorType string, config types.Config, commandExecutor func(args []string) (string, error), shellService services.ShellExecutionService) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
 	ta.Focus()
@@ -391,32 +375,27 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 		textarea:                     ta,
 		spinner:                      s,
 		messages:                     []Message{},
-		executor:                     executor,
+		chatService:                  chatService,
 		executorType:                 executorType,
 		config:                       config,
-		router:                       router,
-		shellService:                 shellService, // Initialize new field
+		shellService:                 shellService,
 		isStreaming:                  false,
 		status:                       "Ready",
 		title:                        "Go AI Agent Chat",
-		commandExecutor:              commandExecutor, // Initialize the new field
+		commandExecutor:              commandExecutor,
 		activeToolCalls:              make(map[string]*ToolCallStatus),
-		senderStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("5")),              // User
-		botStyle:                     lipgloss.NewStyle().Foreground(lipgloss.Color("6")),              // Bot
-		toolStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true), // Tool
+		senderStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		botStyle:                     lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+		toolStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
 		errorStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
 		statusStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		titleStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
 		suggestionStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
 		logFile:                      logFile,
 		logWriter:                    logWriter,
-		userConfirmationResponseChan: make(chan bool, 1), // Initialize the channel
 		commandHistory:               []string{},
 		historyIndex:                 0,
 	}
-
-	// Pass the confirmation channel to the executor
-	model.executor.SetUserConfirmationChannel(model.userConfirmationResponseChan)
 
 	return model
 }
@@ -463,37 +442,17 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.awaitingConfirmation {
 			switch msg.String() {
 			case "c", "C": // Continue
-				// Find the active user_confirm tool call
-				var toolCallID string
-				for id, tc := range m.activeToolCalls {
-					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
-						toolCallID = id
-						break
-					}
-				}
-				if toolCallID != "" {
-					m.awaitingConfirmation = false
-					m.status = "User confirmed. Resuming..."
-					// Directly send the confirmation message
-					return m, userConfirmationCmd(toolCallID, "continue")
-				}
+				m.awaitingConfirmation = false
+				m.status = "User confirmed. Resuming..."
+				m.chatService.GetUserConfirmationChannel() <- true
+				return m, nil // No further command needed
 			case "x", "X": // Cancel
-				// Find the active user_confirm tool call
-				var toolCallID string
-				for id, tc := range m.activeToolCalls {
-					if tc.ToolName == "user_confirm" && tc.Status == "Executing" {
-						toolCallID = id
-						break
-					}
-				}
-				if toolCallID != "" {
-					m.awaitingConfirmation = false
-					m.status = "User cancelled."
-					// Directly send the cancellation message
-					return m, userConfirmationCmd(toolCallID, "cancel")
-				}
+				m.awaitingConfirmation = false
+				m.status = "User cancelled. Resuming..."
+				m.chatService.GetUserConfirmationChannel() <- false
+				return m, nil // No further command needed
 			}
-			return m, nil // Consume key presses while awaiting confirmation
+			return m, nil // Consume other key presses while awaiting confirmation
 		}
 
 		switch msg.Type {
@@ -630,17 +589,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			errMsg := ErrorMessage{Err: event.Err}
 			m.messages = append(m.messages, errMsg)
 			m.logMessage(errMsg) // Log error message
-			// Check for a model suggestion
-			routingCtx := &routing.RoutingContext{
-				IsFallback:   true,
-				ExecutorType: m.executorType,
-			}
-			decision, err := m.router.Route(routingCtx, m.config)
-			if err == nil && decision != nil {
-				suggestion := fmt.Sprintf("Model error. Suggestion: switch to '%s'. Use '/settings set model %s' to switch.", decision.Model, decision.Model)
-				m.messages = append(m.messages, SuggestionMessage{Content: suggestion})
-				m.logMessage(SuggestionMessage{Content: suggestion}) // Log suggestion message
-			}
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
@@ -689,6 +637,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.args) > 0 {
 			switch msg.args[0] {
 			case "clear":
+				m.chatService.ClearHistory()
 				m.messages = []Message{}
 			case "quit", "exit":
 				return m, tea.Quit
@@ -701,21 +650,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.updateViewport()
 		return m, nil
-
-	case userConfirmationMsg:
-		telemetry.LogDebugf("User confirmation received: ToolCallID: %s, Response: %s", msg.toolCallID, msg.response)
-		// Send the user's confirmation back to the executor
-		select {
-		case m.userConfirmationResponseChan <- (msg.response == "continue"):
-			telemetry.LogDebugf("Sent user confirmation to executor: %t", (msg.response == "continue"))
-			// Successfully sent confirmation
-		case <-m.cancelCtx.Done():
-			// Context was cancelled, don't block sending
-		default:
-			// Channel might be full or closed, log an error or handle appropriately
-			telemetry.LogErrorf("Failed to send user confirmation to executor: channel blocked or closed")
-		}
-		return m, waitForEvent(m.streamCh) // Continue waiting for events
 	}
 
 	return m, tea.Batch(cmds...)
@@ -799,13 +733,8 @@ func (m *ChatModel) logMessage(msg Message) {
 // startStreaming initiates the stream and returns a message with the channel.
 func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 	return func() tea.Msg {
-		// Create a new context for this streaming session
 		m.cancelCtx, m.cancelFunc = context.WithCancel(context.Background())
-		userContent := &types.Content{
-			Role:  "user",
-			Parts: []types.Part{{Text: userInput}},
-		}
-		stream, err := m.executor.GenerateStream(m.cancelCtx, userContent)
+		stream, err := m.chatService.SendMessage(m.cancelCtx, userInput)
 		if err != nil {
 			return streamErrorMsg{err}
 		}

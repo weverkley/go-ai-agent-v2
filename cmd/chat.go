@@ -7,7 +7,6 @@ import (
 	"strings" // New import for strings.TrimSpace
 
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
@@ -65,7 +64,8 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 		os.Exit(1)
 	}
 
-	router := routing.NewModelRouterService(appConfig)
+	toolRegistry, _ := appConfig.Get("toolRegistry")
+	chatService := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), []*types.Content{})
 
 	// Create a CommandExecutor function that wraps the Cobra command execution
 	commandExecutor := func(cmdArgs []string) (string, error) {
@@ -92,7 +92,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 		return output, err
 	}
 
-	p := tea.NewProgram(ui.NewChatModel(executor, executorType, appConfig, router, commandExecutor, shellService), tea.WithAltScreen())
+	p := tea.NewProgram(ui.NewChatModel(chatService, executorType, appConfig, commandExecutor, shellService), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running interactive chat: %v\n", err)
 		os.Exit(1)
