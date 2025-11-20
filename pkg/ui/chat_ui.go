@@ -12,6 +12,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/pathutils"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -344,22 +345,29 @@ func NewChatModel(executor core.Executor, executorType string, config types.Conf
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	// Determine the log file path from telemetry settings
-	logDirPath := ""
+	var logDirPath string
 	telemetrySettingsVal, ok := config.Get("telemetry")
 	if ok {
 		if telemetrySettings, ok := telemetrySettingsVal.(*types.TelemetrySettings); ok && telemetrySettings.Enabled && telemetrySettings.OutDir != "" {
-			logDirPath = telemetrySettings.OutDir
+			expandedPath, err := pathutils.ExpandPath(telemetrySettings.OutDir)
+			if err != nil {
+				telemetry.LogErrorf("Error expanding telemetry OutDir path '%s': %v", telemetrySettings.OutDir, err)
+			} else {
+				logDirPath = expandedPath
+			}
 		}
 	}
 
-	// Fallback to default if not specified in telemetry
+	// Fallback to default if not specified in telemetry or if expansion failed
 	if logDirPath == "" {
-		homeDir, err := os.UserHomeDir()
+		expandedPath, err := pathutils.ExpandPath("~/.goaiagent/tmp")
 		if err != nil {
-			telemetry.LogErrorf("Error getting user home directory for chat log: %v", err)
-			// Handle error, perhaps return nil or a model with a disabled logger
+			telemetry.LogErrorf("Error expanding default log directory path: %v", err)
+			// As a last resort, use a relative path
+			logDirPath = ".goaiagent/tmp"
+		} else {
+			logDirPath = expandedPath
 		}
-		logDirPath = filepath.Join(homeDir, ".goaiagent", "tmp")
 	}
 
 	logFilePath := filepath.Join(logDirPath, "chat-ui.log")

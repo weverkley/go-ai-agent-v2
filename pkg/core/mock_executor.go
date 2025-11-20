@@ -129,11 +129,14 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 
 						for _, step := range steps {
 							telemetry.LogDebugf("MockExecutor: Processing step: %s (%s)", step.ToolCallID, step.ToolName)
-							if ctx.Done() != nil {
-								telemetry.LogDebugf("MockExecutor: Context cancelled, exiting loop.")
-								eventChan <- types.ErrorEvent{Err: ctx.Err()}
-								return
-							}
+						select {
+						case <-ctx.Done():
+							telemetry.LogDebugf("MockExecutor: Context cancelled, exiting loop.")
+							eventChan <- types.ErrorEvent{Err: ctx.Err()}
+							return
+						default:
+							// Continue if context is not cancelled
+						}
 							
 							eventChan <- types.ThinkingEvent{}
 							time.Sleep(100 * time.Millisecond) // Simulate thinking time

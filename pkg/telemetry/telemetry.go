@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"go-ai-agent-v2/go-cli/pkg/pathutils"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -198,14 +199,20 @@ func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
 	}
 
 	if settings.OutDir != "" {
+		expandedPath, err := pathutils.ExpandPath(settings.OutDir)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error expanding telemetry output directory path %s: %v\n", settings.OutDir, err)
+			return &noopTelemetryLogger{}
+		}
+
 		// Ensure the directory exists
-		if err := os.MkdirAll(settings.OutDir, 0755); err != nil {
+		if err := os.MkdirAll(expandedPath, 0755); err != nil {
 			// Log error to stderr as the logger isn't initialized yet
-			fmt.Fprintf(os.Stderr, "Error creating telemetry output directory %s: %v\n", settings.OutDir, err)
+			fmt.Fprintf(os.Stderr, "Error creating telemetry output directory %s: %v\n", expandedPath, err)
 			// Fallback to no-op logger
 			return &noopTelemetryLogger{}
 		}
-		logFilePath := filepath.Join(settings.OutDir, "go-ai-agent.log")
+		logFilePath := filepath.Join(expandedPath, "go-ai-agent.log")
 		return NewFileTelemetryLogger(logFilePath, true, settings.LogLevel)
 	}
 
