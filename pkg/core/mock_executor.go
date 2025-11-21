@@ -62,19 +62,19 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 			{FunctionCall: &types.FunctionCall{Name: "user_confirm", Args: map[string]interface{}{"message": "Please run 'cd todo-api && node index.js &' in another terminal. Press 'continue' once the server is running."}}},
 			{FunctionCall: &types.FunctionCall{Name: "web_fetch", Args: map[string]interface{}{"prompt": "http://localhost:3000"}}},
 			// Phase 2: Implement Todo Routes
-			{FunctionCall: &types.FunctionCall{Name: "smart_edit", Args: map[string]interface{}{ 
+			{FunctionCall: &types.FunctionCall{Name: "smart_edit", Args: map[string]interface{}{
 				"file_path":   todoAPIIndexPath,
 				"instruction": "Add GET all todos route",
 				"old_string":  "app.get('/', (req, res) => {\n  res.send('Todo API is running!');\n});",
 				"new_string":  "app.get('/', (req, res) => {\n  res.send('Todo API is running!');\n});\n\n// GET all todos\napp.get('/todos', (req, res) => {\n  res.json(todos);\n});",
 			}}},
-			{FunctionCall: &types.FunctionCall{Name: "smart_edit", Args: map[string]interface{}{ 
+			{FunctionCall: &types.FunctionCall{Name: "smart_edit", Args: map[string]interface{}{
 				"file_path":   todoAPIIndexPath,
 				"instruction": "Add POST new todo route",
 				"old_string":  "app.get('/todos', (req, res) => {\n  res.json(todos);\n});",
 				"new_string":  "app.get('/todos', (req, res) => {\n  res.json(todos);\n});\n\n// POST a new todo\napp.post('/todos', (req, res) => {\n  const newTodo = { id: todos.length + 1, title: req.body.title, completed: false };\n  todos.push(newTodo);\n  res.status(201).json(newTodo);\n});",
 			}}},
-			{FunctionCall: &types.FunctionCall{Name: "smart_edit", Args: map[string]interface{}{ 
+			{FunctionCall: &types.FunctionCall{Name: "smart_edit", Args: map[string]interface{}{
 				"file_path":   todoAPIIndexPath,
 				"instruction": "Add GET todo by ID route",
 				"old_string":  "app.post('/todos', (req, res) => {\n  const newTodo = { id: todos.length + 1, title: req.body.title, completed: false };\n  todos.push(newTodo);\n  res.status(201).json(newTodo);\n});",
@@ -86,7 +86,30 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 
 		go func() {
 			defer close(eventChan)
-			
+			// Check if the last message is a response to our user_confirm
+			if len(contents) > 0 {
+				lastContent := contents[len(contents)-1]
+				if lastContent.Role == "user" && len(lastContent.Parts) > 0 {
+					if fr := lastContent.Parts[0].FunctionResponse; fr != nil && fr.Name == "user_confirm" {
+						// It is a confirmation response.
+						if resp, ok := fr.Response["result"].(string); ok && resp == "continue" {
+							// User confirmed. The step *after* user_confirm is at the current mockStep.
+							if mock.mockStep < len(steps) {
+								eventChan <- steps[mock.mockStep]
+								mock.mockStep++
+							}
+							return
+						} else {
+							// User cancelled.
+							eventChan <- types.Part{Text: "Operation cancelled by user."}
+							// We can stop the flow here by just returning.
+							return
+						}
+					}
+				}
+			}
+
+			// Default behavior: just play the next step
 			if mock.mockStep < len(steps) {
 				time.Sleep(200 * time.Millisecond) // Simulate thinking
 				eventChan <- steps[mock.mockStep]
