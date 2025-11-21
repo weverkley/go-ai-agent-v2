@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 )
 
@@ -18,4 +19,11 @@ func FormatDuration(d time.Duration) string {
 		return fmt.Sprintf("%dm %ds", minutes, seconds)
 	}
 	return fmt.Sprintf("%ds", seconds)
+}
+
+var ansiRegex = regexp.MustCompile(`\x1b\[[0-?]*[ -/]*[@-~]`)
+
+// StripAnsi removes ANSI escape codes from a string.
+func StripAnsi(str string) string {
+	return ansiRegex.ReplaceAllString(str, "")
 }

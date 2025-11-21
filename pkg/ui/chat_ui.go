@@ -3,7 +3,6 @@ package ui
 import (
 	"bufio" // New import
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"            // New import
 	"path/filepath" // New import
@@ -14,6 +13,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/utils"
 
 	"github.com/alecthomas/chroma/v2/formatters"
 	"github.com/alecthomas/chroma/v2/lexers"
@@ -492,7 +492,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.historyIndex = len(m.commandHistory) // Reset history index to the end
 
 			if strings.HasPrefix(userInput, "/") {
-				m.messages = append(m.messages, UserMessage{Content: userInput})
+				userMsg := UserMessage{Content: userInput}
+				m.messages = append(m.messages, userMsg)
+				m.logMessage(userMsg)
 				m.updateViewport()
 				return m.handleSlashCommand(userInput)
 			}
@@ -555,9 +557,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if group == nil {
 				group = &ToolCallGroupMessage{ToolCalls: make(map[string]*ToolCallStatus)}
 				m.messages = append(m.messages, group)
-				m.logMessage(group) // Log tool call group message
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
+			m.logMessage(group)
 
 		case types.UserConfirmationRequestEvent:
 			telemetry.LogDebugf("Received stream event: UserConfirmationRequestEvent (ID: %s, Message: %s)", event.ToolCallID, event.Message)
@@ -585,6 +587,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				tc.Result = event.Result
 				tc.Err = event.Err
 			}
+			// Log the updated group message
+			if len(m.messages) > 0 {
+				if group, ok := m.messages[len(m.messages)-1].(*ToolCallGroupMessage); ok {
+					m.logMessage(group)
+				}
+			}
 		case types.FinalResponseEvent:
 			botMsg := BotMessage{Content: event.Content}
 			m.messages = append(m.messages, botMsg)
@@ -602,7 +610,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case streamErrorMsg:
 		m.err = msg.err
 		m.status = "Error"
-		m.messages = append(m.messages, ErrorMessage{Err: msg.err})
+		errMsg := ErrorMessage{Err: msg.err}
+		m.messages = append(m.messages, errMsg)
+		m.logMessage(errMsg)
 		m.updateViewport()
 		m.isStreaming = false
 		m.streamCh = nil
@@ -615,7 +625,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
 		m.cancelFunc = nil                                   // Clear cancel function
 		m.cancelCtx = nil                                    // Clear context
-		m.logHistory()                                       // Log history at the end of the turn
 		return m, nil
 
 	case commandFinishedMsg:
@@ -650,7 +659,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "settings":
 				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
-					m.messages = append(m.messages, SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."})
+					suggestionMsg := SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."}
+					m.messages = append(m.messages, suggestionMsg)
+					m.logMessage(suggestionMsg)
 				}
 			}
 		}
@@ -730,29 +741,14 @@ func (m *ChatModel) logMessage(msg Message) {
 	if m.logWriter == nil {
 		return
 	}
+	renderedString := msg.Render(m)
+	cleanString := utils.StripAnsi(renderedString)
 	// Render the message to a string and write to log
-	_, err := m.logWriter.WriteString(msg.Render(m) + "\n")
+	_, err := m.logWriter.WriteString(cleanString + "\n")
 	if err != nil {
 		telemetry.LogErrorf("Error writing to chat log: %v", err)
 	}
 	m.logWriter.Flush() // Ensure message is written immediately
-}
-
-// logHistory writes the full chat history to the log file as JSON.
-func (m *ChatModel) logHistory() {
-	if m.logWriter == nil {
-		return
-	}
-	history := m.chatService.GetHistory()
-	historyJSON, err := json.MarshalIndent(history, "", "  ")
-	if err != nil {
-		telemetry.LogErrorf("Error marshaling chat history to JSON: %v", err)
-		return
-	}
-	if _, err := m.logWriter.WriteString(fmt.Sprintf("\n--- CHAT HISTORY ---\n%s\n--- END HISTORY ---\n", string(historyJSON))); err != nil {
-		telemetry.LogErrorf("Error writing chat history to log: %v", err)
-	}
-	m.logWriter.Flush()
 }
 
 // startStreaming initiates the stream and returns a message with the channel.
