@@ -49,6 +49,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 		eventChan <- types.StreamingStartedEvent{}
 
 		for {
+			telemetry.LogDebugf("ChatService: Top of the loop.")
 			// Check for cancellation at the start of each turn
 			select {
 			case <-ctx.Done():
@@ -94,10 +95,10 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			// After the stream is done, decide what to do next
 			if len(functionCalls) > 0 {
 				telemetry.LogDebugf("ChatService: Received %d tool call(s) from model.", len(functionCalls))
-				
+
 				// Add the model's response (containing the tool calls) to history
 				cs.history = append(cs.history, &types.Content{Role: "model", Parts: modelResponseParts})
-				
+
 				var toolResponseParts []types.Part
 
 				// Execute all tool calls
@@ -117,7 +118,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 						confirmed := <-cs.userConfirmationChan
 						telemetry.LogDebugf("ChatService: Received user confirmation response: %t", confirmed)
-						
+
 						result := "cancel"
 						if confirmed {
 							result = "continue"
@@ -134,7 +135,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 					// For all other tools, execute them
 					eventChan <- types.ToolCallStartEvent{ToolCallID: toolCallID, ToolName: fc.Name, Args: fc.Args}
-					
+
 					tool, err := cs.toolRegistry.GetTool(fc.Name)
 					if err != nil {
 						telemetry.LogErrorf("Tool %s not found: %v", fc.Name, err)
@@ -152,7 +153,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					if err != nil {
 						telemetry.LogErrorf("Error executing tool %s: %v", fc.Name, err)
 					}
-					
+
 					eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Result: result.ReturnDisplay, Err: err}
 
 					toolResponseParts = append(toolResponseParts, types.Part{
@@ -162,7 +163,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						},
 					})
 				}
-				
+				telemetry.LogDebugf("ChatService: Finished tool call loop.")
 				// Add the collected tool responses to history for the next turn
 				cs.history = append(cs.history, &types.Content{Role: "user", Parts: toolResponseParts})
 
