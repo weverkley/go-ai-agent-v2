@@ -8,6 +8,7 @@ import (
 	"path/filepath" // New import
 	"sort"
 	"strings"
+	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
@@ -494,14 +495,14 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(userInput, "/") {
 				userMsg := UserMessage{Content: userInput}
 				m.messages = append(m.messages, userMsg)
-				m.logMessage(userMsg)
+				m.logUIMessage(userMsg)
 				m.updateViewport()
 				return m.handleSlashCommand(userInput)
 			}
 
 			userMsg := UserMessage{Content: userInput}
 			m.messages = append(m.messages, userMsg)
-			m.logMessage(userMsg) // Log user message
+			m.logUIMessage(userMsg) // Log user message
 			m.updateViewport()
 			m.isStreaming = true
 			m.status = "Sending..."
@@ -539,7 +540,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			telemetry.LogDebugf("Received stream event: ThinkingEvent")
 		case types.ToolCallStartEvent:
 			m.status = "Executing tool..."
-			telemetry.LogDebugf("Received stream event: ToolCallStartEvent (ID: %s, Name: %s, Args: %#v)", event.ToolCallID, event.ToolName, event.Args)
+			m.logSystemMessage(fmt.Sprintf("Tool Started: %s with args %v", event.ToolName, event.Args))
 			tcStatus := &ToolCallStatus{
 				ToolName: event.ToolName,
 				Args:     event.Args,
@@ -559,13 +560,13 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, group)
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
-			m.logMessage(group)
 
 		case types.UserConfirmationRequestEvent:
 			telemetry.LogDebugf("Received stream event: UserConfirmationRequestEvent (ID: %s, Message: %s)", event.ToolCallID, event.Message)
 			// Add a message to the UI indicating confirmation is needed
-			m.messages = append(m.messages, SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s (c: continue, x: cancel)", types.USER_CONFIRM_TOOL_NAME, event.Message)})
-			m.logMessage(SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s", types.USER_CONFIRM_TOOL_NAME, event.Message)})
+			suggestionMsg := SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s (c: continue, x: cancel)", types.USER_CONFIRM_TOOL_NAME, event.Message)}
+			m.messages = append(m.messages, suggestionMsg)
+			m.logUIMessage(suggestionMsg)
 			m.awaitingConfirmation = true
 			m.status = "Awaiting user confirmation..."
 
@@ -581,28 +582,22 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
-			telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", event.ToolCallID, event.ToolName, event.Result, event.Err)
+			m.logSystemMessage(fmt.Sprintf("Tool Ended: %s. Result: %s, Error: %v", event.ToolName, event.Result, event.Err))
 			if tc, ok := m.activeToolCalls[event.ToolCallID]; ok {
 				tc.Status = "Completed"
 				tc.Result = event.Result
 				tc.Err = event.Err
 			}
-			// Log the updated group message
-			if len(m.messages) > 0 {
-				if group, ok := m.messages[len(m.messages)-1].(*ToolCallGroupMessage); ok {
-					m.logMessage(group)
-				}
-			}
 		case types.FinalResponseEvent:
 			botMsg := BotMessage{Content: event.Content}
 			m.messages = append(m.messages, botMsg)
-			m.logMessage(botMsg) // Log bot message
+			m.logUIMessage(botMsg) // Log bot message
 			telemetry.LogDebugf("Received stream event: FinalResponseEvent (Content: %s)", event.Content)
 		case types.ErrorEvent:
 			telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", event.Err)
 			errMsg := ErrorMessage{Err: event.Err}
 			m.messages = append(m.messages, errMsg)
-			m.logMessage(errMsg) // Log error message
+			m.logUIMessage(errMsg) // Log error message
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
@@ -612,7 +607,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Error"
 		errMsg := ErrorMessage{Err: msg.err}
 		m.messages = append(m.messages, errMsg)
-		m.logMessage(errMsg)
+		m.logUIMessage(errMsg)
 		m.updateViewport()
 		m.isStreaming = false
 		m.streamCh = nil
@@ -636,17 +631,17 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			errMsg := ErrorMessage{Err: msg.err}
 			m.messages = append(m.messages, errMsg)
-			m.logMessage(errMsg)
+			m.logUIMessage(errMsg)
 		}
 
 		if msg.output != "" {
 			botMsg := BotMessage{Content: msg.output}
 			m.messages = append(m.messages, botMsg)
-			m.logMessage(botMsg)
+			m.logUIMessage(botMsg)
 		} else if msg.err == nil {
 			botMsg := BotMessage{Content: "Command executed successfully."}
 			m.messages = append(m.messages, botMsg)
-			m.logMessage(botMsg)
+			m.logUIMessage(botMsg)
 		}
 
 		// Handle specific commands that might require UI changes
@@ -661,7 +656,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
 					suggestionMsg := SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."}
 					m.messages = append(m.messages, suggestionMsg)
-					m.logMessage(suggestionMsg)
+					m.logUIMessage(suggestionMsg)
 				}
 			}
 		}
@@ -736,8 +731,8 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 
 // --- Commands ---
 
-// logMessage writes a message to the chat log file.
-func (m *ChatModel) logMessage(msg Message) {
+// logUIMessage writes the rendered UI message to the log file.
+func (m *ChatModel) logUIMessage(msg Message) {
 	if m.logWriter == nil {
 		return
 	}
@@ -749,6 +744,20 @@ func (m *ChatModel) logMessage(msg Message) {
 		telemetry.LogErrorf("Error writing to chat log: %v", err)
 	}
 	m.logWriter.Flush() // Ensure message is written immediately
+}
+
+// logSystemMessage writes a timestamped system message to the log file.
+func (m *ChatModel) logSystemMessage(logMsg string) {
+	if m.logWriter == nil {
+		return
+	}
+	timestamp := time.Now().Format("15:04:05.000")
+	formattedMsg := fmt.Sprintf("[%s] %s\n", timestamp, logMsg)
+	_, err := m.logWriter.WriteString(formattedMsg)
+	if err != nil {
+		telemetry.LogErrorf("Error writing system message to chat log: %v", err)
+	}
+	m.logWriter.Flush()
 }
 
 // startStreaming initiates the stream and returns a message with the channel.
