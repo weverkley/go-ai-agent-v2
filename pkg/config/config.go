@@ -122,6 +122,8 @@ func (c *Config) Get(key string) (interface{}, bool) {
 		return c.toolDiscoveryCommand, true
 	case "toolCallCommand":
 		return c.toolCallCommand, true
+	case "telemetry":
+		return c.Telemetry, c.Telemetry != nil
 	case "telemetryEnabled":
 		if c.Telemetry != nil {
 			return c.Telemetry.Enabled, true
