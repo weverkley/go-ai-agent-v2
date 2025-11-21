@@ -427,12 +427,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.awaitingConfirmation = false
 			m.status = "User confirmed. Resuming..."
 			m.chatService.GetUserConfirmationChannel() <- true
-			return m, nil
+			return m, waitForEvent(m.streamCh)
 		case "x", "X":
 			m.awaitingConfirmation = false
 			m.status = "User cancelled. Resuming..."
 			m.chatService.GetUserConfirmationChannel() <- false
-			return m, nil
+			return m, waitForEvent(m.streamCh)
 		default:
 			// For any other key, just ignore it and don't pass it to the text area.
 			return m, nil
@@ -534,10 +534,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch event := msg.event.(type) {
 		case types.StreamingStartedEvent:
 			m.status = "Stream started..."
-			telemetry.LogDebugf("Received stream event: StreamingStartedEvent")
 		case types.ThinkingEvent:
 			m.status = "Thinking..."
-			telemetry.LogDebugf("Received stream event: ThinkingEvent")
 		case types.ToolCallStartEvent:
 			m.status = "Executing tool..."
 			m.logSystemMessage(fmt.Sprintf("Tool Started: %s with args %v", event.ToolName, event.Args))
@@ -562,7 +560,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			group.ToolCalls[event.ToolCallID] = tcStatus
 
 		case types.UserConfirmationRequestEvent:
-			telemetry.LogDebugf("Received stream event: UserConfirmationRequestEvent (ID: %s, Message: %s)", event.ToolCallID, event.Message)
 			// Add a message to the UI indicating confirmation is needed
 			suggestionMsg := SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s (c: continue, x: cancel)", types.USER_CONFIRM_TOOL_NAME, event.Message)}
 			m.messages = append(m.messages, suggestionMsg)
@@ -592,9 +589,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			botMsg := BotMessage{Content: event.Content}
 			m.messages = append(m.messages, botMsg)
 			m.logUIMessage(botMsg) // Log bot message
-			telemetry.LogDebugf("Received stream event: FinalResponseEvent (Content: %s)", event.Content)
 		case types.ErrorEvent:
-			telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", event.Err)
 			errMsg := ErrorMessage{Err: event.Err}
 			m.messages = append(m.messages, errMsg)
 			m.logUIMessage(errMsg) // Log error message

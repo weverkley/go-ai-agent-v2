@@ -47,6 +47,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 		defer close(eventChan)
 
 		eventChan <- types.StreamingStartedEvent{}
+		telemetry.LogDebugf("Received stream event: StreamingStartedEvent")
 
 		for {
 			telemetry.LogDebugf("ChatService: Top of the loop.")
@@ -60,6 +61,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			}
 
 			eventChan <- types.ThinkingEvent{}
+			telemetry.LogDebugf("Received stream event: ThinkingEvent")
 
 			// Call the executor to get the model's response stream
 			stream, err := cs.executor.StreamContent(ctx, cs.history...)
@@ -87,6 +89,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						textResponse.WriteString(e.Text)
 					}
 				case types.ErrorEvent:
+					telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", e.Err)
 					// If the stream returns an error, stop processing
 					return
 				}
@@ -115,6 +118,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 						telemetry.LogDebugf("ChatService: Emitting UserConfirmationRequestEvent for tool call %s", toolCallID)
 						eventChan <- types.UserConfirmationRequestEvent{ToolCallID: toolCallID, Message: message}
+						telemetry.LogDebugf("Received stream event: UserConfirmationRequestEvent (ID: %s, Message: %s)", toolCallID, message)
 
 						confirmed := <-cs.userConfirmationChan
 						telemetry.LogDebugf("ChatService: Received user confirmation response: %t", confirmed)
@@ -135,11 +139,13 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 					// For all other tools, execute them
 					eventChan <- types.ToolCallStartEvent{ToolCallID: toolCallID, ToolName: fc.Name, Args: fc.Args}
+					telemetry.LogDebugf("Received stream event: ToolCallStartEvent (ID: %s, Name: %s, Args: %#v)", toolCallID, fc.Name, fc.Args)
 
 					tool, err := cs.toolRegistry.GetTool(fc.Name)
 					if err != nil {
 						telemetry.LogErrorf("Tool %s not found: %v", fc.Name, err)
 						eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Err: err}
+						telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", toolCallID, fc.Name, "", err)
 						toolResponseParts = append(toolResponseParts, types.Part{
 							FunctionResponse: &types.FunctionResponse{
 								Name: fc.Name,
@@ -155,6 +161,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					}
 
 					eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Result: result.ReturnDisplay, Err: err}
+					telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", toolCallID, fc.Name, result.ReturnDisplay, err)
 
 					toolResponseParts = append(toolResponseParts, types.Part{
 						FunctionResponse: &types.FunctionResponse{
@@ -173,6 +180,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 				// We just need to add the complete response to history
 				cs.history = append(cs.history, &types.Content{Role: "model", Parts: modelResponseParts})
 				eventChan <- types.FinalResponseEvent{Content: textResponse.String()}
+				telemetry.LogDebugf("Received stream event: FinalResponseEvent (Content: %s)", textResponse.String())
 				return // Exit the loop
 			}
 		}
