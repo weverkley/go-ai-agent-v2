@@ -3,6 +3,7 @@ package ui
 import (
 	"bufio" // New import
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"            // New import
 	"path/filepath" // New import
@@ -418,6 +419,25 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	var cmd tea.Cmd
 
+	// Handle confirmation prompt first, blocking all other input.
+	if keyMsg, ok := msg.(tea.KeyMsg); ok && m.awaitingConfirmation {
+		switch keyMsg.String() {
+		case "c", "C":
+			m.awaitingConfirmation = false
+			m.status = "User confirmed. Resuming..."
+			m.chatService.GetUserConfirmationChannel() <- true
+			return m, nil
+		case "x", "X":
+			m.awaitingConfirmation = false
+			m.status = "User cancelled. Resuming..."
+			m.chatService.GetUserConfirmationChannel() <- false
+			return m, nil
+		default:
+			// For any other key, just ignore it and don't pass it to the text area.
+			return m, nil
+		}
+	}
+
 	m.textarea, cmd = m.textarea.Update(msg)
 	cmds = append(cmds, cmd)
 
@@ -439,21 +459,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		if m.awaitingConfirmation {
-			switch msg.String() {
-			case "c", "C": // Continue
-				m.awaitingConfirmation = false
-				m.status = "User confirmed. Resuming..."
-				m.chatService.GetUserConfirmationChannel() <- true
-				return m, nil // No further command needed
-			case "x", "X": // Cancel
-				m.awaitingConfirmation = false
-				m.status = "User cancelled. Resuming..."
-				m.chatService.GetUserConfirmationChannel() <- false
-				return m, nil // No further command needed
-			}
-			return m, nil // Consume other key presses while awaiting confirmation
-		}
+		// NOTE: Confirmation logic is now handled at the top of the Update function.
 
 		switch msg.Type {
 		case tea.KeyEsc: // Handle ESC for cancellation
@@ -609,6 +615,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
 		m.cancelFunc = nil                                   // Clear cancel function
 		m.cancelCtx = nil                                    // Clear context
+		m.logHistory()                                       // Log history at the end of the turn
 		return m, nil
 
 	case commandFinishedMsg:
@@ -654,6 +661,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	return m, tea.Batch(cmds...)
 }
+
 
 func (m *ChatModel) View() string {
 	title := m.titleStyle.Render(m.title)
@@ -728,6 +736,23 @@ func (m *ChatModel) logMessage(msg Message) {
 		telemetry.LogErrorf("Error writing to chat log: %v", err)
 	}
 	m.logWriter.Flush() // Ensure message is written immediately
+}
+
+// logHistory writes the full chat history to the log file as JSON.
+func (m *ChatModel) logHistory() {
+	if m.logWriter == nil {
+		return
+	}
+	history := m.chatService.GetHistory()
+	historyJSON, err := json.MarshalIndent(history, "", "  ")
+	if err != nil {
+		telemetry.LogErrorf("Error marshaling chat history to JSON: %v", err)
+		return
+	}
+	if _, err := m.logWriter.WriteString(fmt.Sprintf("\n--- CHAT HISTORY ---\n%s\n--- END HISTORY ---\n", string(historyJSON))); err != nil {
+		telemetry.LogErrorf("Error writing chat history to log: %v", err)
+	}
+	m.logWriter.Flush()
 }
 
 // startStreaming initiates the stream and returns a message with the channel.
