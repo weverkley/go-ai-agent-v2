@@ -12,6 +12,10 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
     - Syntax highlighting for code within tool calls.
     - Automatic model fallback suggestions on API errors.
 
+- **Persistent Chat Sessions**: Automatically saves every conversation to disk.
+    - **Resume Sessions**: Resume previous conversations using flags (`--latest`, `--session-id <id>`).
+    - **Session Management**: List and delete previous sessions (`--list-sessions`, `--delete-session <id>`).
+
 - **Multi-Executor Support**: A flexible, factory-based architecture allows the application to be independent of any single AI provider.
     - **Interface-Driven**: Core logic is built against a common `Executor` interface.
     - **Pluggable Backends**: Concrete implementations for Google Gemini (`gemini.go`) and Qwen-compatible endpoints (`qwen.go`) can be selected at runtime.
@@ -52,7 +56,20 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
     ./go-ai-agent-v2
     ```
 
-4.  **Explore other commands:**
+4.  **Managing Chat Sessions:**
+    You can easily manage and resume your chat sessions.
+    ```bash
+    # List all previous sessions
+    ./go-ai-agent-v2 chat --list-sessions
+
+    # Resume the latest session
+    ./go-ai-agent-v2 chat --latest
+
+    # Resume a specific session by its ID
+    ./go-ai-agent-v2 chat --session-id <your-session-id>
+    ```
+
+5.  **Explore other commands:**
     ```bash
     # See all commands
     ./go-ai-agent-v2 --help

@@ -26,15 +26,86 @@ var chatCmd = &cobra.Command{
 	},
 }
 
+func init() {
+	chatCmd.Flags().String("session-id", "", "Specify an existing session ID to resume or create a new one with this ID")
+	chatCmd.Flags().Bool("new-session", false, "Force creation of a new session (generates a new ID)")
+	chatCmd.Flags().Bool("list-sessions", false, "List all available sessions and exit")
+	chatCmd.Flags().String("delete-session", "", "Delete a specific session by ID and exit")
+	chatCmd.Flags().Bool("latest", false, "Resume the latest session")
+}
+
 // runChatCmd contains the logic for the chat command, accepting necessary services.
 func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
+	// Parse session flags
+	listSessions, _ := cmd.Flags().GetBool("list-sessions")
+	deleteSessionID, _ := cmd.Flags().GetString("delete-session")
+	newSessionFlag, _ := cmd.Flags().GetBool("new-session")
+	sessionIDFlag, _ := cmd.Flags().GetString("session-id")
+	latestSessionFlag, _ := cmd.Flags().GetBool("latest")
+
+	// Handle --list-sessions
+	if listSessions {
+		sessions, err := SessionService.ListSessions()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error listing sessions: %v\n", err)
+			os.Exit(1)
+		}
+		if len(sessions) == 0 {
+			fmt.Println("No chat sessions found.")
+			os.Exit(0)
+		}
+		fmt.Println("Available chat sessions (newest first):")
+		for i, id := range sessions {
+			fmt.Printf("  %d: %s\n", i+1, id)
+		}
+		os.Exit(0)
+	}
+
+	// Handle --delete-session
+	if deleteSessionID != "" {
+		err := SessionService.DeleteSession(deleteSessionID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error deleting session '%s': %v\n", deleteSessionID, err)
+			os.Exit(1)
+		}
+		fmt.Printf("Session '%s' deleted successfully.\n", deleteSessionID)
+		os.Exit(0)
+	}
+
+	// Determine the current session ID
+	var currentSessionID string
+	if newSessionFlag {
+		currentSessionID = SessionService.GenerateSessionID()
+	} else if sessionIDFlag != "" {
+		currentSessionID = sessionIDFlag
+	} else if latestSessionFlag {
+		sessions, err := SessionService.ListSessions()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error getting latest session: %v\n", err)
+			os.Exit(1)
+		}
+		if len(sessions) > 0 {
+			currentSessionID = sessions[0] // ListSessions returns newest first
+		} else {
+			fmt.Println("No previous sessions found. Starting a new session.")
+			currentSessionID = SessionService.GenerateSessionID()
+		}
+	} else {
+		// Default behavior: create a new session if no flags are specified
+		currentSessionID = SessionService.GenerateSessionID()
+	}
+
 	// Use the global Cfg and initialized executor
 	appConfig := Cfg
 	executorTypeVal, _ := settingsService.Get("executor")
 	executorType, _ := executorTypeVal.(string)
 
 	toolRegistry, _ := appConfig.Get("toolRegistry")
-	chatService := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), []*types.Content{})
+	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating chat service: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Create a CommandExecutor function that wraps the Cobra command execution
 	commandExecutor := func(cmdArgs []string) (string, error) {
@@ -67,7 +138,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 	// Initialize WorkspaceService
 	workspaceService := services.NewWorkspaceService(".") // Assuming "." is the project root
 
-	p := tea.NewProgram(ui.NewChatModel(chatService, executorType, appConfig, commandExecutor, shellService, gitService, workspaceService), tea.WithAltScreen())
+	p := tea.NewProgram(ui.NewChatModel(chatService, executorType, appConfig, commandExecutor, shellService, gitService, workspaceService, currentSessionID), tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Printf("Error running interactive chat: %v\n", err)

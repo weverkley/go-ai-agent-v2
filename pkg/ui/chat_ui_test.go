@@ -2,6 +2,8 @@ package ui
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -36,23 +38,46 @@ func (m *MockShellExecutionService) KillAllProcesses() {
 }
 
 // --- Helper for creating a test model ---
-func newTestModel(executor core.Executor) *ChatModel {
+func setupTestSessionService(t *testing.T) (*services.SessionService, func()) {
+	projectRoot, err := os.MkdirTemp("", "project_root_*")
+	assert.NoError(t, err)
+	goaiagentDir := filepath.Join(projectRoot, ".goaiagent")
+	err = os.Mkdir(goaiagentDir, 0755)
+	assert.NoError(t, err)
+
+	ss, err := services.NewSessionService(goaiagentDir)
+	assert.NoError(t, err)
+
+	cleanup := func() {
+		os.RemoveAll(projectRoot)
+	}
+	return ss, cleanup
+}
+
+func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 	dummyCommandExecutor := func(args []string) (string, error) { return "command executed", nil }
 	dummyShellService := new(MockShellExecutionService)
-	// Use real services here to avoid type mismatch issues, as they are simple enough.
 	realGitService := services.NewGitService()
 	realWorkspaceService := services.NewWorkspaceService(".")
 
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 
-	chatService := services.NewChatService(executor, types.NewToolRegistry(), []*types.Content{})
+	sessionService, cleanup := setupTestSessionService(t)
+	// We don't call cleanup() here because the test function that called newTestModel will be responsible for it.
+	// This is a simplification for this test file. A more robust solution might use t.Cleanup(cleanup).
 
-	return NewChatModel(chatService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService)
+	sessionID := "test-session"
+	chatService, err := services.NewChatService(executor, types.NewToolRegistry(), sessionService, sessionID)
+	assert.NoError(t, err)
+
+	model := NewChatModel(chatService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)
+	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.
+	return model
 }
 
 func TestNewChatModel(t *testing.T) {
 	executor := &core.MockExecutor{}
-	model := newTestModel(executor)
+	model := newTestModel(t, executor)
 
 	assert.NotNil(t, model)
 	assert.Equal(t, "Ready", model.status)
@@ -72,7 +97,7 @@ func TestUpdate_UserInput(t *testing.T) {
 			return ch, nil
 		},
 	}
-	model := newTestModel(executor)
+	model := newTestModel(t, executor)
 	model.textarea.SetValue("hello")
 
 	// Execute
@@ -97,7 +122,7 @@ func TestUpdate_UserInput(t *testing.T) {
 func TestUpdate_SlashCommand_Clear(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	model := newTestModel(executor)
+	model := newTestModel(t, executor)
 	model.messages = append(model.messages, UserMessage{Content: "test"}) // Add a message
 	assert.Len(t, model.messages, 3)
 	model.textarea.SetValue("/clear")
@@ -116,7 +141,7 @@ func TestUpdate_SlashCommand_Clear(t *testing.T) {
 func TestUpdate_SlashCommand_Quit(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	model := newTestModel(executor)
+	model := newTestModel(t, executor)
 	model.textarea.SetValue("/quit")
 
 	// Execute
@@ -138,7 +163,7 @@ func TestUpdate_SlashCommand_Quit(t *testing.T) {
 
 func TestUpdate_StreamingEvents(t *testing.T) {
 	// Setup
-	model := newTestModel(&core.MockExecutor{})
+	model := newTestModel(t, &core.MockExecutor{})
 	ch := make(chan any, 5)
 	ch <- types.StreamingStartedEvent{}
 	ch <- types.ThinkingEvent{}
@@ -197,7 +222,7 @@ func TestUpdate_StreamingEvents(t *testing.T) {
 func TestUpdate_UserConfirmationFlow(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	model := newTestModel(executor)
+	model := newTestModel(t, executor)
 	model.isStreaming = true // We must be streaming to receive a confirmation request
 
 	// 1. Simulate the executor sending a UserConfirmationRequestEvent

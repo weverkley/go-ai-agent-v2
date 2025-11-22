@@ -35,6 +35,7 @@ var WorkspaceService *services.WorkspaceService // Declare package-level workspa
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
 var MemoryService *services.MemoryService       // Declare package-level memoryService
 var SettingsService *services.SettingsService   // Declare package-level settingsService
+var SessionService *services.SessionService // Declare package-level sessionService
 
 var FSService services.FileSystemService // Declare package-level FileSystemService
 var ShellService services.ShellExecutionService   // Declare package-level ShellExecutionService
@@ -186,6 +187,13 @@ func init() {
 		telemetrySettings := getTelemetrySettings(SettingsService)
 		toolRegistry := registerTools(FSService, ShellService, SettingsService)
 		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
+
+		// Initialize SessionService now that Cfg is available
+		SessionService, err = services.NewSessionService(Cfg.GetGoaiagentDir())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing SessionService: %v\n", err)
+			os.Exit(1)
+		}
 
 		// Get executor type from settings
 		executorTypeVal, _ := SettingsService.Get("executor")

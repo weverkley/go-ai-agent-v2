@@ -335,6 +335,7 @@ type ChatModel struct {
 	toolCallCount  int
 	toolErrorCount int
 	contextFile    string
+	sessionID      string // New field to store the current session ID
 }
 
 func NewChatModel(
@@ -345,6 +346,7 @@ func NewChatModel(
 	shellService services.ShellExecutionService,
 	gitService services.GitService,
 	workspaceService *services.WorkspaceService,
+	sessionID string, // New parameter
 ) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
@@ -406,89 +408,49 @@ func NewChatModel(
 	}
 	logWriter := bufio.NewWriter(logFile)
 
-		model := &ChatModel{
-
-			viewport:                     vp,
-
-			textarea:                     ta,
-
-			spinner:                      s,
-
-			messages:                     createInitialMessages(),
-
-			chatService:                  chatService,
-
-			executorType:                 executorType,
-
-			config:                       config,
-
-			shellService:                 shellService,
-
-			gitService:                   gitService,
-
-			workspaceService:             workspaceService,
-
-			isStreaming:                  false,
-
-			status:                       "Ready",
-
-			commandExecutor:              commandExecutor,
-
-			activeToolCalls:              make(map[string]*ToolCallStatus),
-
-			senderStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-
-			botStyle:                     lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
-
-			toolStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
-
-			errorStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
-
-			statusStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-
-			footerStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-
-			suggestionStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
-
-			pathStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // Blue
-
-			branchStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // Green
-
-			modelStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Pink
-
-			logFile:                      logFile,
-
-			logWriter:                    logWriter,
-
-			commandHistory:               []string{},
-
-			historyIndex:                 0,
-
-			startTime:                    time.Now(),
-
-			toolCallCount:                0,
-
-			toolErrorCount:               0,
-
-		}
-
-	
-
-		// Check for context file
-
-		if _, err := os.Stat("GOAIAGENT.md"); err == nil {
-
-			model.contextFile = "GOAIAGENT.md"
-
-		}
-
-	
-
-		model.updateViewport() // Ensure initial messages are displayed
-
-		return model
-
+	model := &ChatModel{
+		viewport:         vp,
+		textarea:         ta,
+		spinner:          s,
+		messages:         createInitialMessages(),
+		chatService:      chatService,
+		executorType:     executorType,
+		config:           config,
+		shellService:     shellService,
+		gitService:       gitService,
+		workspaceService: workspaceService,
+		isStreaming:      false,
+		status:           "Ready",
+		commandExecutor:  commandExecutor,
+		activeToolCalls:  make(map[string]*ToolCallStatus),
+		senderStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		botStyle:         lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
+		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+		statusStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		footerStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		suggestionStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		pathStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // Blue
+		branchStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // Green
+		modelStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Pink
+		logFile:          logFile,
+		logWriter:        logWriter,
+		commandHistory:   []string{},
+		historyIndex:     0,
+		startTime:        time.Now(),
+		toolCallCount:    0,
+		toolErrorCount:   0,
+		sessionID:        sessionID, // Store the session ID
 	}
+
+	// Check for context file
+	if _, err := os.Stat("GOAIAGENT.md"); err == nil {
+		model.contextFile = "GOAIAGENT.md"
+	}
+
+	model.updateViewport() // Ensure initial messages are displayed
+	return model
+}
 
 // Close closes the log file.
 func (m *ChatModel) Close() error {
@@ -810,15 +772,16 @@ func (m *ChatModel) renderFooter() string {
 	if err != nil {
 		cwd = "???"
 	}
+	baseCwd := filepath.Base(cwd) // Get only the current folder name
 	branch, err := m.gitService.GetCurrentBranch(cwd)
 	if err != nil {
 		branch = "" // Don't show branch if not in a git repo or error
 	}
 	var left string
 	if branch != "" {
-		left = fmt.Sprintf("%s (%s)", m.pathStyle.Render(cwd), m.branchStyle.Render(branch))
+		left = fmt.Sprintf("%s (%s)", m.pathStyle.Render(baseCwd), m.branchStyle.Render(branch))
 	} else {
-		left = m.pathStyle.Render(cwd)
+		left = m.pathStyle.Render(baseCwd)
 	}
 
 		// Center: Stats
@@ -836,8 +799,8 @@ func (m *ChatModel) renderFooter() string {
 		}
 	stats := fmt.Sprintf("%s | Time: %02d:%02d:%02d", toolsStats, hours, minutes, seconds)
 
-	// Right side: Model name
-	right := m.modelStyle.Render(m.executorType)
+	// Right side: Model name and Session ID
+	right := fmt.Sprintf("%s | Session: %s", m.modelStyle.Render(m.executorType), m.modelStyle.Render(m.sessionID))
 
 	// Calculate remaining space
 	usedWidth := lipgloss.Width(left) + lipgloss.Width(right) + lipgloss.Width(stats) + 2*lipgloss.Width(separator)

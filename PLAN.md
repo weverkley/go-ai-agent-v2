@@ -12,6 +12,12 @@ The UI for this CLI is implemented using `charmbracelet/bubbletea` for a rich, i
 
 The application is built on a modular, decoupled architecture. A central `PersistentPreRun` hook in `cmd/root.go` initializes and injects all necessary services (File System, Shell, Git, Settings) into the command context, ensuring a consistent environment.
 
+- **`pkg/services` - Session Management**:
+    - `SessionService` (`session_service.go`) provides file-based persistence for chat sessions.
+    - Chat history is saved as a JSON file in a dedicated directory within the user's home (`~/.go-ai-agent/sessions`).
+    - The `chat` command now supports session management via flags (`--session-id`, `--new-session`, `--latest`, `--list-sessions`, `--delete-session`), allowing users to resume previous conversations.
+    - Each session is automatically saved after every user message and model response, ensuring no data is lost.
+
 - **`pkg/core` - Multi-Executor Abstraction**:
     - The `Executor` interface defines a common contract for all AI backends (`StreamContent`, `ExecuteTool`, etc.).
     - `ExecutorFactory` (`executor_factory.go`) provides an abstract factory pattern, allowing the CLI to dynamically instantiate different AI backends (`gemini`, `qwen`, `mock`) by name.
@@ -33,7 +39,7 @@ The application is built on a modular, decoupled architecture. A central `Persis
     - `chat_ui.go` implements a sophisticated UI based on the `bubbletea` framework.
     - It functions as an event stream visualizer. It initiates a request via the `Executor`'s `StreamContent` method and then renders the stream of events (`Thinking`, `ToolCallStart`, `ToolCallEnd`, `FinalResponse`, etc.) into a human-readable, interactive format.
     - Includes advanced rendering for tool calls, providing real-time insight into the agent's actions.
-    - Features a dynamic footer with live session stats, Git status, and more.
+    - Features a dynamic footer with live session stats, Git status, the current session ID, and more.
     - It can execute other CLI commands from within the chat (e.g., `/settings`, `/clear`) via a `commandExecutor` function.
 
 - **Command Status**: All commands listed in the previous version of this plan are considered functionally integrated into this new architecture.
@@ -74,7 +80,7 @@ The core application logic has been successfully migrated to the new Go architec
 
 6.  **Completing Features:**
     *   Implement full IDE integration (`ide` command).
-    - Implement saving and restoring CLI state, including tool calls and conversation/file history, for the `restore` command.
+    - [COMPLETED] Implement saving and restoring CLI state, including tool calls and conversation/file history, for the `restore` command.
     *   Implement folder trust management for the `permissions` command.
 
 7.  **General**:

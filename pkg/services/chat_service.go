@@ -18,19 +18,33 @@ type ChatService struct {
 	userConfirmationChan chan bool
 	toolCallCounter      int
 	toolErrorCounter     int
+	sessionService       *SessionService // New field
+	sessionID            string          // New field
 }
 
 // NewChatService creates a new ChatService.
-func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, initialHistory []*types.Content) *ChatService {
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string) (*ChatService, error) {
 	confirmationChan := make(chan bool, 1)
 	executor.SetUserConfirmationChannel(confirmationChan)
 
-	return &ChatService{
+	initialHistory, err := sessionService.LoadHistory(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load session history for ID %s: %w", sessionID, err)
+	}
+
+	cs := &ChatService{
 		executor:             executor,
 		toolRegistry:         toolRegistry,
 		history:              initialHistory,
 		userConfirmationChan: confirmationChan,
+		sessionService:       sessionService,
+		sessionID:            sessionID,
 	}
+	// Save the loaded (or empty) history immediately to ensure the session file exists if it's new.
+	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+		return nil, fmt.Errorf("failed to save initial session history: %w", err)
+	}
+	return cs, nil
 }
 
 // SendMessage starts the conversation loop for a user's message and returns a channel of events.
@@ -43,6 +57,10 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 		Parts: []types.Part{{Text: userInput}},
 	}
 	cs.history = append(cs.history, currentContent)
+	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+		eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after user message: %w", err)}
+		return nil, err
+	}
 
 	go func() {
 		defer close(eventChan)
@@ -102,6 +120,10 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 				// Add the model's response (containing the tool calls) to history
 				cs.history = append(cs.history, &types.Content{Role: "model", Parts: modelResponseParts})
+				if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after model response with tool calls: %w", err)}
+					return
+				}
 
 				var toolResponseParts []types.Part
 
@@ -175,12 +197,20 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 				telemetry.LogDebugf("ChatService: Finished tool call loop.")
 				// Add the collected tool responses to history for the next turn
 				cs.history = append(cs.history, &types.Content{Role: "user", Parts: toolResponseParts})
+				if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after tool responses: %w", err)}
+					return
+				}
 
 			} else { // No tool calls, this is the final answer
 				telemetry.LogDebugf("ChatService: Received final text response.")
 				// The final text is already composed of the text parts sent to the UI
 				// We just need to add the complete response to history
 				cs.history = append(cs.history, &types.Content{Role: "model", Parts: modelResponseParts})
+				if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after final model response: %w", err)}
+					return
+				}
 				eventChan <- types.FinalResponseEvent{Content: textResponse.String()}
 				telemetry.LogDebugf("Received stream event: FinalResponseEvent (Content: %s)", textResponse.String())
 				return // Exit the loop
@@ -199,6 +229,11 @@ func (cs *ChatService) GetHistory() []*types.Content {
 // ClearHistory resets the chat history.
 func (cs *ChatService) ClearHistory() {
 	cs.history = []*types.Content{}
+	// Persist the empty history to clear the session file
+	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+		// Log the error but don't fail, as clearing history is a best-effort operation
+		telemetry.LogErrorf("Failed to clear persisted history for session %s: %v", cs.sessionID, err)
+	}
 }
 
 // GetUserConfirmationChannel returns the channel used for user confirmation responses.
