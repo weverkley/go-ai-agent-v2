@@ -63,6 +63,7 @@ func (s *ExtensionFlowTestSuite) TestExtensionFlow() {
 	// 3. Install the extension from the local path
 	installCmd := exec.Command(s.cliPath, "extensions", "install", clonedRepoPath)
 	installCmd.Dir = s.tempDir
+	installCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err := installCmd.CombinedOutput()
 	fmt.Println(string(output))
 	s.Require().NoError(err, "Failed to install git extension. Output: %s", string(output))
@@ -70,6 +71,7 @@ func (s *ExtensionFlowTestSuite) TestExtensionFlow() {
 	// 4. List extensions and verify the new extension is there
 	listCmd := exec.Command(s.cliPath, "extensions", "list")
 	listCmd.Dir = s.tempDir
+	listCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = listCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to list extensions. Output: %s", string(output))
 	s.Contains(string(output), extName, "The installed extension should be in the list")
@@ -77,12 +79,14 @@ func (s *ExtensionFlowTestSuite) TestExtensionFlow() {
 	// 5. Disable the extension
 	disableCmd := exec.Command(s.cliPath, "extensions", "disable", extName)
 	disableCmd.Dir = s.tempDir
+	disableCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = disableCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to disable extension. Output: %s", string(output))
 
 	// 6. List extensions and verify the extension is disabled
 	listCmd = exec.Command(s.cliPath, "extensions", "list")
 	listCmd.Dir = s.tempDir
+	listCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = listCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to list extensions. Output: %s", string(output))
 	s.Contains(string(output), fmt.Sprintf("- %s (Enabled: false)", extName), "The extension should be disabled")
@@ -90,12 +94,14 @@ func (s *ExtensionFlowTestSuite) TestExtensionFlow() {
 	// 7. Enable the extension
 	enableCmd := exec.Command(s.cliPath, "extensions", "enable", extName)
 	enableCmd.Dir = s.tempDir
+	enableCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = enableCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to enable extension. Output: %s", string(output))
 
 	// 8. List extensions and verify the extension is enabled
 	listCmd = exec.Command(s.cliPath, "extensions", "list")
 	listCmd.Dir = s.tempDir
+	listCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = listCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to list extensions. Output: %s", string(output))
 	s.NotContains(string(output), "disabled", "The extension should be enabled")
@@ -103,12 +109,14 @@ func (s *ExtensionFlowTestSuite) TestExtensionFlow() {
 	// 9. Uninstall the extension
 	uninstallCmd := exec.Command(s.cliPath, "extensions", "uninstall", extName)
 	uninstallCmd.Dir = s.tempDir
+	uninstallCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = uninstallCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to uninstall extension. Output: %s", string(output))
 
 	// 10. List extensions and verify the extension is gone
 	listCmd = exec.Command(s.cliPath, "extensions", "list")
 	listCmd.Dir = s.tempDir
+	listCmd.Env = append(os.Environ(), "GO_AI_AGENT_TEST_EXECUTOR=mock")
 	output, err = listCmd.CombinedOutput()
 	s.Require().NoError(err, "Failed to list extensions. Output: %s", string(output))
 	s.NotContains(string(output), extName, "The uninstalled extension should not be in the list")

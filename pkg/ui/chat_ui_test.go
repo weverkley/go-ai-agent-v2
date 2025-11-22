@@ -1,13 +1,13 @@
 package ui
 
 import (
-	"context" // New import
+	"context"
 	"testing"
-	"time"    // Added
+	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/routing"
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/charmbracelet/bubbletea"
@@ -15,7 +15,8 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockShellExecutionService is a mock implementation of services.ShellExecutionService
+// --- Mock Services ---
+
 type MockShellExecutionService struct {
 	mock.Mock
 }
@@ -34,40 +35,44 @@ func (m *MockShellExecutionService) KillAllProcesses() {
 	m.Called()
 }
 
+// --- Helper for creating a test model ---
+func newTestModel(executor core.Executor) *ChatModel {
+	dummyCommandExecutor := func(args []string) (string, error) { return "command executed", nil }
+	dummyShellService := new(MockShellExecutionService)
+	// Use real services here to avoid type mismatch issues, as they are simple enough.
+	realGitService := services.NewGitService()
+	realWorkspaceService := services.NewWorkspaceService(".")
+
+	appConfig := config.NewConfig(&config.ConfigParameters{})
+
+	chatService := services.NewChatService(executor, types.NewToolRegistry(), []*types.Content{})
+
+	return NewChatModel(chatService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService)
+}
+
 func TestNewChatModel(t *testing.T) {
 	executor := &core.MockExecutor{}
-	// Define a dummy commandExecutor for testing
-	dummyCommandExecutor := func(args []string) (string, error) {
-		return "command executed", nil
-	}
-	dummyShellService := new(MockShellExecutionService) // Create a dummy shell service
-	appConfig := config.NewConfig(&config.ConfigParameters{})
-	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
+	model := newTestModel(executor)
 
 	assert.NotNil(t, model)
 	assert.Equal(t, "Ready", model.status)
-	assert.Equal(t, "Go AI Agent Chat", model.title)
 	assert.False(t, model.isStreaming)
-	assert.Empty(t, model.messages)
+	assert.Len(t, model.messages, 2) // initial logo and tips
 }
 
 func TestUpdate_UserInput(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{
-		GenerateStreamFunc: func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
+		StreamContentFunc: func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 			ch := make(chan any)
-			close(ch)
+			go func() {
+				defer close(ch)
+				ch <- types.FinalResponseEvent{Content: "response"}
+			}()
 			return ch, nil
 		},
 	}
-	dummyCommandExecutor := func(args []string) (string, error) {
-		return "command executed", nil
-	}
-	dummyShellService := new(MockShellExecutionService)
-	appConfig := config.NewConfig(&config.ConfigParameters{})
-	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
+	model := newTestModel(executor)
 	model.textarea.SetValue("hello")
 
 	// Execute
@@ -82,8 +87,9 @@ func TestUpdate_UserInput(t *testing.T) {
 	assert.True(t, ok)
 	assert.True(t, chatModel.isStreaming)
 	assert.Equal(t, "Sending...", chatModel.status)
-	assert.Len(t, chatModel.messages, 1)
-	userMsg, ok := chatModel.messages[0].(UserMessage)
+	// 2 initial messages + 1 user message
+	assert.Len(t, chatModel.messages, 3)
+	userMsg, ok := chatModel.messages[2].(UserMessage)
 	assert.True(t, ok)
 	assert.Equal(t, "hello", userMsg.Content)
 }
@@ -91,14 +97,9 @@ func TestUpdate_UserInput(t *testing.T) {
 func TestUpdate_SlashCommand_Clear(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	dummyCommandExecutor := func(args []string) (string, error) {
-		return "command executed", nil
-	}
-	dummyShellService := new(MockShellExecutionService)
-	appConfig := config.NewConfig(&config.ConfigParameters{})
-	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
-	model.messages = []Message{UserMessage{Content: "test"}}
+	model := newTestModel(executor)
+	model.messages = append(model.messages, UserMessage{Content: "test"}) // Add a message
+	assert.Len(t, model.messages, 3)
 	model.textarea.SetValue("/clear")
 
 	// Execute
@@ -109,40 +110,35 @@ func TestUpdate_SlashCommand_Clear(t *testing.T) {
 	assert.Nil(t, cmd)
 	chatModel, ok := newModel.(*ChatModel)
 	assert.True(t, ok)
-	assert.Empty(t, chatModel.messages)
+	assert.Len(t, chatModel.messages, 2) // Should be reset to the 2 initial messages
 }
 
 func TestUpdate_SlashCommand_Quit(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	dummyCommandExecutor := func(args []string) (string, error) {
-		return "command executed", nil
-	}
-	dummyShellService := new(MockShellExecutionService)
-	appConfig := config.NewConfig(&config.ConfigParameters{})
-	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
+	model := newTestModel(executor)
 	model.textarea.SetValue("/quit")
 
 	// Execute
 	msg := tea.KeyMsg{Type: tea.KeyEnter}
-	_, cmd := model.Update(msg)
+	newModel, cmd := model.Update(msg)
 
-	// Assert
+	// Assert: It should dispatch a command to be executed
 	assert.NotNil(t, cmd)
-	assert.IsType(t, tea.Quit(), cmd())
+	assert.NotNil(t, newModel)
+
+	// Now, simulate the end of the command execution
+	finishMsg := cmd()
+	finalModel, finalCmd := newModel.Update(finishMsg)
+
+	// Assert: The final command should be tea.Quit
+	assert.NotNil(t, finalModel)
+	assert.IsType(t, tea.Quit(), finalCmd())
 }
 
 func TestUpdate_StreamingEvents(t *testing.T) {
 	// Setup
-	executor := &core.MockExecutor{}
-	dummyCommandExecutor := func(args []string) (string, error) {
-		return "command executed", nil
-	}
-	dummyShellService := new(MockShellExecutionService)
-	appConfig := config.NewConfig(&config.ConfigParameters{})
-	router := routing.NewModelRouterService(appConfig)
-	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
+	model := newTestModel(&core.MockExecutor{})
 	ch := make(chan any, 5)
 	ch <- types.StreamingStartedEvent{}
 	ch <- types.ThinkingEvent{}
@@ -154,209 +150,108 @@ func TestUpdate_StreamingEvents(t *testing.T) {
 	model.streamCh = ch
 	var newModel tea.Model
 	var cmd tea.Cmd
-	var ok bool
-	var chatModel *ChatModel // Explicitly declare chatModel
+	chatModel := model
 
-	chatModel = model // Assign the initial model after type assertion
-
+	// --- StreamingStartedEvent ---
 	newModel, cmd = chatModel.Update(streamEventMsg{event: <-ch})
-	var tempChatModel *ChatModel
-	var tempOk bool
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
+	chatModel = newModel.(*ChatModel)
 	assert.Equal(t, "Stream started...", chatModel.status)
 	assert.NotNil(t, cmd)
 
+	// --- ThinkingEvent ---
 	newModel, cmd = chatModel.Update(streamEventMsg{event: <-ch})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
+	chatModel = newModel.(*ChatModel)
 	assert.Equal(t, "Thinking...", chatModel.status)
 	assert.NotNil(t, cmd)
 
-	// Execute & Assert for ThinkingEvent
+	// --- ToolCallStartEvent ---
 	newModel, cmd = chatModel.Update(streamEventMsg{event: <-ch})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
+	chatModel = newModel.(*ChatModel)
 	assert.Equal(t, "Executing tool...", chatModel.status)
-	assert.Len(t, chatModel.messages, 1)
+	assert.Len(t, chatModel.messages, 3) // 2 initial + 1 tool call group
+	assert.Equal(t, 1, chatModel.toolCallCount)
 	assert.NotNil(t, cmd)
 
-	// Execute & Assert for ToolCallEndEvent
+	// --- ToolCallEndEvent ---
 	newModel, cmd = chatModel.Update(streamEventMsg{event: <-ch})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
+	chatModel = newModel.(*ChatModel)
 	assert.Equal(t, "Got tool result...", chatModel.status)
+	assert.Len(t, chatModel.messages, 3) // Still 3, end event updates the group
 	assert.NotNil(t, cmd)
 
-	// Execute & Assert for FinalResponseEvent
+	// --- FinalResponseEvent ---
 	newModel, cmd = chatModel.Update(streamEventMsg{event: <-ch})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
-	assert.Len(t, chatModel.messages, 2)
+	chatModel = newModel.(*ChatModel)
+	assert.Len(t, chatModel.messages, 4) // 2 initial + 1 tool group + 1 final response
 	assert.NotNil(t, cmd)
 
-	// Execute & Assert for streamFinishMsg
+	// --- streamFinishMsg ---
 	newModel, cmd = chatModel.Update(streamFinishMsg{})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
+	chatModel = newModel.(*ChatModel)
 	assert.False(t, chatModel.isStreaming)
 	assert.Equal(t, "Ready", chatModel.status)
 	assert.Nil(t, cmd)
 }
 
+
 func TestUpdate_UserConfirmationFlow(t *testing.T) {
 	// Setup
 	executor := &core.MockExecutor{}
-	dummyCommandExecutor := func(args []string) (string, error) {
-		return "command executed", nil
-	}
-	dummyShellService := new(MockShellExecutionService)
-	appConfig := config.NewConfig(&config.ConfigParameters{})
-	router := routing.NewModelRouterService(appConfig)
+	model := newTestModel(executor)
+	model.isStreaming = true // We must be streaming to receive a confirmation request
 
-	// Initialize the mock executor's UserConfirmationChan before creating the model
-	executor.UserConfirmationChan = make(chan bool, 1)
-
-	model := NewChatModel(executor, "mock", appConfig, router, dummyCommandExecutor, dummyShellService)
-
-	// Initialize cancelCtx, cancelFunc, and streamCh for the test
-	model.cancelCtx, model.cancelFunc = context.WithCancel(context.Background())
-	model.streamCh = make(chan any, 1) // Create a dummy channel
-
-	// Simulate the executor sending a UserConfirmationRequestEvent
-	toolCallID := "confirm-123"
-	confirmationMessage := "Do you want to proceed?"
+	// 1. Simulate the executor sending a UserConfirmationRequestEvent
 	confirmationEvent := types.UserConfirmationRequestEvent{
-		ToolCallID: toolCallID,
-		Message:    confirmationMessage,
+		ToolCallID: "confirm-123",
+		Message:    "Do you want to proceed?",
 	}
+	newModel, cmd := model.Update(streamEventMsg{event: confirmationEvent})
 
-	var newModel tea.Model
-	var cmd tea.Cmd
-	var ok bool
-	var chatModel *ChatModel // Explicitly declare chatModel
-	var tempChatModel *ChatModel
-	var tempOk bool
-
-	chatModel = model // Assign the initial model after type assertion
-
-	// --- Test Continue ---
-	// Reset model state for this sub-test
-	chatModel.awaitingConfirmation = true // Should be true to enter confirmation flow
-	chatModel.status = "Ready"
-
-	t.Logf("Step 1: Initial state - chatModel: %p", chatModel)
-
-	// Send the confirmation request event to the model
-	newModel, cmd = chatModel.Update(streamEventMsg{event: confirmationEvent})
-	t.Logf("Step 2: After confirmationEvent - newModel: %p, cmd: %v", newModel, cmd)
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
+	// Assert: Model is now awaiting confirmation
+	chatModel, ok := newModel.(*ChatModel)
 	assert.True(t, ok)
 	assert.True(t, chatModel.awaitingConfirmation)
-	assert.Contains(t, chatModel.status, "Awaiting user confirmation...")
-	assert.Nil(t, cmd) // Expect a nil command when awaiting confirmation
-	t.Logf("Step 3: After confirmationEvent cast - chatModel: %p, ok: %t", chatModel, ok)
+	assert.Equal(t, "Awaiting user confirmation...", chatModel.status)
+	assert.Nil(t, cmd) // Should be nil now, as the stream listener is paused
 
-	// Simulate user pressing 'c'
+	// 2. Simulate user pressing 'c' to confirm
 	newModel, cmd = chatModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
-	t.Logf("Step 4: After KeyMsg 'c' - newModel: %p, cmd: %v", newModel, cmd)
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
+	chatModel, ok = newModel.(*ChatModel)
 	assert.True(t, ok)
-	t.Logf("Step 5: After KeyMsg 'c' cast - chatModel: %p, ok: %t", chatModel, ok)
 
-	// Directly send the confirmation to the channel
-	select {
-	case executor.UserConfirmationChan <- true:
-		t.Logf("Step 6: Directly sent 'true' to UserConfirmationChan")
-	case <-time.After(time.Millisecond * 100):
-		t.Fatal("Timed out sending 'true' to UserConfirmationChan")
-	}
-
-	// Process the userConfirmationMsg that would have been returned by the Update function
-	// This is now handled by the direct send above, so we just need to ensure the model state is updated
-	// We can simulate the effect of the userConfirmationMsg being processed by the Update function
-	// by calling Update with a dummy userConfirmationMsg.
-	newModel, cmd = chatModel.Update(userConfirmationMsg{toolCallID: toolCallID, response: "continue"})
-	t.Logf("Step 7: After userConfirmationMsg - newModel: %p, cmd: %v", newModel, cmd)
-	t.Logf("Step 8: After reading from UserConfirmationChan")
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	t.Logf("Step 9: After userConfirmationMsg cast - tempChatModel: %p, tempOk: %t", tempChatModel, tempOk)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
-	assert.NotNil(t, cmd) // Expect a command to wait for stream events
-	t.Logf("Step 10: End of 'c' sub-test - chatModel: %p, ok: %t", chatModel, ok)
-
-	// Verify that 'true' was sent to the executor's channel
-	select {
-	case confirmed := <-executor.UserConfirmationChan: // Access the channel directly from the mock
-		assert.True(t, confirmed)
-	case <-time.After(time.Second):
-		t.Fatal("Timed out waiting for confirmation response")
-	}
-
-	// --- Test Cancel ---
-	// Reset model state for this sub-test
-	chatModel.awaitingConfirmation = true // Should be true to enter confirmation flow
-	chatModel.status = "Ready"
-
-	// Send the confirmation request event to the model
-	newModel, cmd = chatModel.Update(streamEventMsg{event: confirmationEvent})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
-	assert.True(t, chatModel.awaitingConfirmation)
-	assert.Contains(t, chatModel.status, "Awaiting user confirmation...")
-	assert.Nil(t, cmd) // Expect a nil command when awaiting confirmation
-
-	// Simulate user pressing 'x'
-	newModel, cmd = chatModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
+	// Assert: Model is no longer awaiting confirmation and is resuming
 	assert.False(t, chatModel.awaitingConfirmation)
-	assert.Contains(t, chatModel.status, "User cancelled.")
-	assert.NotNil(t, cmd) // Expect a command to be returned
+	assert.Equal(t, "User confirmed. Resuming...", chatModel.status)
+	assert.NotNil(t, cmd) // Should return a waitForEvent command
 
-	// Directly send the cancellation to the channel
+	// Assert: The confirmation was sent to the service's channel
 	select {
-	case executor.UserConfirmationChan <- false:
-		t.Logf("Step X: Directly sent 'false' to UserConfirmationChan")
-	case <-time.After(time.Second):
-		t.Fatal("Timed out sending 'false' to UserConfirmationChan")
+	case confirmed := <-model.chatService.GetUserConfirmationChannel():
+		assert.True(t, confirmed)
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for confirmation")
 	}
 
-	// Process the userConfirmationMsg that would have been returned by the Update function
-	newModel, cmd = chatModel.Update(userConfirmationMsg{toolCallID: toolCallID, response: "cancel"})
-	tempChatModel, tempOk = newModel.(*ChatModel)
-	chatModel = tempChatModel
-	ok = tempOk
-	assert.True(t, ok)
-	assert.NotNil(t, cmd) // Expect a command to wait for stream events
+	// 3. Simulate user pressing 'x' to cancel
+	model.isStreaming = true
+	model.awaitingConfirmation = false // Reset state
+	newModel, _ = model.Update(streamEventMsg{event: confirmationEvent})
+	chatModel, _ = newModel.(*ChatModel) // Enter confirmation state again
 
-	// Verify that 'false' was sent to the executor's channel
+	newModel, cmd = chatModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	chatModel, ok = newModel.(*ChatModel)
+	assert.True(t, ok)
+
+	// Assert: Model is no longer awaiting and is cancelled
+	assert.False(t, chatModel.awaitingConfirmation)
+	assert.Equal(t, "User cancelled. Resuming...", chatModel.status)
+	assert.NotNil(t, cmd)
+
+	// Assert: The cancellation was sent to the service's channel
 	select {
-	case confirmed := <-executor.UserConfirmationChan: // Access the channel directly from the mock
+	case confirmed := <-model.chatService.GetUserConfirmationChannel():
 		assert.False(t, confirmed)
-	case <-time.After(time.Second):
-		t.Fatal("Timed out waiting for cancellation response")
+	case <-time.After(1 * time.Second):
+		t.Fatal("timed out waiting for cancellation")
 	}
 }

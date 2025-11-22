@@ -52,7 +52,7 @@ func TestGenerateStream(t *testing.T) {
 		modelName: "qwen-turbo", // Added missing field
 	}
 
-	eventChan, err := qwenChat.GenerateStream(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
+	eventChan, err := qwenChat.StreamContent(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
 	assert.NoError(t, err)
 
 	var events []any
@@ -128,7 +128,7 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 		toolRegistry: toolRegistry,
 	}
 
-	eventChan, err := qwenChat.GenerateStream(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
+	eventChan, err := qwenChat.StreamContent(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
 	assert.NoError(t, err)
 
 	var events []any

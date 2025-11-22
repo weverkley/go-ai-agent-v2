@@ -194,6 +194,11 @@ func init() {
 			executorType = "gemini" // Fallback
 		}
 
+		// Allow tests to override the executor
+		if testExecutor := os.Getenv("GO_AI_AGENT_TEST_EXECUTOR"); testExecutor != "" {
+			executorType = testExecutor
+		}
+
 		// Get model from settings
 		modelVal, _ := SettingsService.Get("model")
 		model, ok := modelVal.(string)

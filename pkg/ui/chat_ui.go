@@ -635,7 +635,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForEvent(m.streamCh)
 
 	case streamEventMsg:
-		shouldWaitForEvent := true
 		switch event := msg.event.(type) {
 		case types.StreamingStartedEvent:
 			m.status = "Stream started..."
@@ -681,7 +680,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.updateViewport()
-			shouldWaitForEvent = false // Stop waiting for stream events
+			return m, nil // Stop waiting for stream events, but allow other ticks to continue
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
 			if event.Err != nil {
@@ -703,12 +702,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logUIMessage(errMsg) // Log error message
 		}
 		m.updateViewport()
-
-		if shouldWaitForEvent {
-			return m, waitForEvent(m.streamCh) // Continue waiting for events
-		}
-		// If we are not waiting for an event, just return the batched commands (for the spinner)
-		return m, tea.Batch(cmds...)
+		return m, waitForEvent(m.streamCh) // Continue waiting for events
 
 	case streamErrorMsg:
 		m.err = msg.err
