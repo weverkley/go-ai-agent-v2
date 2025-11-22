@@ -24,12 +24,34 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mbndr/figlet4go"
 )
+
+const tipsMessage = `Tips for getting started:
+1. Ask questions, edit files, or run commands.
+2. Be specific for the best results.
+3. /help for more information.`
 
 // --- Message Interface and Structs ---
 
 type Message interface {
 	Render(m *ChatModel) string
+}
+
+func createInitialMessages() []Message {
+	ascii := figlet4go.NewAsciiRender()
+	// You can change the font and color if you wish
+	// options := figlet4go.NewRenderOptions()
+	// options.FontColor = []figlet4go.Color{
+	// 	// Colors here
+	// }
+	// ascii.LoadFont(options.FontName)
+	renderStr, _ := ascii.Render("GO AI AGENT")
+
+	return []Message{
+		SystemMessage{Content: renderStr},
+		SuggestionMessage{Content: tipsMessage},
+	}
 }
 
 type UserMessage struct {
@@ -46,6 +68,15 @@ type BotMessage struct {
 
 func (msg BotMessage) Render(m *ChatModel) string {
 	return m.botStyle.Render("Bot: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
+}
+
+type SystemMessage struct {
+	Content string
+}
+
+func (msg SystemMessage) Render(m *ChatModel) string {
+	// A simple message type that just renders the content, useful for logos or announcements.
+	return lipgloss.NewStyle().Width(m.viewport.Width).Render(msg.Content)
 }
 
 type ToolCallStatus struct {
@@ -229,6 +260,7 @@ func (msg SuggestionMessage) Render(m *ChatModel) string {
 }
 
 // --- Bubble Tea Message types ---
+type tickMsg time.Time
 type streamChannelMsg struct{ ch <-chan any }
 type streamEventMsg struct{ event any }
 type streamErrorMsg struct{ err error }
@@ -259,47 +291,36 @@ type ChatModel struct {
 
 	messages []Message
 
-	chatService *services.ChatService
-
 	executorType string
-
 	config types.Config
 
-	shellService services.ShellExecutionService // New field
+	// Services
+	chatService *services.ChatService
+	shellService services.ShellExecutionService
+	gitService services.GitService
+	workspaceService *services.WorkspaceService
 
+	// UI state
 	streamCh <-chan any
-
 	isStreaming bool
-
-	cancelCtx context.Context // New field
-
-	cancelFunc context.CancelFunc // New field
-
+	cancelCtx context.Context
+	cancelFunc context.CancelFunc
 	status string
-
 	err error
-
-	title string
-
-	commandExecutor func(args []string) (string, error) // New field for executing commands
-
+	commandExecutor func(args []string) (string, error)
 	activeToolCalls map[string]*ToolCallStatus
 
 	// Styles
-
 	senderStyle lipgloss.Style
-
 	botStyle lipgloss.Style
-
 	toolStyle lipgloss.Style
-
 	errorStyle lipgloss.Style
-
 	statusStyle lipgloss.Style
-
-	titleStyle lipgloss.Style
-
+	footerStyle lipgloss.Style
 	suggestionStyle lipgloss.Style
+	pathStyle lipgloss.Style
+	branchStyle lipgloss.Style
+	modelStyle lipgloss.Style
 
 	logFile   *os.File
 	logWriter *bufio.Writer
@@ -308,23 +329,35 @@ type ChatModel struct {
 
 	commandHistory []string // Stores previous commands
 	historyIndex   int      // Current position in command history
+
+	// Session stats
+	startTime      time.Time
+	toolCallCount  int
+	toolErrorCount int
 }
 
-func NewChatModel(chatService *services.ChatService, executorType string, config types.Config, commandExecutor func(args []string) (string, error), shellService services.ShellExecutionService) *ChatModel {
+func NewChatModel(
+	chatService *services.ChatService,
+	executorType string,
+	config types.Config,
+	commandExecutor func(args []string) (string, error),
+	shellService services.ShellExecutionService,
+	gitService services.GitService,
+	workspaceService *services.WorkspaceService,
+) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
 	ta.Focus()
-	ta.Prompt = "┃ "
+	ta.Prompt = "❯ "
 	ta.CharLimit = 0 // No limit
 	ta.SetWidth(80)
-	ta.SetHeight(3)
+	ta.SetHeight(1)
 	ta.ShowLineNumbers = false
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
 
 	vp := viewport.New(80, 20)
 	vp.Style = lipgloss.NewStyle().
-		BorderStyle(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("62"))
+		BorderStyle(lipgloss.HiddenBorder())
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -376,14 +409,15 @@ func NewChatModel(chatService *services.ChatService, executorType string, config
 		viewport:                     vp,
 		textarea:                     ta,
 		spinner:                      s,
-		messages:                     []Message{},
+		messages:                     createInitialMessages(),
 		chatService:                  chatService,
 		executorType:                 executorType,
 		config:                       config,
 		shellService:                 shellService,
+		gitService:                   gitService,
+		workspaceService:             workspaceService,
 		isStreaming:                  false,
 		status:                       "Ready",
-		title:                        "Go AI Agent Chat",
 		commandExecutor:              commandExecutor,
 		activeToolCalls:              make(map[string]*ToolCallStatus),
 		senderStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
@@ -391,14 +425,20 @@ func NewChatModel(chatService *services.ChatService, executorType string, config
 		toolStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
 		errorStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
 		statusStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		titleStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("62")).Bold(true),
+		footerStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		suggestionStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		pathStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // Blue
+		branchStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // Green
+		modelStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Pink
 		logFile:                      logFile,
 		logWriter:                    logWriter,
 		commandHistory:               []string{},
 		historyIndex:                 0,
+		startTime:                    time.Now(),
+		toolCallCount:                0,
+		toolErrorCount:               0,
 	}
-
+	model.updateViewport() // Ensure initial messages are displayed
 	return model
 }
 
@@ -412,8 +452,20 @@ func (m *ChatModel) Close() error {
 	}
 	return nil
 }
+
+// GetStats returns the final session statistics.
+func (m *ChatModel) GetStats() (int, int, time.Duration) {
+	return m.toolCallCount, m.toolErrorCount, time.Since(m.startTime)
+}
+
 func (m *ChatModel) Init() tea.Cmd {
-	return tea.Batch(textarea.Blink, m.spinner.Tick)
+	return tea.Batch(
+		textarea.Blink,
+		m.spinner.Tick,
+		tea.Tick(time.Second, func(t time.Time) tea.Msg {
+			return tickMsg(t)
+		}),
+	)
 }
 
 func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -451,12 +503,16 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg := msg.(type) {
+	case tickMsg:
+		// This is just to trigger a re-render for the timer.
+		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
+			return tickMsg(t)
+		})
 	case tea.WindowSizeMsg:
 		m.viewport.Width = msg.Width
-		m.viewport.Height = msg.Height - 8 // Adjust for title, status, and input
+		m.viewport.Height = msg.Height - 3 // Adjust for footer and input
 		m.textarea.SetWidth(msg.Width)
 		m.viewport.Style.Width(msg.Width)
-		m.titleStyle.Width(msg.Width)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -538,6 +594,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Thinking..."
 		case types.ToolCallStartEvent:
 			m.status = "Executing tool..."
+			m.toolCallCount++ // Increment tool call count
 			m.logSystemMessage(fmt.Sprintf("Tool Started: %s with args %v", event.ToolName, event.Args))
 			tcStatus := &ToolCallStatus{
 				ToolName: event.ToolName,
@@ -579,6 +636,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
+			if event.Err != nil {
+				m.toolErrorCount++
+			}
 			m.logSystemMessage(fmt.Sprintf("Tool Ended: %s. Result: %s, Error: %v", event.ToolName, event.Result, event.Err))
 			if tc, ok := m.activeToolCalls[event.ToolCallID]; ok {
 				tc.Status = "Completed"
@@ -642,11 +702,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle specific commands that might require UI changes
 		if len(msg.args) > 0 {
 			switch msg.args[0] {
-			case "clear":
-				m.chatService.ClearHistory()
-				m.messages = []Message{}
-			case "quit", "exit":
-				return m, tea.Quit
 			case "settings":
 				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
 					suggestionMsg := SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."}
@@ -665,27 +720,79 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 
 func (m *ChatModel) View() string {
-	title := m.titleStyle.Render(m.title)
 	return fmt.Sprintf(
-		"%s\n%s\n\n%s\n%s",
-		title,
+		"%s\n\n%s\n%s",
 		m.viewport.View(),
-		m.renderStatus(),
+		m.renderFooter(),
 		m.textarea.View(),
 	)
 }
 
-func (m *ChatModel) renderStatus() string {
-	statusLine := m.statusStyle.Render(m.status)
+func (m *ChatModel) renderFooter() string {
+	// While streaming, show the spinner and status.
 	if m.isStreaming {
-		// Add "Press ESC to stop" instruction for executing / streaming processes
+		statusLine := m.statusStyle.Render(m.status)
 		instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
 		return m.spinner.View() + " " + statusLine + instruction
-	} else if m.awaitingConfirmation {
+	}
+	if m.awaitingConfirmation {
+		statusLine := m.statusStyle.Render(m.status)
 		confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
 		return statusLine + confirmationOptions
 	}
-	return statusLine
+
+	// When not streaming, show the full footer.
+	const separator = "  "
+
+	// Left side: CWD and Git branch
+	cwd, err := os.Getwd() // Use os.Getwd() directly
+	if err != nil {
+		cwd = "???"
+	}
+	branch, err := m.gitService.GetCurrentBranch(cwd)
+	if err != nil {
+		branch = "" // Don't show branch if not in a git repo or error
+	}
+	var left string
+	if branch != "" {
+		left = fmt.Sprintf("%s (%s)", m.pathStyle.Render(cwd), m.branchStyle.Render(branch))
+	} else {
+		left = m.pathStyle.Render(cwd)
+	}
+
+	// Center: Stats
+	duration := time.Since(m.startTime)
+	hours := int(duration.Hours())
+	minutes := int(duration.Minutes()) % 60
+	seconds := int(duration.Seconds()) % 60
+	
+	var toolsStats string
+	if m.toolErrorCount > 0 {
+		toolsStats = fmt.Sprintf("Tools: %d (%d errors)", m.toolCallCount, m.toolErrorCount)
+	} else {
+		toolsStats = fmt.Sprintf("Tools: %d", m.toolCallCount)
+	}
+
+	stats := fmt.Sprintf("%s | Time: %02d:%02d:%02d", toolsStats, hours, minutes, seconds)
+
+	// Right side: Model name
+	right := m.modelStyle.Render(m.executorType)
+
+	// Calculate remaining space
+	usedWidth := lipgloss.Width(left) + lipgloss.Width(right) + lipgloss.Width(stats) + 2*lipgloss.Width(separator)
+	remainingWidth := m.viewport.Width - usedWidth
+	if remainingWidth < 0 {
+		remainingWidth = 0
+	}
+	spring := lipgloss.NewStyle().Width(remainingWidth).Render("")
+
+	return m.footerStyle.Render(lipgloss.JoinHorizontal(lipgloss.Bottom,
+		left,
+		separator,
+		stats,
+		spring,
+		right,
+	))
 }
 
 func (m *ChatModel) updateViewport() {
@@ -701,6 +808,19 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	// Remove the leading slash for Cobra
 	commandString := strings.TrimPrefix(input, "/")
 	args := strings.Fields(commandString)
+
+	// --- UI-only commands ---
+	if len(args) > 0 {
+		switch args[0] {
+		case "clear":
+			m.chatService.ClearHistory()
+			m.messages = createInitialMessages()
+			m.updateViewport()
+			return m, nil
+		case "quit", "exit":
+			return m, tea.Quit
+		}
+	}
 
 	// --- Safety Check ---
 	if len(args) > 0 {

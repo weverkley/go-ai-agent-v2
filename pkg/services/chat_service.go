@@ -17,6 +17,7 @@ type ChatService struct {
 	history              []*types.Content
 	userConfirmationChan chan bool
 	toolCallCounter      int
+	toolErrorCounter     int
 }
 
 // NewChatService creates a new ChatService.
@@ -158,6 +159,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					result, err := tool.Execute(ctx, fc.Args)
 					if err != nil {
 						telemetry.LogErrorf("Error executing tool %s: %v", fc.Name, err)
+						cs.toolErrorCounter++
 					}
 
 					eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Result: result.ReturnDisplay, Err: err}
@@ -202,4 +204,14 @@ func (cs *ChatService) ClearHistory() {
 // GetUserConfirmationChannel returns the channel used for user confirmation responses.
 func (cs *ChatService) GetUserConfirmationChannel() chan bool {
 	return cs.userConfirmationChan
+}
+
+// GetToolCallCount returns the total number of tool calls made in the session.
+func (cs *ChatService) GetToolCallCount() int {
+	return cs.toolCallCounter
+}
+
+// GetToolErrorCount returns the total number of tool calls that resulted in an error.
+func (cs *ChatService) GetToolErrorCount() int {
+	return cs.toolErrorCounter
 }

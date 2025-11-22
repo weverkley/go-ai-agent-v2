@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings" // New import for strings.TrimSpace
+	"time"    // New import for time
 
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/services"
@@ -92,9 +93,25 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 		return output, err
 	}
 
-	p := tea.NewProgram(ui.NewChatModel(chatService, executorType, appConfig, commandExecutor, shellService), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
+	// Initialize GitService
+	gitService := services.NewGitService()
+
+	// Initialize WorkspaceService
+	workspaceService := services.NewWorkspaceService(".") // Assuming "." is the project root
+
+	p := tea.NewProgram(ui.NewChatModel(chatService, executorType, appConfig, commandExecutor, shellService, gitService, workspaceService), tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
 		fmt.Printf("Error running interactive chat: %v\n", err)
 		os.Exit(1)
+	}
+
+	// Print final stats after the UI exits
+	if m, ok := finalModel.(*ui.ChatModel); ok {
+		toolCount, errorCount, duration := m.GetStats()
+		fmt.Printf("\n\nSession ended.\n")
+		fmt.Printf("Total tool calls: %d\n", toolCount)
+		fmt.Printf("Failed tool calls: %d\n", errorCount)
+		fmt.Printf("Total session time: %s\n", duration.Round(time.Second))
 	}
 }
