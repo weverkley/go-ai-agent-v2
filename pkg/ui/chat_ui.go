@@ -936,19 +936,68 @@ Available Commands:
 func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Message {
 	newMessages := createInitialMessages()
 	for _, content := range history {
-		// This is a simplified conversion. A real implementation would need to handle
-		// tool calls and other complex parts properly. For now, we just render text.
-		var textContent strings.Builder
-		for _, part := range content.Parts {
-			if part.Text != "" {
+		if content.Role == "user" {
+			// A "user" role can be a text prompt or a set of tool responses.
+			isToolResponse := false
+			for _, part := range content.Parts {
+				if part.FunctionResponse != nil {
+					isToolResponse = true
+					break
+				}
+			}
+
+			// If it's a tool response, we don't render a separate message for it in the UI.
+			if isToolResponse {
+				continue
+			}
+
+			// It's a normal text message from the user.
+			var textContent strings.Builder
+			for _, part := range content.Parts {
 				textContent.WriteString(part.Text)
 			}
-		}
+			if textContent.Len() > 0 {
+				newMessages = append(newMessages, UserMessage{Content: textContent.String()})
+			}
 
-		if content.Role == "user" {
-			newMessages = append(newMessages, UserMessage{Content: textContent.String()})
 		} else if content.Role == "model" {
-			newMessages = append(newMessages, BotMessage{Content: textContent.String()})
+			// A "model" role can be a text response, a set of tool calls, or both.
+			var functionCalls []*types.FunctionCall
+			var textParts []string
+
+			for _, part := range content.Parts {
+				if part.FunctionCall != nil {
+					functionCalls = append(functionCalls, part.FunctionCall)
+				}
+				if part.Text != "" {
+					textParts = append(textParts, part.Text)
+				}
+			}
+
+			if len(functionCalls) > 0 {
+				// This was a tool-calling turn.
+				group := &ToolCallGroupMessage{ToolCalls: make(map[string]*ToolCallStatus)}
+				for i, fc := range functionCalls {
+					// We don't have the original result or status here, as the history
+					// doesn't store UI state. We'll render it as "Completed" since it's in the past.
+					toolCallID := fmt.Sprintf("resumed-tool-%d-%d", len(newMessages), i)
+					status := &ToolCallStatus{
+						ToolName: fc.Name,
+						Args:     fc.Args,
+						Status:   "Completed", // Assume completed as it's from history
+						Result:   "(resumed from history)", // Placeholder result
+						Err:      nil,
+					}
+					group.ToolCalls[toolCallID] = status
+				}
+				newMessages = append(newMessages, group)
+			}
+
+			if len(textParts) > 0 {
+				// This was a text response turn.
+				fullText := strings.Join(textParts, "")
+				newMessages = append(newMessages, BotMessage{Content: fullText})
+			}
 		}
 	}
 	return newMessages
