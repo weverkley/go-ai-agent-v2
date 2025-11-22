@@ -5,6 +5,8 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
 ## Key Features
 
 - **Interactive Chat Mode**: A rich, interactive chat UI powered by Bubble Tea, featuring:
+    - A dynamic "GO AI AGENT" banner on startup.
+    - A persistent footer displaying live session statistics (timer, tool call counts), current working directory, Git branch status, and the active AI model.
     - Real-time streaming of AI responses.
     - Advanced, color-coded rendering for tool calls in a clean, boxed layout.
     - Syntax highlighting for code within tool calls.
@@ -38,12 +40,19 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
     ```
     This will create the `go-ai-agent-v2` executable.
 
-2.  **Start the Interactive Chat:**
+2.  **Initialize the Project (First-Time Use):**
+    Before starting a chat in a new project, run the `init` command. This analyzes your project and creates a `GOAIAGENT.md` file that provides essential context to the AI.
     ```bash
-    ./go-ai-agent-v2 chat
+    ./go-ai-agent-v2 init
     ```
 
-3.  **Explore other commands:**
+3.  **Start the Interactive Chat:**
+    Running the executable without any arguments will start the interactive chat session.
+    ```bash
+    ./go-ai-agent-v2
+    ```
+
+4.  **Explore other commands:**
     ```bash
     # See all commands
     ./go-ai-agent-v2 --help
@@ -64,7 +73,7 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
         - `executor_factory.go`: The factory for creating specific executor instances (Gemini, Qwen, Mock).
         - `gemini.go`, `qwen.go`: The concrete implementations for each AI provider.
         - **`agents/`**: The hierarchical sub-agent framework, including the `AgentDefinition` blueprint, the `AgentExecutor` engine, and the `CodebaseInvestigatorAgent`.
-    - **`ui/`**: The Bubble Tea-based interactive chat interface (`chat_ui.go`), which renders the stream of events from the core executor.
+    - **`ui/`**: The Bubble Tea-based interactive chat interface (`chat_ui.go`), which renders the stream of events from the core executor and includes a dynamic footer for displaying real-time session statistics.
     - **`tools/`**: Definitions for all available agent tools (e.g., `read_file`, `execute_command`). `register.go` assembles the central tool registry.
     - **`services/`**: Shared, decoupled services for file system, Git, shell execution, etc.
     - **`config/`**: Application configuration and settings management.

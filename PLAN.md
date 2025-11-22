@@ -6,14 +6,14 @@ This document outlines the plan and current status of the Go AI Agent CLI. The g
 This project is meant to be a generic CLI; it will use multiple AI executors (e.g., Gemini, OpenAI, etc.), not only Gemini which this tool is currently based on.
 
 ### **UI Package**
-The UI for this CLI is implemented using `charmbracelet/bubbletea` for a rich, interactive terminal user interface.
+The UI for this CLI is implemented using `charmbracelet/bubbletea` for a rich, interactive terminal user interface. It features a dynamic footer that displays live session statistics (timer, tool calls), the current working directory, Git status, and the active AI model.
 
 ## 1. Current Architectural Status
 
 The application is built on a modular, decoupled architecture. A central `PersistentPreRun` hook in `cmd/root.go` initializes and injects all necessary services (File System, Shell, Git, Settings) into the command context, ensuring a consistent environment.
 
 - **`pkg/core` - Multi-Executor Abstraction**:
-    - The `Executor` interface defines a common contract for all AI backends (`GenerateStream`, `ExecuteTool`, etc.).
+    - The `Executor` interface defines a common contract for all AI backends (`StreamContent`, `ExecuteTool`, etc.).
     - `ExecutorFactory` (`executor_factory.go`) provides an abstract factory pattern, allowing the CLI to dynamically instantiate different AI backends (`gemini`, `qwen`, `mock`) by name.
     - `gemini.go` (`GoaiagentChat`) provides a concrete implementation for the Google Gemini API.
     - `qwen.go` (`QwenChat`) provides a concrete implementation for Qwen-compatible (OpenAI-style) APIs.
@@ -31,8 +31,9 @@ The application is built on a modular, decoupled architecture. A central `Persis
 
 - **`pkg/ui` - Interactive Chat UI**:
     - `chat_ui.go` implements a sophisticated UI based on the `bubbletea` framework.
-    - It functions as an event stream visualizer. It initiates a request via the `Executor`'s `GenerateStream` method and then renders the stream of events (`Thinking`, `ToolCallStart`, `ToolCallEnd`, `FinalResponse`, etc.) into a human-readable, interactive format.
+    - It functions as an event stream visualizer. It initiates a request via the `Executor`'s `StreamContent` method and then renders the stream of events (`Thinking`, `ToolCallStart`, `ToolCallEnd`, `FinalResponse`, etc.) into a human-readable, interactive format.
     - Includes advanced rendering for tool calls, providing real-time insight into the agent's actions.
+    - Features a dynamic footer with live session stats, Git status, and more.
     - It can execute other CLI commands from within the chat (e.g., `/settings`, `/clear`) via a `commandExecutor` function.
 
 - **Command Status**: All commands listed in the previous version of this plan are considered functionally integrated into this new architecture.
@@ -59,7 +60,6 @@ The core application logic has been successfully migrated to the new Go architec
     *   Expose the `codebase_investigator` sub-agent as a runnable tool/command from the main CLI.
 
 3.  **UI/Tool Integration:**
-    *   Fully integrate the `user_confirm` tool with the chat UI. The UI already has the keyboard handlers (`c`/`x`), but the tool itself returns a mock response. This needs to be connected to the UI's confirmation channel.
     *   Implement scrolling and text selection/copying in the chat viewport.
     *   Allow resizing of the tool call code view.
 
@@ -74,9 +74,8 @@ The core application logic has been successfully migrated to the new Go architec
 
 6.  **Completing Features:**
     *   Implement full IDE integration (`ide` command).
-    - Implement the logic for collecting and displaying detailed model and tool-specific usage statistics for the `stats` command.
     - Implement saving and restoring CLI state, including tool calls and conversation/file history, for the `restore` command.
     *   Implement folder trust management for the `permissions` command.
 
-7.  **Testing**:
-    *   Continue to add comprehensive unit and integration tests for all new components and commands.
+7.  **General**:
+    *   Continue to add comprehensive unit and integration tests for all new components and commands. The test suite has been successfully refactored to pass with the new architecture.
