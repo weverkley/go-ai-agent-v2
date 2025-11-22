@@ -2,11 +2,8 @@ package cmd
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/spf13/cobra"
-
-	"go-ai-agent-v2/go-cli/pkg/utils" // Import utils package
 )
 
 // statsCmd represents the stats command
@@ -16,8 +13,7 @@ var statsCmd = &cobra.Command{
 	Short:   "Check session stats",
 	Long:    `The stats command displays various usage statistics for the current session, including overall duration and model/tool specific metrics.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		duration := time.Since(SessionStartTime)
-		fmt.Printf("Overall session duration: %s.\n", utils.FormatDuration(duration))
+		fmt.Println("Session statistics are now shown at the end of an interactive 'chat' session.")
 	},
 }
 

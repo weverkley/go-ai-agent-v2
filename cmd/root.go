@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"os"
-	"time" // Import time package
 
 	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
 	"go-ai-agent-v2/go-cli/pkg/config"
@@ -35,7 +34,6 @@ var chatService *services.ChatService           // Declare package-level chatSer
 var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
 var MemoryService *services.MemoryService       // Declare package-level memoryService
-var SessionStartTime time.Time                  // Declare sessionStartTime
 var SettingsService *services.SettingsService   // Declare package-level settingsService
 
 var FSService services.FileSystemService // Declare package-level FileSystemService
@@ -49,9 +47,6 @@ func Execute() {
 	}
 }
 
-func initSessionStartTime() {
-	SessionStartTime = time.Now()
-}
 
 func initServices(projectRoot string) (
 	*services.WorkspaceService,
@@ -179,7 +174,6 @@ func registerCommands() {
 
 func init() {
 	RootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
-		initSessionStartTime()
 
 		projectRoot, err := os.Getwd()
 		if err != nil {

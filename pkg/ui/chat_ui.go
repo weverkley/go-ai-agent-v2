@@ -497,7 +497,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
-	if m.isStreaming {
+	if m.isStreaming || m.awaitingConfirmation {
 		m.spinner, cmd = m.spinner.Update(msg)
 		cmds = append(cmds, cmd)
 	}
@@ -632,8 +632,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.updateViewport()
-			return m, nil // Stop processing stream events until user confirms
-
+			// Do not return here, let the command batch at the end of Update run
+			// to keep the spinner ticking.
+			break
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
 			if event.Err != nil {
@@ -702,6 +703,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Handle specific commands that might require UI changes
 		if len(msg.args) > 0 {
 			switch msg.args[0] {
+			case "quit", "exit":
+				return m, tea.Quit
 			case "settings":
 				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
 					suggestionMsg := SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."}
@@ -729,19 +732,22 @@ func (m *ChatModel) View() string {
 }
 
 func (m *ChatModel) renderFooter() string {
-	// While streaming, show the spinner and status.
-	if m.isStreaming {
+	// While streaming or awaiting confirmation, show the spinner and status.
+	if m.isStreaming || m.awaitingConfirmation {
 		statusLine := m.statusStyle.Render(m.status)
-		instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
-		return m.spinner.View() + " " + statusLine + instruction
-	}
-	if m.awaitingConfirmation {
-		statusLine := m.statusStyle.Render(m.status)
-		confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
-		return statusLine + confirmationOptions
+		var finalRender string
+
+		if m.awaitingConfirmation {
+			confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
+			finalRender = statusLine + confirmationOptions
+		} else {
+			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
+			finalRender = statusLine + instruction
+		}
+		return m.spinner.View() + " " + finalRender
 	}
 
-	// When not streaming, show the full footer.
+	// When not busy, show the full stats footer.
 	const separator = "  "
 
 	// Left side: CWD and Git branch
@@ -817,8 +823,6 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 			m.messages = createInitialMessages()
 			m.updateViewport()
 			return m, nil
-		case "quit", "exit":
-			return m, tea.Quit
 		}
 	}
 
