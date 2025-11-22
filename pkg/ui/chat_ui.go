@@ -296,6 +296,7 @@ type ChatModel struct {
 
 	// Services
 	chatService      *services.ChatService
+	sessionService   *services.SessionService // New field
 	shellService     services.ShellExecutionService
 	gitService       services.GitService
 	workspaceService *services.WorkspaceService
@@ -340,13 +341,14 @@ type ChatModel struct {
 
 func NewChatModel(
 	chatService *services.ChatService,
+	sessionService *services.SessionService, // New parameter
 	executorType string,
 	config types.Config,
 	commandExecutor func(args []string) (string, error),
 	shellService services.ShellExecutionService,
 	gitService services.GitService,
 	workspaceService *services.WorkspaceService,
-	sessionID string, // New parameter
+	sessionID string,
 ) *ChatModel {
 	ta := textarea.New()
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
@@ -414,6 +416,7 @@ func NewChatModel(
 		spinner:          s,
 		messages:         createInitialMessages(),
 		chatService:      chatService,
+		sessionService:   sessionService, // Initialize new field
 		executorType:     executorType,
 		config:           config,
 		shellService:     shellService,
@@ -440,7 +443,7 @@ func NewChatModel(
 		startTime:        time.Now(),
 		toolCallCount:    0,
 		toolErrorCount:   0,
-		sessionID:        sessionID, // Store the session ID
+		sessionID:        sessionID,
 	}
 
 	// Check for context file
@@ -841,6 +844,69 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 			m.messages = createInitialMessages()
 			m.updateViewport()
 			return m, nil
+		case "help":
+			helpText := `
+Available Commands:
+  /clear                  - Clears the current chat session history.
+  /sessions list          - Lists all saved chat sessions.
+  /sessions resume <id>   - Resumes a specific chat session by its ID or number.
+  /quit                   - Exits the application.
+  /help                   - Shows this help message.
+`
+			m.messages = append(m.messages, BotMessage{Content: helpText})
+			m.updateViewport()
+			return m, nil
+		case "sessions":
+			if len(args) < 2 {
+				m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("usage: /sessions [list|resume]")})
+				m.updateViewport()
+				return m, nil
+			}
+			switch args[1] {
+			case "list":
+				sessions, err := m.sessionService.ListSessions()
+				if err != nil {
+					m.messages = append(m.messages, ErrorMessage{Err: err})
+				} else if len(sessions) == 0 {
+					m.messages = append(m.messages, BotMessage{Content: "No saved sessions found."})
+				} else {
+					var sessionList strings.Builder
+					sessionList.WriteString("Available sessions (newest first):\n")
+					for i, id := range sessions {
+						sessionList.WriteString(fmt.Sprintf("  %d: %s\n", i+1, id))
+					}
+					m.messages = append(m.messages, BotMessage{Content: sessionList.String()})
+				}
+				m.updateViewport()
+				return m, nil
+			case "resume":
+				if len(args) < 3 {
+					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("usage: /sessions resume <session_id>")})
+					m.updateViewport()
+					return m, nil
+				}
+				sessionID := args[2]
+
+				// Re-initialize chat service with the new session
+				// This assumes the executor can be reused.
+				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID)
+				if err != nil {
+					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
+					m.updateViewport()
+					return m, nil
+				}
+
+				m.chatService = newChatService
+				m.sessionID = sessionID
+				m.messages = m.repopulateMessagesFromHistory(newChatService.GetHistory())
+				m.status = fmt.Sprintf("Resumed session %s", sessionID)
+				m.updateViewport()
+				return m, nil
+			default:
+				m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("unknown /sessions command: %s", args[1])})
+				m.updateViewport()
+				return m, nil
+			}
 		}
 	}
 
@@ -865,6 +931,29 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 
 	return m, executeCommandCmd(m.commandExecutor, args)
 }
+
+// repopulateMessagesFromHistory converts the raw history from the service to UI messages.
+func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Message {
+	newMessages := createInitialMessages()
+	for _, content := range history {
+		// This is a simplified conversion. A real implementation would need to handle
+		// tool calls and other complex parts properly. For now, we just render text.
+		var textContent strings.Builder
+		for _, part := range content.Parts {
+			if part.Text != "" {
+				textContent.WriteString(part.Text)
+			}
+		}
+
+		if content.Role == "user" {
+			newMessages = append(newMessages, UserMessage{Content: textContent.String()})
+		} else if content.Role == "model" {
+			newMessages = append(newMessages, BotMessage{Content: textContent.String()})
+		}
+	}
+	return newMessages
+}
+
 
 // --- Commands ---
 

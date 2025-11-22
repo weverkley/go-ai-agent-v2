@@ -241,6 +241,16 @@ func (cs *ChatService) GetUserConfirmationChannel() chan bool {
 	return cs.userConfirmationChan
 }
 
+// GetToolRegistry returns the tool registry instance.
+func (cs *ChatService) GetToolRegistry() types.ToolRegistryInterface {
+	return cs.toolRegistry
+}
+
+// GetExecutor returns the executor instance.
+func (cs *ChatService) GetExecutor() core.Executor {
+	return cs.executor
+}
+
 // GetToolCallCount returns the total number of tool calls made in the session.
 func (cs *ChatService) GetToolCallCount() int {
 	return cs.toolCallCounter

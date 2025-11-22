@@ -138,7 +138,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 	// Initialize WorkspaceService
 	workspaceService := services.NewWorkspaceService(".") // Assuming "." is the project root
 
-	p := tea.NewProgram(ui.NewChatModel(chatService, executorType, appConfig, commandExecutor, shellService, gitService, workspaceService, currentSessionID), tea.WithAltScreen())
+	p := tea.NewProgram(ui.NewChatModel(chatService, SessionService, executorType, appConfig, commandExecutor, shellService, gitService, workspaceService, currentSessionID), tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Printf("Error running interactive chat: %v\n", err)
