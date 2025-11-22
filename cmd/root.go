@@ -187,7 +187,33 @@ func init() {
 		toolRegistry := registerTools(FSService, ShellService, SettingsService)
 		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
 
-		executorType = "gemini"
+		// Get executor type from settings
+		executorTypeVal, _ := SettingsService.Get("executor")
+		executorType, ok := executorTypeVal.(string)
+		if !ok {
+			executorType = "gemini" // Fallback
+		}
+
+		// Get model from settings
+		modelVal, _ := SettingsService.Get("model")
+		model, ok := modelVal.(string)
+		if !ok {
+			model = config.DEFAULT_GEMINI_MODEL // Fallback
+		}
+		appConfig := Cfg.WithModel(model)
+
+		// Initialize the global executor
+		factory, err := core.NewExecutorFactory(executorType, appConfig)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
+			os.Exit(1)
+		}
+		executor, err = factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
+			os.Exit(1)
+		}
+
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
 	}

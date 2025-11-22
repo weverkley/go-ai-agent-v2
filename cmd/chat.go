@@ -7,7 +7,6 @@ import (
 	"strings" // New import for strings.TrimSpace
 	"time"    // New import for time
 
-	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
@@ -29,41 +28,10 @@ var chatCmd = &cobra.Command{
 
 // runChatCmd contains the logic for the chat command, accepting necessary services.
 func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
-	modelVal, ok := settingsService.Get("model")
-	if !ok {
-		fmt.Printf("Error: 'model' setting not found.\n")
-		os.Exit(1)
-	}
-	model, ok := modelVal.(string)
-	if !ok {
-		fmt.Printf("Error: 'model' setting is not a string.\n")
-		os.Exit(1)
-	}
-
-	executorVal, ok := settingsService.Get("executor")
-	if !ok {
-		fmt.Printf("Error: 'executor' setting not found.\n")
-		os.Exit(1)
-	}
-	executorType, ok := executorVal.(string)
-	if !ok {
-		fmt.Printf("Error: 'executor' setting is not a string.\n\n")
-		os.Exit(1)
-	}
-
-	// Use the global Cfg and override the model
-	appConfig := Cfg.WithModel(model)
-
-	factory, err := core.NewExecutorFactory(executorType, appConfig)
-	if err != nil {
-		fmt.Printf("Error creating executor factory: %v\n", err)
-		os.Exit(1)
-	}
-	executor, err := factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
-	if err != nil {
-		fmt.Printf("Error creating executor: %v\n", err)
-		os.Exit(1)
-	}
+	// Use the global Cfg and initialized executor
+	appConfig := Cfg
+	executorTypeVal, _ := settingsService.Get("executor")
+	executorType, _ := executorTypeVal.(string)
 
 	toolRegistry, _ := appConfig.Get("toolRegistry")
 	chatService := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), []*types.Content{})
