@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/utils"
@@ -292,40 +292,40 @@ type ChatModel struct {
 	messages []Message
 
 	executorType string
-	config types.Config
+	config       types.Config
 
 	// Services
-	chatService *services.ChatService
-	shellService services.ShellExecutionService
-	gitService services.GitService
+	chatService      *services.ChatService
+	shellService     services.ShellExecutionService
+	gitService       services.GitService
 	workspaceService *services.WorkspaceService
 
 	// UI state
-	streamCh <-chan any
-	isStreaming bool
-	cancelCtx context.Context
-	cancelFunc context.CancelFunc
-	status string
-	err error
+	streamCh        <-chan any
+	isStreaming     bool
+	cancelCtx       context.Context
+	cancelFunc      context.CancelFunc
+	status          string
+	err             error
 	commandExecutor func(args []string) (string, error)
 	activeToolCalls map[string]*ToolCallStatus
 
 	// Styles
-	senderStyle lipgloss.Style
-	botStyle lipgloss.Style
-	toolStyle lipgloss.Style
-	errorStyle lipgloss.Style
-	statusStyle lipgloss.Style
-	footerStyle lipgloss.Style
+	senderStyle     lipgloss.Style
+	botStyle        lipgloss.Style
+	toolStyle       lipgloss.Style
+	errorStyle      lipgloss.Style
+	statusStyle     lipgloss.Style
+	footerStyle     lipgloss.Style
 	suggestionStyle lipgloss.Style
-	pathStyle lipgloss.Style
-	branchStyle lipgloss.Style
-	modelStyle lipgloss.Style
+	pathStyle       lipgloss.Style
+	branchStyle     lipgloss.Style
+	modelStyle      lipgloss.Style
 
 	logFile   *os.File
 	logWriter *bufio.Writer
 
-	awaitingConfirmation         bool      // New field to indicate if user confirmation is pending
+	awaitingConfirmation bool // New field to indicate if user confirmation is pending
 
 	commandHistory []string // Stores previous commands
 	historyIndex   int      // Current position in command history
@@ -360,7 +360,7 @@ func NewChatModel(
 		BorderStyle(lipgloss.HiddenBorder())
 
 	s := spinner.New()
-	s.Spinner = spinner.Dot
+	s.Spinner = spinner.Meter
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
 
 	// Determine the log file path from telemetry settings
@@ -406,37 +406,37 @@ func NewChatModel(
 	logWriter := bufio.NewWriter(logFile)
 
 	model := &ChatModel{
-		viewport:                     vp,
-		textarea:                     ta,
-		spinner:                      s,
-		messages:                     createInitialMessages(),
-		chatService:                  chatService,
-		executorType:                 executorType,
-		config:                       config,
-		shellService:                 shellService,
-		gitService:                   gitService,
-		workspaceService:             workspaceService,
-		isStreaming:                  false,
-		status:                       "Ready",
-		commandExecutor:              commandExecutor,
-		activeToolCalls:              make(map[string]*ToolCallStatus),
-		senderStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		botStyle:                     lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
-		toolStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
-		errorStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
-		statusStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		footerStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		suggestionStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
-		pathStyle:                    lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // Blue
-		branchStyle:                  lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // Green
-		modelStyle:                   lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Pink
-		logFile:                      logFile,
-		logWriter:                    logWriter,
-		commandHistory:               []string{},
-		historyIndex:                 0,
-		startTime:                    time.Now(),
-		toolCallCount:                0,
-		toolErrorCount:               0,
+		viewport:         vp,
+		textarea:         ta,
+		spinner:          s,
+		messages:         createInitialMessages(),
+		chatService:      chatService,
+		executorType:     executorType,
+		config:           config,
+		shellService:     shellService,
+		gitService:       gitService,
+		workspaceService: workspaceService,
+		isStreaming:      false,
+		status:           "Ready",
+		commandExecutor:  commandExecutor,
+		activeToolCalls:  make(map[string]*ToolCallStatus),
+		senderStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		botStyle:         lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
+		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+		statusStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		footerStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		suggestionStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		pathStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // Blue
+		branchStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // Green
+		modelStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Pink
+		logFile:          logFile,
+		logWriter:        logWriter,
+		commandHistory:   []string{},
+		historyIndex:     0,
+		startTime:        time.Now(),
+		toolCallCount:    0,
+		toolErrorCount:   0,
 	}
 	model.updateViewport() // Ensure initial messages are displayed
 	return model
@@ -497,12 +497,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
 
-	if m.isStreaming || m.awaitingConfirmation {
-		m.spinner, cmd = m.spinner.Update(msg)
-		cmds = append(cmds, cmd)
-	}
-
 	switch msg := msg.(type) {
+	case spinner.TickMsg:
+		var spinnerCmd tea.Cmd
+		m.spinner, spinnerCmd = m.spinner.Update(msg)
+		return m, spinnerCmd
+
 	case tickMsg:
 		// This is just to trigger a re-render for the timer.
 		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
@@ -587,6 +587,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, waitForEvent(m.streamCh)
 
 	case streamEventMsg:
+		shouldWaitForEvent := true
 		switch event := msg.event.(type) {
 		case types.StreamingStartedEvent:
 			m.status = "Stream started..."
@@ -632,9 +633,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			m.updateViewport()
-			// Do not return here, let the command batch at the end of Update run
-			// to keep the spinner ticking.
-			break
+			shouldWaitForEvent = false // Stop waiting for stream events
 		case types.ToolCallEndEvent:
 			m.status = "Got tool result..."
 			if event.Err != nil {
@@ -656,7 +655,12 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logUIMessage(errMsg) // Log error message
 		}
 		m.updateViewport()
-		return m, waitForEvent(m.streamCh) // Continue waiting for events
+
+		if shouldWaitForEvent {
+			return m, waitForEvent(m.streamCh) // Continue waiting for events
+		}
+		// If we are not waiting for an event, just return the batched commands (for the spinner)
+		return m, tea.Batch(cmds...)
 
 	case streamErrorMsg:
 		m.err = msg.err
@@ -721,7 +725,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-
 func (m *ChatModel) View() string {
 	return fmt.Sprintf(
 		"%s\n\n%s\n%s",
@@ -734,9 +737,8 @@ func (m *ChatModel) View() string {
 func (m *ChatModel) renderFooter() string {
 	// While streaming or awaiting confirmation, show the spinner and status.
 	if m.isStreaming || m.awaitingConfirmation {
-		statusLine := m.statusStyle.Render(m.status)
+		statusLine := lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render(m.status) // Always blue in active state
 		var finalRender string
-
 		if m.awaitingConfirmation {
 			confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
 			finalRender = statusLine + confirmationOptions
@@ -766,19 +768,19 @@ func (m *ChatModel) renderFooter() string {
 		left = m.pathStyle.Render(cwd)
 	}
 
-	// Center: Stats
-	duration := time.Since(m.startTime)
-	hours := int(duration.Hours())
-	minutes := int(duration.Minutes()) % 60
-	seconds := int(duration.Seconds()) % 60
-	
-	var toolsStats string
-	if m.toolErrorCount > 0 {
-		toolsStats = fmt.Sprintf("Tools: %d (%d errors)", m.toolCallCount, m.toolErrorCount)
-	} else {
-		toolsStats = fmt.Sprintf("Tools: %d", m.toolCallCount)
-	}
-
+		// Center: Stats
+		duration := time.Since(m.startTime)
+		hours := int(duration.Hours())
+		minutes := int(duration.Minutes()) % 60
+		seconds := int(duration.Seconds()) % 60
+		
+		var toolsStats string
+		if m.toolErrorCount > 0 {
+			errorString := lipgloss.NewStyle().Foreground(lipgloss.Color("9")).Render(fmt.Sprintf("(%d errors)", m.toolErrorCount)) // Red color
+			toolsStats = fmt.Sprintf("Tools: %d %s", m.toolCallCount, errorString)
+		} else {
+			toolsStats = fmt.Sprintf("Tools: %d", m.toolCallCount)
+		}
 	stats := fmt.Sprintf("%s | Time: %02d:%02d:%02d", toolsStats, hours, minutes, seconds)
 
 	// Right side: Model name
