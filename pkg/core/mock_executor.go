@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
@@ -125,66 +124,10 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 		go func() {
 			defer close(eventChan)
 
-			// Helper to simulate confirmation and tool execution
-			simulateToolCall := func(fc *types.FunctionCall) (map[string]any, error) {
-				time.Sleep(1 * time.Second) // Simulate processing time
-
-				isDangerous := (fc.Name == types.WRITE_FILE_TOOL_NAME || fc.Name == types.SMART_EDIT_TOOL_NAME || fc.Name == types.EXECUTE_COMMAND_TOOL_NAME || fc.Name == types.USER_CONFIRM_TOOL_NAME)
-
-				if isDangerous {
-					// For user_confirm, the message is passed in args. For others, it's generic.
-					confirmationMessage := fmt.Sprintf("Confirm execution of tool '%s'?", fc.Name)
-					if fc.Name == types.USER_CONFIRM_TOOL_NAME {
-						if msg, ok := fc.Args["message"].(string); ok {
-							confirmationMessage = msg
-						}
-					}
-
-					eventChan <- types.ToolConfirmationRequestEvent{
-						ToolCallID: "mock-tool-call",
-						ToolName:   fc.Name,
-						ToolArgs:   fc.Args,
-						Type:       "exec",
-						Message:    confirmationMessage,
-					}
-
-					outcome := <-mock.ToolConfirmationChan
-					switch outcome {
-					case types.ToolConfirmationOutcomeProceedOnce, types.ToolConfirmationOutcomeProceedAlways:
-						if fc.Name == types.USER_CONFIRM_TOOL_NAME {
-							return map[string]any{"result": "continue"}, nil
-						}
-						res, err := mock.ExecuteToolFunc(ctx, fc)
-						if err != nil {
-							return map[string]any{"error": err.Error()}, err
-						}
-						return res.LLMContent.(map[string]any), nil
-					case types.ToolConfirmationOutcomeCancel:
-						if fc.Name == types.USER_CONFIRM_TOOL_NAME {
-							return map[string]any{"result": "cancel"}, nil
-						}
-						return map[string]any{"error": "Tool execution cancelled by user."}, fmt.Errorf("tool execution cancelled by user")
-					default:
-						return map[string]any{"error": "Unknown confirmation outcome."}, fmt.Errorf("unknown confirmation outcome")
-					}
-				} else {
-					// Not dangerous, execute directly
-					res, err := mock.ExecuteToolFunc(ctx, fc)
-					if err != nil {
-						return map[string]any{"error": err.Error()}, err
-					}
-					// Ensure res.LLMContent is a map for FunctionResponse
-				if m, ok := res.LLMContent.(map[string]any); ok {
-						return m, nil
-					}
-					return map[string]any{"result": res.LLMContent}, nil // Wrap in map if not already
-				}
-			}
-
 			// Simple state machine based on history length to simulate a conversation
 			switch len(contents) {
-			case 1: // Initial user prompt
-				fc := &types.FunctionCall{
+			case 1: // Initial user prompt -> Calls write_todos
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
 						"todos": []interface{}{
@@ -195,48 +138,35 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
 						},
 					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 3: // After write_todos response (initial plan)
-				fc := &types.FunctionCall{
-					Name: types.WRITE_FILE_TOOL_NAME,
-					Args: map[string]interface{}{
-						"file_path": "api.js",
-						"content":   jsContentTodoApi,
-					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 5: // After write_file response
-				// Update plan and add the first GET endpoint
+				}}
+			case 3: // After write_todos response -> Calls user_confirm
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-					Name: types.WRITE_TODOS_TOOL_NAME,
+					Name: types.USER_CONFIRM_TOOL_NAME,
 					Args: map[string]interface{}{
-						"todos": []interface{}{
-							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
-							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "in_progress"},
-							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "pending"},
-							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
-							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
-						},
+						"message": "I have created the plan. Shall I proceed with writing the first file?",
 					},
 				}}
-				fc := &types.FunctionCall{
+			case 5: // After user confirms -> Calls write_file
+				// Check the last message to see if user confirmed
+				lastMessage := contents[len(contents)-1]
+				if len(lastMessage.Parts) > 0 && lastMessage.Parts[0].FunctionResponse != nil {
+					response := lastMessage.Parts[0].FunctionResponse.Response
+					if result, ok := response["result"].(map[string]any); ok {
+						if result["result"] == "continue" {
+							eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+								Name: types.WRITE_FILE_TOOL_NAME,
+								Args: map[string]interface{}{
+									"file_path": "api.js",
+									"content":   jsContentTodoApi,
+								},
+							}}
+						} else {
+							eventChan <- types.Part{Text: "Okay, I will not proceed."}
+						}
+					}
+				}
+			case 7: // After writing the file -> Calls smart_edit to add GET /todos
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.SMART_EDIT_TOOL_NAME,
 					Args: map[string]interface{}{
 						"file_path":   "api.js",
@@ -244,124 +174,10 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 						"old_string":  jsOldStringTodoApiGet,
 						"new_string":  jsNewStringTodoApiGet,
 					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 7: // After adding GET /todos
-				// Update plan and add the POST endpoint
-				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-					Name: types.WRITE_TODOS_TOOL_NAME,
-					Args: map[string]interface{}{
-						"todos": []interface{}{
-							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
-							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "completed"},
-							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "in_progress"},
-							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
-							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
-						},
-					},
 				}}
-				fc := &types.FunctionCall{
-					Name: types.SMART_EDIT_TOOL_NAME,
-					Args: map[string]interface{}{
-						"file_path":   "api.js",
-						"instruction": "Add an endpoint to create a new todo.",
-						"old_string":  jsOldStringTodoApiPost,
-						"new_string":  jsNewStringTodoApiPost,
-					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 9: // After adding POST /todos
-				// Update plan and add the GET by ID endpoint
-				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-					Name: types.WRITE_TODOS_TOOL_NAME,
-					Args: map[string]interface{}{
-						"todos": []interface{}{
-							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
-							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "completed"},
-							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "completed"},
-							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "in_progress"},
-							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
-						},
-					},
-				}}
-				fc := &types.FunctionCall{
-					Name: types.SMART_EDIT_TOOL_NAME,
-					Args: map[string]interface{}{
-						"file_path":   "api.js",
-						"instruction": "Add an endpoint to get a single todo by its ID.",
-						"old_string":  jsOldStringTodoApiGetById,
-						"new_string":  jsNewStringTodoApiGetById,
-					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 11: // After adding GET by ID
-				fc := &types.FunctionCall{
-					Name: types.USER_CONFIRM_TOOL_NAME,
-					Args: map[string]interface{}{
-						"message": "I have implemented all API endpoints. Shall I provide the final instructions on how to run the server?",
-					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 13: // After user_confirm response
-				fc := &types.FunctionCall{
-					Name: types.WRITE_TODOS_TOOL_NAME,
-					Args: map[string]interface{}{
-						"todos": []interface{}{
-							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
-							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "completed"},
-							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "completed"},
-							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "completed"},
-							map[string]interface{}{"description": "Provide final instructions.", "status": "completed"},
-						},
-					},
-				}
-				eventChan <- types.Part{FunctionCall: fc}
-
-				res, err := simulateToolCall(fc)
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: err}
-					return
-				}
-				eventChan <- types.Part{FunctionResponse: &types.FunctionResponse{Name: fc.Name, Response: res}}
-
-			case 15: // After final plan update
-				finalResponse := "The `api.js` file is complete.\n\nTo run the server, first install the dependencies:\n```sh\nnpm init -y\nnpm install express body-parser\n```\n\nThen, start the server:\n```sh\nnode api.js\n```"
-				eventChan <- types.Part{Text: finalResponse}
-
+			// Add more cases here to continue the mock conversation if needed
 			default:
-				eventChan <- types.Part{Text: "Mock: I've lost track of the conversation. Please start over."}
+				eventChan <- types.Part{Text: "Mock: I have completed my tasks."}
 			}
 		}()
 		return eventChan, nil

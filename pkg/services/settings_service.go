@@ -134,6 +134,15 @@ func LoadSettings(workspaceDir string) *Settings {
 	if settings.Tavily == nil {
 		settings.Tavily = &types.TavilySettings{}
 	}
+	// IMPORTANT: Apply default dangerous tools if not specified in the settings file
+	if settings.DangerousTools == nil {
+		settings.DangerousTools = []string{
+			types.EXECUTE_COMMAND_TOOL_NAME,
+			types.WRITE_FILE_TOOL_NAME,
+			types.SMART_EDIT_TOOL_NAME,
+			types.USER_CONFIRM_TOOL_NAME,
+		}
+	}
 
 	return &settings
 }

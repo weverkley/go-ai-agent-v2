@@ -176,18 +176,23 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 		}, fmt.Errorf("failed to write todos file: %w", err)
 	}
 
-	llmContent := "Successfully updated the todo list."
+	displayContent := "Successfully updated the todo list."
 	if len(todos) > 0 {
-		llmContent += fmt.Sprintf(" The current list is now:\n%s", todoListBuilder.String())
+		displayContent += fmt.Sprintf(" The current list is now:\n%s", todoListBuilder.String())
 	} else {
-		llmContent = "Successfully cleared the todo list."
+		displayContent = "Successfully cleared the todo list."
+	}
+
+	// Provide a simple, structured response for the model.
+	llmContent := map[string]interface{}{
+		"success": true,
+		"message": "Successfully updated the todo list.",
 	}
 
 	return types.ToolResult{
 		LLMContent:    llmContent,
-		ReturnDisplay: llmContent,
-	},
-	nil
+		ReturnDisplay: displayContent,
+	}, nil
 }
 
 // isValidTodoStatus checks if the given status is a valid todo status.
