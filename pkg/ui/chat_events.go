@@ -1,0 +1,41 @@
+package ui
+
+import (
+	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
+)
+
+// --- Bubble Tea Message types ---
+type tickMsg time.Time
+type streamChannelMsg struct{ ch <-chan any }
+type streamEventMsg struct{ event any }
+type streamErrorMsg struct{ err error }
+type streamFinishMsg struct{}
+
+// commandFinishedMsg is sent when a slash command has finished executing.
+type commandFinishedMsg struct {
+	output string
+	err    error
+	args   []string // Keep track of the command that was run
+}
+
+// executeCommandCmd runs the commandExecutor in a goroutine and returns a
+// commandFinishedMsg when done.
+func executeCommandCmd(executor func(args []string) (string, error), args []string) tea.Cmd {
+	return func() tea.Msg {
+		output, err := executor(args)
+		return commandFinishedMsg{output: output, err: err, args: args}
+	}
+}
+
+// waitForEvent listens on the channel for the next event.
+func waitForEvent(ch <-chan any) tea.Cmd {
+	return func() tea.Msg {
+		event, ok := <-ch
+		if !ok {
+			return streamFinishMsg{}
+		}
+		return streamEventMsg{event: event}
+	}
+}

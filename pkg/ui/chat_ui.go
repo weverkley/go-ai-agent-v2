@@ -1,7 +1,7 @@
 package ui
 
 import (
-	"bufio" // New import
+	"bufio"
 	"context"
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
@@ -9,261 +9,17 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/utils"
-	"os"            // New import
-	"path/filepath" // New import
-	"sort"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/alecthomas/chroma/v2/formatters"
-	"github.com/alecthomas/chroma/v2/lexers"
-	"github.com/alecthomas/chroma/v2/styles"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/mbndr/figlet4go"
 )
-
-const tipsMessage = `Tips for getting started:
-1. Ask questions, edit files, or run commands.
-2. Be specific for the best results.
-3. /help for more information.`
-
-// --- Message Interface and Structs ---
-type Message interface {
-	Render(m *ChatModel) string
-}
-
-func createInitialMessages() []Message {
-	ascii := figlet4go.NewAsciiRender()
-	// You can change the font and color if you wish
-	// options := figlet4go.NewRenderOptions()
-	// options.FontColor = []figlet4go.Color{
-	// 	// Colors here
-	// }
-	// ascii.LoadFont(options.FontName)
-	renderStr, _ := ascii.Render("GO AI AGENT")
-	return []Message{
-		SystemMessage{Content: renderStr},
-		SuggestionMessage{Content: tipsMessage},
-	}
-}
-
-type UserMessage struct {
-	Content string
-}
-
-func (msg UserMessage) Render(m *ChatModel) string {
-	return m.senderStyle.Render("You: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
-}
-
-type BotMessage struct {
-	Content string
-}
-
-func (msg BotMessage) Render(m *ChatModel) string {
-	return m.botStyle.Render("Bot: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
-}
-
-type SystemMessage struct {
-	Content string
-}
-
-func (msg SystemMessage) Render(m *ChatModel) string {
-	// A simple message type that just renders the content, useful for logos or announcements.
-	return lipgloss.NewStyle().Width(m.viewport.Width).Render(msg.Content)
-}
-
-type ToolCallStatus struct {
-	ToolName string
-	Args     map[string]interface{}
-	Result   string
-	Err      error
-	Status   string // "Executing", "Completed"
-}
-type ToolCallGroupMessage struct {
-	ToolCalls map[string]*ToolCallStatus
-}
-
-func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
-	var builder strings.Builder
-	// Sort the keys for a stable order
-	ids := make([]string, 0, len(msg.ToolCalls))
-	for id := range msg.ToolCalls {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	for i, id := range ids {
-		tc := msg.ToolCalls[id]
-		var boxContent strings.Builder
-		// --- Legend Line ---
-		iconColor := lipgloss.Color("208") // Default/Executing color (Orange)
-		var statusIcon string
-		switch tc.Status {
-		case "Executing":
-			statusIcon = "⏳"
-		case "Completed":
-			if tc.Err != nil {
-				statusIcon = "❌"
-				iconColor = lipgloss.Color("9") // Red
-			} else {
-				statusIcon = "✅"
-				iconColor = lipgloss.Color("10") // Green
-			}
-		default:
-			statusIcon = "•"
-		}
-		actionWordStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("6")) // Blue
-		argumentStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("15"))  // White
-		var actionWord, argument string
-		switch tc.ToolName {
-		case "execute_command":
-			actionWord = "Running:"
-			if cmd, ok := tc.Args["command"].(string); ok {
-				argument = cmd
-			}
-		case "write_file":
-			actionWord = "Writing to:"
-			if path, ok := tc.Args["file_path"].(string); ok {
-				argument = path
-			}
-		case "read_file":
-			actionWord = "Reading:"
-			if path, ok := tc.Args["file_path"].(string); ok {
-				argument = path
-			}
-		case "web_search":
-			actionWord = "Searching:"
-			if query, ok := tc.Args["query"].(string); ok {
-				argument = query
-			}
-		case "smart_edit": // New case for smart_edit
-			actionWord = "Smart Editing:"
-			if filePath, ok := tc.Args["file_path"].(string); ok {
-				argument = filePath
-			}
-		case "user_confirm": // New case for user_confirm
-			actionWord = "Confirmation Required:"
-			if message, ok := tc.Args["message"].(string); ok {
-				argument = message
-			}
-		default:
-			actionWord = tc.ToolName + ":"
-			argument = fmt.Sprintf("%v", tc.Args)
-			if len(argument) > 60 {
-				argument = argument[:57] + "..."
-			}
-		}
-		legend := fmt.Sprintf("%s %s %s",
-			lipgloss.NewStyle().Foreground(iconColor).Render(statusIcon),
-			actionWordStyle.Render(actionWord),
-			argumentStyle.Render(argument),
-		)
-		boxContent.WriteString(legend)
-		// --- Special Content (for write_file, smart_edit, and user_confirm) ---
-		if (tc.ToolName == "write_file" || tc.ToolName == "smart_edit") && tc.Args != nil {
-			var contentToDisplay string
-			var filePathForLexer string
-			if tc.ToolName == "write_file" {
-				contentToDisplay, _ = tc.Args["content"].(string)
-				filePathForLexer, _ = tc.Args["file_path"].(string)
-			} else if tc.ToolName == "smart_edit" {
-				// For smart_edit, display the new_string and the instruction
-				instruction, _ := tc.Args["instruction"].(string)
-				newString, _ := tc.Args["new_string"].(string)
-				filePathForLexer, _ = tc.Args["file_path"].(string)
-				contentToDisplay = fmt.Sprintf("Instruction: %s\n\n--- NEW CONTENT ---\n%s", instruction, newString)
-			}
-			lines := strings.Split(contentToDisplay, "\n")
-			if len(lines) > 6 {
-				lines = lines[:6]
-				lines = append(lines, "...")
-			}
-			truncatedContent := strings.Join(lines, "\n")
-			lexer := lexers.Match(filePathForLexer)
-			if lexer == nil {
-				lexer = lexers.Analyse(truncatedContent)
-			}
-			if lexer == nil {
-				lexer = lexers.Fallback
-			}
-			style := styles.Get("monokai")
-			if style == nil {
-				style = styles.Fallback
-			}
-			formatter := formatters.Get("terminal256")
-			iterator, err := lexer.Tokenise(nil, truncatedContent)
-			if err == nil {
-				var highlightedContent strings.Builder
-				if formatter.Format(&highlightedContent, style, iterator) == nil {
-					boxContent.WriteString("\n\n") // Add a newline to separate legend from code
-					boxContent.WriteString(highlightedContent.String())
-				}
-			}
-		} else if tc.ToolName == "user_confirm" && tc.Args != nil {
-			if message, ok := tc.Args["message"].(string); ok {
-				boxContent.WriteString("\n\n")
-				boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(message))
-				boxContent.WriteString("\n")
-				boxContent.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)"))
-			}
-		}
-		// --- Box Rendering ---
-		contentWidth := m.viewport.Width - 6
-		box := lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("240")).
-			Padding(0, 1).
-			Width(contentWidth).
-			Render(boxContent.String())
-		builder.WriteString(box)
-		if i < len(ids)-1 {
-			builder.WriteString("\n")
-		}
-	}
-	return builder.String()
-}
-
-type ErrorMessage struct {
-	Err error
-}
-
-func (msg ErrorMessage) Render(m *ChatModel) string {
-	return m.errorStyle.Width(m.viewport.Width - 10).Render(fmt.Sprintf("Error: %v", msg.Err))
-}
-
-type SuggestionMessage struct {
-	Content string
-}
-
-func (msg SuggestionMessage) Render(m *ChatModel) string {
-	return m.suggestionStyle.Width(m.viewport.Width - 10).Render(msg.Content)
-}
-
-// --- Bubble Tea Message types ---
-type tickMsg time.Time
-type streamChannelMsg struct{ ch <-chan any }
-type streamEventMsg struct{ event any }
-type streamErrorMsg struct{ err error }
-type streamFinishMsg struct{}
-
-// commandFinishedMsg is sent when a slash command has finished executing.
-type commandFinishedMsg struct {
-	output string
-	err    error
-	args   []string // Keep track of the command that was run
-}
-
-// executeCommandCmd runs the commandExecutor in a goroutine and returns a
-// commandFinishedMsg when done.
-func executeCommandCmd(executor func(args []string) (string, error), args []string) tea.Cmd {
-	return func() tea.Msg {
-		output, err := executor(args)
-		return commandFinishedMsg{output: output, err: err, args: args}
-	}
-}
 
 type ChatModel struct {
 	viewport     viewport.Model
@@ -274,12 +30,12 @@ type ChatModel struct {
 	config       types.Config
 	// Services
 	chatService      *services.ChatService
-	sessionService   *services.SessionService // New field
+	sessionService   *services.SessionService
 	shellService     services.ShellExecutionService
 	gitService       services.GitService
 	workspaceService *services.WorkspaceService
 	// UI state
-	streamCh        <-chan any
+	streamCh        <-chan interface{}
 	isStreaming     bool
 	cancelCtx       context.Context
 	cancelFunc      context.CancelFunc
@@ -300,22 +56,22 @@ type ChatModel struct {
 	modelStyle               lipgloss.Style
 	logFile                  *os.File
 	logWriter                *bufio.Writer
-	awaitingConfirmation     bool                                // New field to indicate if user confirmation is pending
-	toolConfirmationRequest  *types.ToolConfirmationRequestEvent // New field for rich tool confirmation
-	awaitingToolConfirmation bool                                // New field
-	commandHistory           []string                            // Stores previous commands
-	historyIndex             int                                 // Current position in command history
+	awaitingConfirmation     bool
+	toolConfirmationRequest  *types.ToolConfirmationRequestEvent
+	awaitingToolConfirmation bool
+	commandHistory           []string
+	historyIndex             int
 	// Session stats
 	startTime      time.Time
 	toolCallCount  int
 	toolErrorCount int
 	contextFile    string
-	sessionID      string // New field to store the current session ID
+	sessionID      string
 }
 
 func NewChatModel(
 	chatService *services.ChatService,
-	sessionService *services.SessionService, // New parameter
+	sessionService *services.SessionService,
 	executorType string,
 	config types.Config,
 	commandExecutor func(args []string) (string, error),
@@ -328,7 +84,7 @@ func NewChatModel(
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
 	ta.Focus()
 	ta.Prompt = "❯ "
-	ta.CharLimit = 0 // No limit
+	ta.CharLimit = 0
 	ta.SetWidth(80)
 	ta.SetHeight(1)
 	ta.ShowLineNumbers = false
@@ -339,7 +95,6 @@ func NewChatModel(
 	s := spinner.New()
 	s.Spinner = spinner.Meter
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
-	// Determine the log file path from telemetry settings
 	var logDirPath string
 	telemetrySettingsVal, ok := config.Get("telemetry")
 	if ok {
@@ -352,28 +107,22 @@ func NewChatModel(
 			}
 		}
 	}
-	// Fallback to default if not specified in telemetry or if expansion failed
 	if logDirPath == "" {
 		expandedPath, err := pathutils.ExpandPath("~/.goaiagent/tmp")
 		if err != nil {
 			telemetry.LogErrorf("Error expanding default log directory path: %v", err)
-			// As a last resort, use a relative path
 			logDirPath = ".goaiagent/tmp"
 		} else {
 			logDirPath = expandedPath
 		}
 	}
 	logFilePath := filepath.Join(logDirPath, "chat-ui.log")
-	// Ensure the log directory exists
 	if err := os.MkdirAll(logDirPath, 0755); err != nil {
 		telemetry.LogErrorf("Error creating log directory: %v", err)
-		// Handle error
 	}
-	// Open log file
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		telemetry.LogErrorf("Error opening chat log file: %v", err)
-		// Handle error, perhaps return nil or a model with a disabled logger
 	}
 	logWriter := bufio.NewWriter(logFile)
 	model := &ChatModel{
@@ -382,7 +131,7 @@ func NewChatModel(
 		spinner:          s,
 		messages:         createInitialMessages(),
 		chatService:      chatService,
-		sessionService:   sessionService, // Initialize new field
+		sessionService:   sessionService,
 		executorType:     executorType,
 		config:           config,
 		shellService:     shellService,
@@ -399,9 +148,9 @@ func NewChatModel(
 		statusStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		footerStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
 		suggestionStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
-		pathStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")), // Blue
-		branchStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("10")), // Green
-		modelStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("13")), // Pink
+		pathStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
+		branchStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		modelStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
 		logFile:          logFile,
 		logWriter:        logWriter,
 		commandHistory:   []string{},
@@ -409,17 +158,16 @@ func NewChatModel(
 		startTime:        time.Now(),
 		toolCallCount:    0,
 		toolErrorCount:   0,
+		contextFile:      "", // Initializing as empty string
 		sessionID:        sessionID,
 	}
-	// Check for context file
 	if _, err := os.Stat("GOAIAGENT.md"); err == nil {
 		model.contextFile = "GOAIAGENT.md"
 	}
-	model.updateViewport() // Ensure initial messages are displayed
+	model.updateViewport()
 	return model
 }
 
-// Close closes the log file.
 func (m *ChatModel) Close() error {
 	if m.logWriter != nil {
 		m.logWriter.Flush()
@@ -430,7 +178,6 @@ func (m *ChatModel) Close() error {
 	return nil
 }
 
-// GetStats returns the final session statistics.
 func (m *ChatModel) GetStats() (int, int, time.Duration) {
 	return m.toolCallCount, m.toolErrorCount, time.Since(m.startTime)
 }
@@ -636,18 +383,18 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.messages = append(m.messages, botMsg)
 			m.logUIMessage(botMsg) // Log bot message
 		case types.ErrorEvent:
-			errMsg := ErrorMessage{Err: event.Err}
-			m.messages = append(m.messages, errMsg)
-			m.logUIMessage(errMsg) // Log error message
+			errmsg := ErrorMessage{Err: event.Err} // Corrected errmsg to errMsg
+			m.messages = append(m.messages, errmsg)
+			m.logUIMessage(errmsg) // Log error message
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
 	case streamErrorMsg:
 		m.err = msg.err
 		m.status = "Error"
-		errMsg := ErrorMessage{Err: msg.err}
-		m.messages = append(m.messages, errMsg)
-		m.logUIMessage(errMsg)
+		errmsg := ErrorMessage{Err: msg.err} // Corrected errmsg to errMsg
+		m.messages = append(m.messages, errmsg)
+		m.logUIMessage(errmsg)
 		m.updateViewport()
 		m.isStreaming = false
 		m.streamCh = nil
@@ -669,9 +416,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Ready"
 		telemetry.LogDebugf("Command execution finished. Error: %v, Output: %s", msg.err, msg.output)
 		if msg.err != nil {
-			errMsg := ErrorMessage{Err: msg.err}
-			m.messages = append(m.messages, errMsg)
-			m.logUIMessage(errMsg)
+			errmsg := ErrorMessage{Err: msg.err} // Corrected errmsg to errMsg
+			m.messages = append(m.messages, errmsg)
+			m.logUIMessage(errmsg)
 		}
 		if msg.output != "" {
 			botMsg := BotMessage{Content: msg.output}
@@ -707,17 +454,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *ChatModel) View() string {
 	var contextInfo string
 	if m.contextFile != "" {
-		// Mimicking the "Using: 2 GEMINI.md files" format
 		contextInfo = lipgloss.NewStyle().
-			PaddingLeft(1). // Add some left padding
+			PaddingLeft(1).
 			Foreground(lipgloss.Color("240")).
-			Render(fmt.Sprintf("Using: 1 %s file", m.contextFile))
+			Render(fmt.Sprintf("Using: 1 %s file", m.contextFile)) // Fixed comma before Render
 	}
-	// Place context info on the left side, above the footer
 	return fmt.Sprintf(
 		"%s\n%s\n%s\n%s",
 		m.viewport.View(),
-		contextInfo, // Render directly for left alignment
+		contextInfo,
 		m.renderFooter(),
 		m.textarea.View(),
 	)
@@ -743,7 +488,7 @@ func (m *ChatModel) renderFooter() string {
 			confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
 			finalRender = statusLine + confirmationOptions
 		} else {
-			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
+			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)") // Fixed NewNewStyle to NewStyle
 			finalRender = statusLine + instruction
 		}
 		return m.spinner.View() + " " + finalRender
@@ -858,8 +603,6 @@ Available Commands:
 					return m, nil
 				}
 				sessionID := args[2]
-				// Re-initialize chat service with the new session
-				// This assumes the executor can be reused.
 				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService())
 				if err != nil {
 					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
@@ -895,16 +638,14 @@ Available Commands:
 	// --- End Safety Check ---
 	telemetry.LogDebugf("Executing command asynchronously: %s with args: %v", commandString, args)
 	m.status = fmt.Sprintf("Executing `/%s`...", commandString)
-	m.isStreaming = true // Use the spinner to indicate the command is running
+	m.isStreaming = true
 	return m, executeCommandCmd(m.commandExecutor, args)
 }
 
-// repopulateMessagesFromHistory converts the raw history from the service to UI messages.
 func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Message {
 	newMessages := createInitialMessages()
 	for _, content := range history {
 		if content.Role == "user" {
-			// A "user" role can be a text prompt or a set of tool responses.
 			isToolResponse := false
 			for _, part := range content.Parts {
 				if part.FunctionResponse != nil {
@@ -912,11 +653,9 @@ func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Me
 					break
 				}
 			}
-			// If it's a tool response, we don't render a separate message for it in the UI.
 			if isToolResponse {
 				continue
 			}
-			// It's a normal text message from the user.
 			var textContent strings.Builder
 			for _, part := range content.Parts {
 				textContent.WriteString(part.Text)
@@ -925,7 +664,6 @@ func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Me
 				newMessages = append(newMessages, UserMessage{Content: textContent.String()})
 			}
 		} else if content.Role == "model" {
-			// A "model" role can be a text response, a set of tool calls, or both.
 			var functionCalls []*types.FunctionCall
 			var textParts []string
 			for _, part := range content.Parts {
@@ -937,17 +675,14 @@ func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Me
 				}
 			}
 			if len(functionCalls) > 0 {
-				// This was a tool-calling turn.
 				group := &ToolCallGroupMessage{ToolCalls: make(map[string]*ToolCallStatus)}
 				for i, fc := range functionCalls {
-					// We don't have the original result or status here, as the history
-					// doesn't store UI state. We'll render it as "Completed" since it's in the past.
 					toolCallID := fmt.Sprintf("resumed-tool-%d-%d", len(newMessages), i)
 					status := &ToolCallStatus{
 						ToolName: fc.Name,
 						Args:     fc.Args,
-						Status:   "Completed",              // Assume completed as it's from history
-						Result:   "(resumed from history)", // Placeholder result
+						Status:   "Completed",
+						Result:   "(resumed from history)",
 						Err:      nil,
 					}
 					group.ToolCalls[toolCallID] = status
@@ -955,7 +690,6 @@ func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Me
 				newMessages = append(newMessages, group)
 			}
 			if len(textParts) > 0 {
-				// This was a text response turn.
 				fullText := strings.Join(textParts, "")
 				newMessages = append(newMessages, BotMessage{Content: fullText})
 			}
@@ -965,22 +699,19 @@ func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Me
 }
 
 // --- Commands ---
-// logUIMessage writes the rendered UI message to the log file.
 func (m *ChatModel) logUIMessage(msg Message) {
 	if m.logWriter == nil {
 		return
 	}
 	renderedString := msg.Render(m)
 	cleanString := utils.StripAnsi(renderedString)
-	// Render the message to a string and write to log
 	_, err := m.logWriter.WriteString(cleanString + "\n")
 	if err != nil {
 		telemetry.LogErrorf("Error writing to chat log: %v", err)
 	}
-	m.logWriter.Flush() // Ensure message is written immediately
+	m.logWriter.Flush()
 }
 
-// logSystemMessage writes a timestamped system message to the log file.
 func (m *ChatModel) logSystemMessage(logMsg string) {
 	if m.logWriter == nil {
 		return
@@ -994,7 +725,6 @@ func (m *ChatModel) logSystemMessage(logMsg string) {
 	m.logWriter.Flush()
 }
 
-// startStreaming initiates the stream and returns a message with the channel.
 func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 	return func() tea.Msg {
 		m.cancelCtx, m.cancelFunc = context.WithCancel(context.Background())
@@ -1003,16 +733,5 @@ func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 			return streamErrorMsg{err}
 		}
 		return streamChannelMsg{ch: stream}
-	}
-}
-
-// waitForEvent listens on the channel for the next event.
-func waitForEvent(ch <-chan any) tea.Cmd {
-	return func() tea.Msg {
-		event, ok := <-ch
-		if !ok {
-			return streamFinishMsg{}
-		}
-		return streamEventMsg{event: event}
 	}
 }

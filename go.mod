@@ -10,14 +10,15 @@ require (
 	github.com/go-git/go-git/v5 v5.16.3
 	github.com/gobwas/glob v0.2.3
 	github.com/google/generative-ai-go v0.20.1
+	github.com/mbndr/figlet4go v0.0.0-20190224160619-d6cef5b186ea
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/spf13/cobra v1.10.1
-	github.com/stretchr/testify v1.10.0
-	google.golang.org/api v0.254.0
+	github.com/stretchr/testify v1.11.1
+	google.golang.org/api v0.256.0
 )
 
 require (
-	cloud.google.com/go v0.116.0 // indirect
+	cloud.google.com/go v0.115.0 // indirect
 	cloud.google.com/go/ai v0.8.0 // indirect
 	cloud.google.com/go/auth v0.17.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
@@ -46,7 +47,7 @@ require (
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
+	github.com/googleapis/enterprise-certificate-proxy v0.3.7 // indirect
 	github.com/googleapis/gax-go/v2 v2.15.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -55,7 +56,6 @@ require (
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
-	github.com/mbndr/figlet4go v0.0.0-20190224160619-d6cef5b186ea // indirect
 	github.com/muesli/ansi v0.0.0-20230316100256-276c6243b2f6 // indirect
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
@@ -76,13 +76,13 @@ require (
 	go.opentelemetry.io/otel/trace v1.37.0 // indirect
 	golang.org/x/crypto v0.43.0 // indirect
 	golang.org/x/net v0.46.0 // indirect
-	golang.org/x/oauth2 v0.32.0 // indirect
-	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/oauth2 v0.33.0 // indirect
+	golang.org/x/sync v0.18.0 // indirect
 	golang.org/x/sys v0.37.0 // indirect
 	golang.org/x/text v0.30.0 // indirect
 	golang.org/x/time v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250804133106-a7a43d27e69b // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20251022142026-3a174f9686a8 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251103181224-f26f9409b101 // indirect
 	google.golang.org/grpc v1.76.0 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
