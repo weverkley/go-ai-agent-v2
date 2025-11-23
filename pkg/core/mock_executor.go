@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
@@ -90,7 +91,8 @@ app.get('/todos/:id', (req, res) => {
 });`
 )
 
-// NewRealisticMockExecutor creates a mock executor that simulates a realistic workflow.
+// NewRealisticMockExecutor creates a mock executor that simulates a realistic workflow
+// for creating a simple Node.js Todo API.
 func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExecutor {
 	mock := &MockExecutor{
 		toolRegistry: toolRegistry,
@@ -123,45 +125,147 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 		go func() {
 			defer close(eventChan)
 
-			currentHistoryLength := len(contents)
+			// Simple state machine based on history length to simulate a conversation
+			switch len(contents) {
+			case 1: // Initial user prompt: "Create a simple Express.js API for a todo list."
+				time.Sleep(1 * time.Second)
+				// Step 1: Plan the work with write_todos
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_TODOS_TOOL_NAME,
+					Args: map[string]interface{}{
+						"todos": []map[string]interface{}{
+							{"description": "Create api.js with basic Express server.", "status": "in_progress"},
+							{"description": "Add GET /todos endpoint.", "status": "pending"},
+							{"description": "Add POST /todos endpoint.", "status": "pending"},
+							{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							{"description": "Provide final instructions.", "status": "pending"},
+						},
+					},
+				}}
 
-			if mock.MockStep == 0 && currentHistoryLength == 1 { // Initial user message
-				toolCallID := "mock-write-file-1"
-				filePath := "test_file.txt"
-				newContent := "Hello, Mock World!"
-
-				// Model proposes tool call (as a Part with FunctionCall)
-				select {
-				case <-ctx.Done():
-					return
-				case eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-					ID:   toolCallID,
+			case 3: // After write_todos response
+				time.Sleep(1 * time.Second)
+				// Step 2: Create the initial file
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_FILE_TOOL_NAME,
 					Args: map[string]interface{}{
-						"file_path": filePath,
-						"content":   newContent,
+						"file_path": "api.js",
+						"content":   jsContentTodoApi,
 					},
-				}}:
-					mock.MockStep++
-				}
-			} else if mock.MockStep == 1 && currentHistoryLength == 3 { // After tool response has been added to history by ChatService
-				// This implies ChatService has processed the initial FunctionCall, handled confirmation,
-				// executed the mock tool, and added the FunctionResponse to the history.
-				// Now the mock model provides a final text response.
-				finalResponse := "Mock: Based on your confirmation, I have finished the task."
-				select {
-				case <-ctx.Done():
-					return
-				case eventChan <- types.Part{Text: finalResponse}: // Emit as Part with text
-					mock.MockStep++
-				}
-			} else {
-				// Default or unhandled step, provide a generic response
-				select {
-				case <-ctx.Done():
-					return
-				case eventChan <- types.FinalResponseEvent{Content: "Mock: Thank you for chatting!"}:
-				}
+				}}
+
+			case 5: // After write_file response
+				time.Sleep(1 * time.Second)
+				// Step 3: Update plan and add the first GET endpoint
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_TODOS_TOOL_NAME,
+					Args: map[string]interface{}{
+						"todos": []map[string]interface{}{
+							{"description": "Create api.js with basic Express server.", "status": "completed"},
+							{"description": "Add GET /todos endpoint.", "status": "in_progress"},
+							{"description": "Add POST /todos endpoint.", "status": "pending"},
+							{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							{"description": "Provide final instructions.", "status": "pending"},
+						},
+					},
+				}}
+				time.Sleep(1 * time.Second)
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.SMART_EDIT_TOOL_NAME,
+					Args: map[string]interface{}{
+						"file_path":   "api.js",
+						"instruction": "Add an endpoint to get all todos.",
+						"old_string":  jsOldStringTodoApiGet,
+						"new_string":  jsNewStringTodoApiGet,
+					},
+				}}
+
+			case 7: // After adding GET /todos
+				time.Sleep(1 * time.Second)
+				// Step 4: Update plan and add the POST endpoint
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_TODOS_TOOL_NAME,
+					Args: map[string]interface{}{
+						"todos": []map[string]interface{}{
+							{"description": "Create api.js with basic Express server.", "status": "completed"},
+							{"description": "Add GET /todos endpoint.", "status": "completed"},
+							{"description": "Add POST /todos endpoint.", "status": "in_progress"},
+							{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							{"description": "Provide final instructions.", "status": "pending"},
+						},
+					},
+				}}
+				time.Sleep(1 * time.Second)
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.SMART_EDIT_TOOL_NAME,
+					Args: map[string]interface{}{
+						"file_path":   "api.js",
+						"instruction": "Add an endpoint to create a new todo.",
+						"old_string":  jsOldStringTodoApiPost,
+						"new_string":  jsNewStringTodoApiPost,
+					},
+				}}
+
+			case 9: // After adding POST /todos
+				time.Sleep(1 * time.Second)
+				// Step 5: Update plan and add the GET by ID endpoint
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_TODOS_TOOL_NAME,
+					Args: map[string]interface{}{
+						"todos": []map[string]interface{}{
+							{"description": "Create api.js with basic Express server.", "status": "completed"},
+							{"description": "Add GET /todos endpoint.", "status": "completed"},
+							{"description": "Add POST /todos endpoint.", "status": "completed"},
+							{"description": "Add GET /todos/:id endpoint.", "status": "in_progress"},
+							{"description": "Provide final instructions.", "status": "pending"},
+						},
+					},
+				}}
+				time.Sleep(1 * time.Second)
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.SMART_EDIT_TOOL_NAME,
+					Args: map[string]interface{}{
+						"file_path":   "api.js",
+						"instruction": "Add an endpoint to get a single todo by its ID.",
+						"old_string":  jsOldStringTodoApiGetById,
+						"new_string":  jsNewStringTodoApiGetById,
+					},
+				}}
+
+			case 11: // After adding GET by ID
+				time.Sleep(1 * time.Second)
+				// Step 6: All code is written, ask for confirmation before finishing
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.USER_CONFIRM_TOOL_NAME,
+					Args: map[string]interface{}{
+						"message": "I have implemented all API endpoints. Shall I provide the final instructions on how to run the server?",
+					},
+				}}
+
+			case 13: // After user confirmation
+				time.Sleep(1 * time.Second)
+				// Step 7: Finalize the plan
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_TODOS_TOOL_NAME,
+					Args: map[string]interface{}{
+						"todos": []map[string]interface{}{
+							{"description": "Create api.js with basic Express server.", "status": "completed"},
+							{"description": "Add GET /todos endpoint.", "status": "completed"},
+							{"description": "Add POST /todos endpoint.", "status": "completed"},
+							{"description": "Add GET /todos/:id endpoint.", "status": "completed"},
+							{"description": "Provide final instructions.", "status": "completed"},
+						},
+					},
+				}}
+
+			case 15: // After final plan update
+				time.Sleep(1 * time.Second)
+				// Step 8: Provide the final text response
+				finalResponse := "The `api.js` file is complete.\n\nTo run the server, first install the dependencies:\n```sh\nnpm init -y\nnpm install express body-parser\n```\n\nThen, start the server:\n```sh\nnode api.js\n```"
+				eventChan <- types.Part{Text: finalResponse}
+
+			default:
+				eventChan <- types.Part{Text: "Mock: I've lost track of the conversation. Please start over."}
 			}
 		}()
 		return eventChan, nil
