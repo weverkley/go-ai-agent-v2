@@ -16,7 +16,7 @@ type ChatService struct {
 	executor             core.Executor
 	toolRegistry         types.ToolRegistryInterface
 	history              []*types.Content
-	userConfirmationChan chan bool // Keep for the user_confirm tool
+	userConfirmationChan chan bool                          // Keep for the user_confirm tool
 	ToolConfirmationChan chan types.ToolConfirmationOutcome // New channel for rich confirmation
 	toolCallCounter      int
 	toolErrorCounter     int
@@ -182,12 +182,12 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					if isDangerousTool {
 						// Build ToolConfirmationRequestEvent
 						confirmationEvent := types.ToolConfirmationRequestEvent{
-								ToolCallID: toolCallID,
-								ToolName:   fc.Name,
-								ToolArgs:   fc.Args,
-								Type:       "exec", // Default type
-								Message:    fmt.Sprintf("Confirm execution of tool '%s'?", fc.Name),
-							}
+							ToolCallID: toolCallID,
+							ToolName:   fc.Name,
+							ToolArgs:   fc.Args,
+							Type:       "exec", // Default type
+							Message:    fmt.Sprintf("Confirm execution of tool '%s'?", fc.Name),
+						}
 
 						switch fc.Name {
 						case types.WRITE_FILE_TOOL_NAME:
@@ -201,10 +201,11 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 									originalContentBytes, err := os.ReadFile(filePath)
 									if err == nil {
 										confirmationEvent.OriginalContent = string(originalContentBytes)
-										                                        confirmationEvent.FileDiff = generateDiff(string(originalContentBytes), newContent)
-										                                    } else {
-										                                        telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
-										                                    }								}
+										confirmationEvent.FileDiff = generateDiff(string(originalContentBytes), newContent)
+									} else {
+										telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+									}
+								}
 							}
 						case types.SMART_EDIT_TOOL_NAME:
 							confirmationEvent.Type = "edit"
@@ -224,7 +225,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 										// Perform in-memory replacement for diff generation
 										// This is a simplified approach and assumes single exact match
 										// A more robust solution might need to match `replace` tool's exact logic
-									simulatedNewContent := strings.Replace(originalFileContent, oldString, newString, 1) // Replace once
+										simulatedNewContent := strings.Replace(originalFileContent, oldString, newString, 1) // Replace once
 										confirmationEvent.NewContent = simulatedNewContent
 										confirmationEvent.FileDiff = generateDiff(originalFileContent, simulatedNewContent)
 									} else {
