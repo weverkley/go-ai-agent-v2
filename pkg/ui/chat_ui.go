@@ -320,6 +320,19 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Executing tool..."
 			m.toolCallCount++ // Increment tool call count
 			m.logSystemMessage(fmt.Sprintf("Tool Started: %s with args %v", event.ToolName, event.Args))
+
+			// Don't add user_confirm to the visual chat history as a tool call,
+			// as it's handled separately in the footer.
+			if event.ToolName == types.USER_CONFIRM_TOOL_NAME {
+				// We still need to track it as active for the UI state.
+				m.activeToolCalls[event.ToolCallID] = &ToolCallStatus{
+					ToolName: event.ToolName,
+					Args:     event.Args,
+					Status:   "Awaiting Confirmation",
+				}
+				break // Exit the switch case for this event
+			}
+
 			tcStatus := &ToolCallStatus{
 				ToolName: event.ToolName,
 				Args:     event.Args,
@@ -461,16 +474,21 @@ func (m *ChatModel) renderFooter() string {
 		var finalRender string
 		if m.awaitingToolConfirmation && m.toolConfirmationRequest != nil {
 			options := "(y: allow once, a: allow always, n: cancel, m: modify)"
-			if m.toolConfirmationRequest.Type == "edit" {
-				// Also show diff
-				diffSummary := ""
-				if m.toolConfirmationRequest.FileDiff != "" {
-					diffSummary = "\n" + m.toolConfirmationRequest.FileDiff
-				}
-				finalRender = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(m.toolConfirmationRequest.Message+diffSummary) + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(options)
+			
+			messageStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Width(m.viewport.Width - lipgloss.Width(m.spinner.View()) - 1)
+			
+			var finalRender string
+			if m.toolConfirmationRequest.Type == "edit" && m.toolConfirmationRequest.FileDiff != "" {
+				// For edits, show message, options, and then the diff on subsequent lines.
+				messageLine := messageStyle.Render(m.toolConfirmationRequest.Message)
+				optionsLine := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(options)
+				finalRender = lipgloss.JoinVertical(lipgloss.Left, messageLine, optionsLine, m.toolConfirmationRequest.FileDiff)
 			} else {
-				finalRender = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(m.toolConfirmationRequest.Message) + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(options)
+				// For other confirmations, show message and options.
+				fullMessage := fmt.Sprintf("%s %s", m.toolConfirmationRequest.Message, options)
+				finalRender = messageStyle.Render(fullMessage)
 			}
+			return m.spinner.View() + " " + finalRender
 		} else {
 			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
 			finalRender = statusLine + instruction
