@@ -24,6 +24,11 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
     - **Declarative by Design**: Each tool defines its own name, description, and argument schema, making it easy for the AI to understand and use.
     - **Centrally Registered**: All tools are instantiated and registered in a central `ToolRegistry`, which is then provided to the active executor.
 
+- **Special Tool: User Confirmation**: A unique tool, `user_confirm`, is available to the agent for seeking explicit user approval before proceeding with an action.
+    - **Intercepted by ChatService**: Unlike other tools, `user_confirm` is not executed directly. Instead, the `ChatService` intercepts the tool call and triggers a `ToolConfirmationRequestEvent`.
+    - **UI Interaction**: The `ChatUI` listens for this event and displays a confirmation prompt to the user.
+    - **User Response**: The user's response (e.g., 'y' for yes, 'n' for no) is then sent back to the `ChatService`, which determines whether to proceed with the action or cancel it.
+
 - **Hierarchical Sub-Agent Framework**: A powerful system for delegating complex tasks to specialized, autonomous agents that run non-interactively.
     - **Agent Blueprints**: The `AgentDefinition` struct allows for creating detailed blueprints for sub-agents, specifying their purpose, allowed tools, and system prompts.
     - **Autonomous Execution**: The `AgentExecutor` runs these agents in an isolated, multi-turn loop until they complete their objective.
@@ -93,7 +98,8 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
     - **`ui/`**: The Bubble Tea-based interactive chat interface (`chat_ui.go`), which renders the stream of events from the core executor and includes a dynamic footer for displaying real-time session statistics.
     - **`tools/`**: Definitions for all available agent tools (e.g., `read_file`, `execute_command`). `register.go` assembles the central tool registry.
     - **`services/`**: Shared, decoupled services for file system, Git, shell execution, etc.
-    - **`config/`**: Application configuration and settings management.
+        - `chat_service.go`: The central orchestrator for a chat session. It manages the conversation history, handles the streaming of events to and from the `Executor`, and intercepts special tool calls like `user_confirm` to manage the UI confirmation flow.
+    - **`config/`**: Application configuration and settings management. Handles loading, accessing, and saving settings for the application, such as API keys, model preferences, and tool configurations.
     - **`routing/`**: Logic for dynamically routing requests to different AI models based on context or errors.
     - **`types/`**: Centralized data structures and interfaces used across the application.
 
