@@ -11,6 +11,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"github.com/stretchr/testify/assert"
+
 )
 
 // MockSettingsService for testing ChatService
@@ -336,6 +337,93 @@ func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 		assert.Contains(t, history[2].Parts[0].FunctionResponse.Response["result"].(string), "cancel")
 	})
 }
+
+func TestChatService_SendMessage_ProceedAlways(t *testing.T) {
+	_, _, _, _, _, _, cleanupOuter := setupTestChatService(t)
+	defer cleanupOuter()
+
+	// Scenario: User selects "Proceed Always" for a tool, and it then executes automatically
+	t.Run("User selects Proceed Always for a tool", func(t *testing.T) {
+		chatService, mockExecutor, _, _, mockSettingsService, _, cleanup := setupTestChatService(t)
+		defer cleanup()
+		mockSettingsService.dangerousTools = []string{types.WRITE_FILE_TOOL_NAME}
+
+		// Configure mock executor to propose write_file tool twice
+		mockExecutor.StreamContentFunc = func(currentCtx context.Context, contents ...*types.Content) (<-chan any, error) {
+			eventChan := make(chan any)
+			go func() {
+				defer close(eventChan)
+
+				currentHistoryLength := len(contents)
+				if currentHistoryLength%2 == 1 { // User message, model proposes tool
+					toolCallID := "mock-write-file-1"
+					eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+						ID:   toolCallID,
+						Name: types.WRITE_FILE_TOOL_NAME,
+						Args: map[string]interface{}{"file_path": "test_always.txt", "content": "Always proceed content."},
+					}}
+				} else { // After tool has been handled by ChatService, mock provides final text
+					eventChan <- types.Part{Text: "Mock: Task handled based on previous confirmation."}
+				}
+			}()
+			return eventChan, nil
+		}
+
+		// --- First Tool Call: User selects "Proceed Always" ---
+		eventChan1, err := chatService.SendMessage(context.Background(), "Write 'Always proceed content' to test_always.txt.")
+		assert.NoError(t, err)
+
+		var receivedEvents1 []any
+		for event := range eventChan1 {
+			receivedEvents1 = append(receivedEvents1, event)
+			if _, ok := event.(types.ToolConfirmationRequestEvent); ok {
+
+				chatService.ToolConfirmationChan <- types.ToolConfirmationOutcomeProceedAlways
+			}
+		}
+
+		// Assertions for the first sequence of events
+		assert.Len(t, receivedEvents1, 7) // StreamingStarted, Thinking, ToolCallStart, ToolConfirmationRequest, ToolCallEnd, Thinking, FinalResponse
+		assert.IsType(t, types.StreamingStartedEvent{}, receivedEvents1[0])
+		assert.IsType(t, types.ThinkingEvent{}, receivedEvents1[1])
+		assert.IsType(t, types.ToolCallStartEvent{}, receivedEvents1[2])
+		assert.IsType(t, types.ToolConfirmationRequestEvent{}, receivedEvents1[3])
+		assert.IsType(t, types.ToolCallEndEvent{}, receivedEvents1[4])
+		assert.IsType(t, types.ThinkingEvent{}, receivedEvents1[5])
+		assert.IsType(t, types.FinalResponseEvent{}, receivedEvents1[6])
+
+		toolCallEndEvent1 := receivedEvents1[4].(types.ToolCallEndEvent)
+		assert.NoError(t, toolCallEndEvent1.Err)
+		assert.Contains(t, toolCallEndEvent1.Result, "Successfully wrote to test_always.txt")
+
+		// --- Second Tool Call: Verify automatic execution ---
+		eventChan2, err := chatService.SendMessage(context.Background(), "Write 'Another content' to test_always.txt.")
+		assert.NoError(t, err)
+
+		var receivedEvents2 []any
+		var confirmationRequested bool
+		for event := range eventChan2 {
+			receivedEvents2 = append(receivedEvents2, event)
+			if _, ok := event.(types.ToolConfirmationRequestEvent); ok {
+				confirmationRequested = true // This should NOT happen
+			}
+		}
+		assert.False(t, confirmationRequested, "Tool confirmation should NOT be requested for the second call.")
+
+		// Assertions for the second sequence of events (should be shorter as no confirmation is requested)
+		assert.Len(t, receivedEvents2, 5) // StreamingStarted, Thinking, ToolCallStart, ToolCallEnd, FinalResponse
+		assert.IsType(t, types.StreamingStartedEvent{}, receivedEvents2[0])
+		assert.IsType(t, types.ThinkingEvent{}, receivedEvents2[1])
+		assert.IsType(t, types.ToolCallStartEvent{}, receivedEvents2[2])
+		assert.IsType(t, types.ToolCallEndEvent{}, receivedEvents2[3])
+		assert.IsType(t, types.FinalResponseEvent{}, receivedEvents2[4])
+
+		toolCallEndEvent2 := receivedEvents2[3].(types.ToolCallEndEvent)
+		assert.NoError(t, toolCallEndEvent2.Err)
+		assert.Contains(t, toolCallEndEvent2.Result, "Successfully wrote to test_always.txt") // Tool executed
+	})
+}
+
 
 // MockWriteFileTool for testing
 type MockWriteFileTool struct {
