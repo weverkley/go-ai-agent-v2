@@ -17,20 +17,23 @@ type TelemetryLogger interface {
 	LogAgentStart(event types.AgentStartEvent)
 	LogAgentFinish(event types.AgentFinishEvent)
 	LogErrorf(format string, args ...interface{})
-	LogWarnf(format string, args ...interface{}) // Added
-	LogInfof(format string, args ...interface{}) // Added
+	LogWarnf(format string, args ...interface{})
+	LogInfof(format string, args ...interface{})
 	LogDebugf(format string, args ...interface{})
+	LogPrompt(prompt string) // New method
 }
 
 // noopTelemetryLogger is a no-operation implementation of TelemetryLogger.
 type noopTelemetryLogger struct{}
 
-func (l *noopTelemetryLogger) LogAgentStart(event types.AgentStartEvent) {}
-func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent) {}
-func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{})    {}
-func (l *noopTelemetryLogger) LogWarnf(format string, args ...interface{})     {} // Added
-func (l *noopTelemetryLogger) LogInfof(format string, args ...interface{})     {} // Added
-func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{})    {}
+func (l *noopTelemetryLogger) LogAgentStart(event types.AgentStartEvent)    {}
+func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent)   {}
+func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{})  {}
+func (l *noopTelemetryLogger) LogWarnf(format string, args ...interface{})   {}
+func (l *noopTelemetryLogger) LogInfof(format string, args ...interface{})   {}
+func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{})  {}
+func (l *noopTelemetryLogger) LogPrompt(prompt string) {} // New method
+
 
 // fileTelemetryLogger logs telemetry events to a specified file.
 type fileTelemetryLogger struct {
@@ -187,6 +190,26 @@ func (l *fileTelemetryLogger) LogDebugf(format string, args ...interface{}) {
 	data, err := json.Marshal(logEntry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshaling debug log entry: %v\n", err)
+		return
+	}
+	l.writeLog(data)
+}
+
+func (l *fileTelemetryLogger) LogPrompt(prompt string) {
+	if !l.enabled || l.logLevel != "debug" {
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	logEntry := map[string]interface{}{
+		"type":      "Prompt",
+		"prompt":    prompt,
+		"timestamp": time.Now().Format(time.RFC3339),
+	}
+	data, err := json.Marshal(logEntry)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling prompt log entry: %v\n", err)
 		return
 	}
 	l.writeLog(data)

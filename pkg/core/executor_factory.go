@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/routing"
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -35,7 +36,7 @@ func (f *GoaiagentExecutorFactory) NewExecutor(cfg types.Config, generationConfi
 
 	routedCfg := cfg.WithModel(decision.Model)
 
-	return NewGoaiagentChat(routedCfg, generationConfig, startHistory)
+	return NewGoaiagentChat(routedCfg, generationConfig, startHistory, telemetry.GlobalLogger)
 }
 
 // MockExecutorFactory is an ExecutorFactory that creates MockExecutor instances.
@@ -65,7 +66,7 @@ type QwenExecutorFactory struct{}
 
 // NewExecutor creates a new QwenChat executor.
 func (f *QwenExecutorFactory) NewExecutor(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
-	return NewQwenChat(cfg, generationConfig, startHistory)
+	return NewQwenChat(cfg, generationConfig, startHistory, telemetry.GlobalLogger)
 }
 
 // NewExecutorFactory creates an ExecutorFactory based on the provided type.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -28,11 +29,12 @@ type GoaiagentChat struct {
 	toolRegistry          types.ToolRegistryInterface
 	toolCallCounter       int
 	userConfirmationChan  chan bool
-	ToolConfirmationChan  chan types.ToolConfirmationOutcome // New channel for rich confirmation
+	ToolConfirmationChan  chan types.ToolConfirmationOutcome
+	logger                telemetry.TelemetryLogger // New field for telemetry logger
 }
 
 // NewGoaiagentChat creates a new GoaiagentChat instance.
-func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
+func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content, logger telemetry.TelemetryLogger) (Executor, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -75,7 +77,8 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 		toolRegistry:          geminiChatToolRegistry,
 		toolCallCounter:       0,
 		userConfirmationChan:  make(chan bool, 1),
-		ToolConfirmationChan:  make(chan types.ToolConfirmationOutcome, 1), // Initialize
+		ToolConfirmationChan:  make(chan types.ToolConfirmationOutcome, 1),
+		logger:                logger, // Assign the logger
 	}, nil
 }
 
@@ -492,8 +495,20 @@ func (gc *GoaiagentChat) StreamContent(ctx context.Context, history ...*types.Co
 		cs := gc.model.StartChat()
 		cs.History = toGenaiContents(history[:len(history)-1])
 		lastMessage := history[len(history)-1]
+		genaiParts := toGenaiParts(lastMessage.Parts)
 
-		iter := cs.SendMessageStream(ctx, toGenaiParts(lastMessage.Parts)...)
+		// Extract and log the prompt before sending
+		var promptBuilder strings.Builder
+		for _, part := range genaiParts {
+			if text, ok := part.(genai.Text); ok {
+				promptBuilder.WriteString(string(text))
+			}
+		}
+		if promptBuilder.Len() > 0 {
+			gc.logger.LogPrompt(promptBuilder.String())
+		}
+
+		iter := cs.SendMessageStream(ctx, genaiParts...)
 
 		for {
 			resp, err := iter.Next()

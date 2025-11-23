@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/sashabaranov/go-openai"
@@ -114,10 +115,11 @@ type QwenChat struct {
 	startHistory []*types.Content
 	toolRegistry types.ToolRegistryInterface
 	ToolConfirmationChan chan types.ToolConfirmationOutcome
+	logger       telemetry.TelemetryLogger // New field for telemetry logger
 }
 
 // NewQwenChat creates a new QwenChat instance.
-func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content) (Executor, error) {
+func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content, logger telemetry.TelemetryLogger) (Executor, error) {
 	apiKey := os.Getenv("QWEN_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("QWEN_API_KEY environment variable not set")
@@ -150,6 +152,7 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 		startHistory: startHistory,
 		toolRegistry: qwenChatToolRegistry,
 		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
+		logger:       logger, // Assign the logger
 	}, nil
 }
 
@@ -173,6 +176,17 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 		}
 
 		messages := append(historyMessages, lastMessage...)
+
+		// Extract and log the prompt before sending
+		var promptBuilder strings.Builder
+		for _, msg := range messages {
+			if msg.Content != "" {
+				promptBuilder.WriteString(msg.Content)
+			}
+		}
+		if promptBuilder.Len() > 0 {
+			qc.logger.LogPrompt(promptBuilder.String())
+		}
 
 		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
