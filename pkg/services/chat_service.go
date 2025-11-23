@@ -144,9 +144,19 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			if streamErr != nil { // This block now handles errors from StreamContent or from the stream channel
 				currentExecutorName := cs.executor.Name()
 
-				if currentExecutorName == "gemini" {
+				telemetry.LogDebugf("ChatService: Currently handling errors for executor '%s'.", currentExecutorName)
+
+				currentExecutorTypeVal, _ := cs.settingsService.Get("executor")
+				currentExecutorType, ok := currentExecutorTypeVal.(string)
+				if !ok {
+					currentExecutorType = "gemini" // Default to gemini if not found
+				}
+
+				// Check if the current executor type (e.g., "gemini" or "qwen") is gemini
+				if currentExecutorType == "gemini" {
 					var apiErr *googleapi.Error
 					if errors.As(streamErr, &apiErr) && apiErr.Code == 429 {
+
 						telemetry.LogDebugf("Gemini Quota Exceeded error detected: %v", streamErr)
 
 						currentExecutorTypeVal, _ := cs.settingsService.Get("executor")
@@ -169,7 +179,6 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							currentModelStr = "unknown" // Default if not found or not a string
 						}
 						telemetry.LogDebugf("ChatService: currentModel for routing decision: %s", currentModelStr)
-
 
 						router := routing.NewModelRouterService(cs.appConfig)
 						routingCtx := &routing.RoutingContext{
