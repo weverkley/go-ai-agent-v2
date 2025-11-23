@@ -23,6 +23,7 @@ type ChatService struct {
 	sessionService       *SessionService
 	sessionID            string
 	settingsService      types.SettingsServiceIface // Change to interface
+	proceedAlwaysTools   map[string]bool            // Store tool names for which "Proceed Always" is active
 }
 
 // NewChatService creates a new ChatService.
@@ -46,6 +47,7 @@ func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInter
 		sessionService:       sessionService,
 		sessionID:            sessionID,
 		settingsService:      settingsService,
+		proceedAlwaysTools:   make(map[string]bool), // Initialize the map
 	}
 	// Save the loaded (or empty) history immediately to ensure the session file exists if it's new.
 	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
@@ -180,96 +182,102 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					var toolExecutionError error
 
 					if isDangerousTool {
-						// Build ToolConfirmationRequestEvent
-						confirmationEvent := types.ToolConfirmationRequestEvent{
-							ToolCallID: toolCallID,
-							ToolName:   fc.Name,
-							ToolArgs:   fc.Args,
-							Type:       "exec", // Default type
-							Message:    fmt.Sprintf("Confirm execution of tool '%s'?", fc.Name),
-						}
+						// Check if "Proceed Always" is active for this tool
+						if cs.proceedAlwaysTools[fc.Name] {
+							telemetry.LogDebugf("ChatService: Proceeding automatically for tool '%s' (Proceed Always).", fc.Name)
+							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+						} else {
+							// Build ToolConfirmationRequestEvent
+							confirmationEvent := types.ToolConfirmationRequestEvent{
+								ToolCallID: toolCallID,
+								ToolName:   fc.Name,
+								ToolArgs:   fc.Args,
+								Type:       "exec", // Default type
+								Message:    fmt.Sprintf("Confirm execution of tool '%s'?", fc.Name),
+							}
 
-						switch fc.Name {
-						case types.WRITE_FILE_TOOL_NAME:
-							confirmationEvent.Type = "edit"
-							confirmationEvent.Message = "Apply this change?"
-							if filePath, ok := fc.Args["file_path"].(string); ok {
-								confirmationEvent.FilePath = filePath
-								if newContent, ok := fc.Args["content"].(string); ok {
-									confirmationEvent.NewContent = newContent
-									// Read original content to generate diff
-									originalContentBytes, err := os.ReadFile(filePath)
-									if err == nil {
-										confirmationEvent.OriginalContent = string(originalContentBytes)
-										confirmationEvent.FileDiff = generateDiff(string(originalContentBytes), newContent)
-									} else {
-										telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+							switch fc.Name {
+							case types.WRITE_FILE_TOOL_NAME:
+								confirmationEvent.Type = "edit"
+								confirmationEvent.Message = "Apply this change?"
+								if filePath, ok := fc.Args["file_path"].(string); ok {
+									confirmationEvent.FilePath = filePath
+									if newContent, ok := fc.Args["content"].(string); ok {
+										confirmationEvent.NewContent = newContent
+										// Read original content to generate diff
+										originalContentBytes, err := os.ReadFile(filePath)
+										if err == nil {
+											confirmationEvent.OriginalContent = string(originalContentBytes)
+											confirmationEvent.FileDiff = generateDiff(string(originalContentBytes), newContent)
+										} else {
+											telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+										}
 									}
 								}
-							}
-						case types.SMART_EDIT_TOOL_NAME:
-							confirmationEvent.Type = "edit"
-							confirmationEvent.Message = "Apply this change?"
-							if filePath, ok := fc.Args["file_path"].(string); ok {
-								confirmationEvent.FilePath = filePath
-								// Smart edit uses old_string and new_string to define the change
-								oldString, oldOk := fc.Args["old_string"].(string)
-								newString, newOk := fc.Args["new_string"].(string)
-								if oldOk && newOk {
-									// To generate a diff for smart_edit, we need to read the file,
-									// perform the replacement in memory, and then diff.
-									originalContentBytes, err := os.ReadFile(filePath)
-									if err == nil {
-										originalFileContent := string(originalContentBytes)
-										confirmationEvent.OriginalContent = originalFileContent
-										// Perform in-memory replacement for diff generation
-										// This is a simplified approach and assumes single exact match
-										// A more robust solution might need to match `replace` tool's exact logic
-										simulatedNewContent := strings.Replace(originalFileContent, oldString, newString, 1) // Replace once
-										confirmationEvent.NewContent = simulatedNewContent
-										confirmationEvent.FileDiff = generateDiff(originalFileContent, simulatedNewContent)
-									} else {
-										telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+							case types.SMART_EDIT_TOOL_NAME:
+								confirmationEvent.Type = "edit"
+								confirmationEvent.Message = "Apply this change?"
+								if filePath, ok := fc.Args["file_path"].(string); ok {
+									confirmationEvent.FilePath = filePath
+									// Smart edit uses old_string and new_string to define the change
+									oldString, oldOk := fc.Args["old_string"].(string)
+									newString, newOk := fc.Args["new_string"].(string)
+									if oldOk && newOk {
+										// To generate a diff for smart_edit, we need to read the file,
+										// perform the replacement in memory, and then diff.
+										originalContentBytes, err := os.ReadFile(filePath)
+										if err == nil {
+											originalFileContent := string(originalContentBytes)
+											confirmationEvent.OriginalContent = originalFileContent
+											// Perform in-memory replacement for diff generation
+											// This is a simplified approach and assumes single exact match
+											// A more robust solution might need to match `replace` tool's exact logic
+											simulatedNewContent := strings.Replace(originalFileContent, oldString, newString, 1) // Replace once
+											confirmationEvent.NewContent = simulatedNewContent
+											confirmationEvent.FileDiff = generateDiff(originalFileContent, simulatedNewContent)
+										} else {
+											telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+										}
 									}
 								}
+							case types.EXECUTE_COMMAND_TOOL_NAME:
+								confirmationEvent.Type = "exec"
+								if cmd, ok := fc.Args["command"].(string); ok {
+									confirmationEvent.Message = fmt.Sprintf("Allow execution of: '%s'?", cmd)
+								}
 							}
-						case types.EXECUTE_COMMAND_TOOL_NAME:
-							confirmationEvent.Type = "exec"
-							if cmd, ok := fc.Args["command"].(string); ok {
-								confirmationEvent.Message = fmt.Sprintf("Allow execution of: '%s'?", cmd)
+
+							telemetry.LogDebugf("ChatService: Emitting ToolConfirmationRequestEvent for tool call %s (%s)", toolCallID, fc.Name)
+							eventChan <- confirmationEvent
+							telemetry.LogDebugf("Received stream event: ToolConfirmationRequestEvent (ID: %s, Name: %s)", toolCallID, fc.Name)
+
+							outcome := <-cs.ToolConfirmationChan
+							telemetry.LogDebugf("ChatService: Received tool confirmation response: %s", outcome)
+
+							switch outcome {
+							case types.ToolConfirmationOutcomeProceedOnce:
+								telemetry.LogDebugf("ChatService: User confirmed '%s' (once). Executing tool.", fc.Name)
+								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							case types.ToolConfirmationOutcomeCancel:
+								telemetry.LogDebugf("ChatService: User cancelled '%s'. Aborting tool execution.", fc.Name)
+								toolExecutionResult = "Tool execution cancelled by user."
+								toolExecutionError = fmt.Errorf("tool execution cancelled by user")
+								cs.toolErrorCounter++
+							case types.ToolConfirmationOutcomeModifyWithEditor:
+								telemetry.LogDebugf("ChatService: User chose to modify '%s' with editor. Aborting tool execution.", fc.Name)
+								toolExecutionResult = "Tool modification chosen by user. Please apply changes manually."
+								toolExecutionError = fmt.Errorf("tool modification with editor chosen by user")
+								cs.toolErrorCounter++
+							case types.ToolConfirmationOutcomeProceedAlways:
+								telemetry.LogDebugf("ChatService: User confirmed '%s' (always). Storing preference and executing tool.", fc.Name)
+								cs.proceedAlwaysTools[fc.Name] = true // Store the preference
+								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							default:
+								telemetry.LogErrorf("ChatService: Unknown confirmation outcome '%s' for tool '%s'. Aborting.", outcome, fc.Name)
+								toolExecutionResult = "Tool execution aborted due to unknown confirmation outcome."
+								toolExecutionError = fmt.Errorf("unknown confirmation outcome")
+								cs.toolErrorCounter++
 							}
-						}
-
-						telemetry.LogDebugf("ChatService: Emitting ToolConfirmationRequestEvent for tool call %s (%s)", toolCallID, fc.Name)
-						eventChan <- confirmationEvent
-						telemetry.LogDebugf("Received stream event: ToolConfirmationRequestEvent (ID: %s, Name: %s)", toolCallID, fc.Name)
-
-						outcome := <-cs.ToolConfirmationChan
-						telemetry.LogDebugf("ChatService: Received tool confirmation response: %s", outcome)
-
-						switch outcome {
-						case types.ToolConfirmationOutcomeProceedOnce:
-							telemetry.LogDebugf("ChatService: User confirmed '%s' (once). Executing tool.", fc.Name)
-							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
-						case types.ToolConfirmationOutcomeCancel:
-							telemetry.LogDebugf("ChatService: User cancelled '%s'. Aborting tool execution.", fc.Name)
-							toolExecutionResult = "Tool execution cancelled by user."
-							toolExecutionError = fmt.Errorf("tool execution cancelled by user")
-							cs.toolErrorCounter++
-						case types.ToolConfirmationOutcomeModifyWithEditor:
-							telemetry.LogDebugf("ChatService: User chose to modify '%s' with editor. Aborting tool execution.", fc.Name)
-							toolExecutionResult = "Tool modification chosen by user. Please apply changes manually."
-							toolExecutionError = fmt.Errorf("tool modification with editor chosen by user")
-							cs.toolErrorCounter++
-						case types.ToolConfirmationOutcomeProceedAlways:
-							// TODO: Implement logic to store approval in settingsService
-							telemetry.LogDebugf("ChatService: User confirmed '%s' (always). Not yet implemented. Executing once.", fc.Name)
-							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
-						default:
-							telemetry.LogErrorf("ChatService: Unknown confirmation outcome '%s' for tool '%s'. Aborting.", outcome, fc.Name)
-							toolExecutionResult = "Tool execution aborted due to unknown confirmation outcome."
-							toolExecutionError = fmt.Errorf("unknown confirmation outcome")
-							cs.toolErrorCounter++
 						}
 					} else {
 						// Default tool execution (not dangerous or no confirmation needed)

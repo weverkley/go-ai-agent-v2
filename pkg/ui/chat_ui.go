@@ -201,6 +201,11 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = fmt.Sprintf("User confirmed '%s' (once). Resuming...", m.toolConfirmationRequest.ToolName)
 			m.chatService.GetToolConfirmationChannel() <- types.ToolConfirmationOutcomeProceedOnce
 			return m, waitForEvent(m.streamCh)
+		case "a", "A": // Yes, allow always
+			m.awaitingToolConfirmation = false
+			m.status = fmt.Sprintf("User confirmed '%s' (always). Resuming...", m.toolConfirmationRequest.ToolName)
+			m.chatService.GetToolConfirmationChannel() <- types.ToolConfirmationOutcomeProceedAlways
+			return m, waitForEvent(m.streamCh)
 		case "n", "N", "esc": // No, cancel
 			m.awaitingToolConfirmation = false
 			m.status = fmt.Sprintf("User cancelled '%s'. Resuming...", m.toolConfirmationRequest.ToolName)
@@ -473,7 +478,7 @@ func (m *ChatModel) renderFooter() string {
 		statusLine := lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render(m.status) // Always blue in active state
 		var finalRender string
 		if m.awaitingToolConfirmation && m.toolConfirmationRequest != nil {
-			options := "(y: allow once, n: cancel, m: modify)"
+			options := "(y: allow once, a: allow always, n: cancel, m: modify)"
 			if m.toolConfirmationRequest.Type == "edit" {
 				// Also show diff
 				diffSummary := ""
