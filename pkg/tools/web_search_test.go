@@ -21,6 +21,7 @@ type MockSettingsService struct {
 	GetGoogleCustomSearchSettingsFunc func() *types.GoogleCustomSearchSettings
 	GetWebSearchProviderFunc          func() types.WebSearchProvider
 	GetTavilySettingsFunc             func() *types.TavilySettings
+	GetDangerousToolsFunc             func() []string // New field
 }
 
 func (m *MockSettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSearchSettings {
@@ -42,6 +43,13 @@ func (m *MockSettingsService) GetTavilySettings() *types.TavilySettings {
 		return m.GetTavilySettingsFunc()
 	}
 	return &types.TavilySettings{}
+}
+
+func (m *MockSettingsService) GetDangerousTools() []string {
+	if m.GetDangerousToolsFunc != nil {
+		return m.GetDangerousToolsFunc()
+	}
+	return []string{} // Default to empty slice
 }
 
 // Dummy implementations for other methods of services.SettingsService to satisfy the interface if needed

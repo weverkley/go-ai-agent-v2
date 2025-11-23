@@ -35,7 +35,7 @@ func init() {
 }
 
 // runChatCmd contains the logic for the chat command, accepting necessary services.
-func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
+func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
 	// Parse session flags
 	listSessions, _ := cmd.Flags().GetBool("list-sessions")
 	deleteSessionID, _ := cmd.Flags().GetString("delete-session")
@@ -101,7 +101,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 	executorType, _ := executorTypeVal.(string)
 
 	toolRegistry, _ := appConfig.Get("toolRegistry")
-	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID)
+	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID, SettingsService)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating chat service: %v\n", err)
 		os.Exit(1)

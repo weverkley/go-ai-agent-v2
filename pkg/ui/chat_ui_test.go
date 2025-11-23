@@ -37,6 +37,61 @@ func (m *MockShellExecutionService) KillAllProcesses() {
 	m.Called()
 }
 
+// MockSettingsService is a mock implementation of types.SettingsServiceIface
+type MockSettingsService struct {
+	mock.Mock
+}
+
+func (m *MockSettingsService) Get(key string) (interface{}, bool) {
+	args := m.Called(key)
+	return args.Get(0), args.Bool(1)
+}
+
+func (m *MockSettingsService) GetTelemetrySettings() *types.TelemetrySettings {
+	args := m.Called()
+	return args.Get(0).(*types.TelemetrySettings)
+}
+
+func (m *MockSettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSearchSettings {
+	args := m.Called()
+	return args.Get(0).(*types.GoogleCustomSearchSettings)
+}
+
+func (m *MockSettingsService) GetWebSearchProvider() types.WebSearchProvider {
+	args := m.Called()
+	return args.Get(0).(types.WebSearchProvider)
+}
+
+func (m *MockSettingsService) GetTavilySettings() *types.TavilySettings {
+	args := m.Called()
+	return args.Get(0).(*types.TavilySettings)
+}
+
+func (m *MockSettingsService) Set(key string, value interface{}) error {
+	args := m.Called(key, value)
+	return args.Error(0)
+}
+
+func (m *MockSettingsService) AllSettings() map[string]interface{} {
+	args := m.Called()
+	return args.Get(0).(map[string]interface{})
+}
+
+func (m *MockSettingsService) Reset() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockSettingsService) Save() error {
+	args := m.Called()
+	return args.Error(0)
+}
+
+func (m *MockSettingsService) GetDangerousTools() []string {
+	args := m.Called()
+	return args.Get(0).([]string)
+}
+
 // --- Helper for creating a test model ---
 func setupTestSessionService(t *testing.T) (*services.SessionService, func()) {
 	projectRoot, err := os.MkdirTemp("", "project_root_*")
@@ -62,16 +117,18 @@ func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 
+	// Setup mock settings service
+	mockSettingsService := new(MockSettingsService)
+	mockSettingsService.On("GetDangerousTools").Return([]string{}).Maybe()
+
 	sessionService, cleanup := setupTestSessionService(t)
-	// We don't call cleanup() here because the test function that called newTestModel will be responsible for it.
-	// This is a simplification for this test file. A more robust solution might use t.Cleanup(cleanup).
+	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.
 
 	sessionID := "test-session"
-	chatService, err := services.NewChatService(executor, types.NewToolRegistry(), sessionService, sessionID)
+	chatService, err := services.NewChatService(executor, types.NewToolRegistry(), sessionService, sessionID, mockSettingsService)
 	assert.NoError(t, err)
 
-	model := NewChatModel(chatService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)
-	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.
+	model := NewChatModel(chatService, sessionService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)
 	return model
 }
 

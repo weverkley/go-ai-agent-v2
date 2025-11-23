@@ -265,7 +265,10 @@ type ToolResultDisplay struct {
 type ToolConfirmationOutcome string
 
 const (
-	ToolConfirmationOutcomeProceedAlways ToolConfirmationOutcome = "PROCEED_ALWAYS"
+	ToolConfirmationOutcomeProceedOnce      ToolConfirmationOutcome = "PROCEED_ONCE"
+	ToolConfirmationOutcomeProceedAlways    ToolConfirmationOutcome = "PROCEED_ALWAYS"
+	ToolConfirmationOutcomeCancel           ToolConfirmationOutcome = "CANCEL"
+	ToolConfirmationOutcomeModifyWithEditor ToolConfirmationOutcome = "MODIFY_WITH_EDITOR"
 )
 
 // AgentTerminateMode defines the reasons an agent might terminate.
@@ -282,6 +285,7 @@ const (
 const (
 	TASK_COMPLETE_TOOL_NAME = "task_complete"
 	USER_CONFIRM_TOOL_NAME  = "user_confirm"
+	TOOL_CONFIRMATION_RESPONSE_TOOL_NAME = "tool_confirmation_response"
 )
 
 const (
@@ -347,6 +351,14 @@ type JsonSchemaObject struct {
 	Type       string                        `json:"type"` // "object"
 	Properties map[string]*JsonSchemaProperty `json:"properties"`
 	Required   []string                      `json:"required,omitempty"`
+}
+
+// NewJsonSchemaObject creates a new instance of JsonSchemaObject with type "object".
+func NewJsonSchemaObject() *JsonSchemaObject {
+	return &JsonSchemaObject{
+		Type:       "object",
+		Properties: make(map[string]*JsonSchemaProperty),
+	}
 }
 
 // SetProperties sets the properties of the JsonSchemaObject.
@@ -494,6 +506,7 @@ type SettingsServiceIface interface {
 	GetGoogleCustomSearchSettings() *GoogleCustomSearchSettings
 	GetWebSearchProvider() WebSearchProvider
 	GetTavilySettings() *TavilySettings
+	GetDangerousTools() []string // New method
 	Set(key string, value interface{}) error
 	AllSettings() map[string]interface{}
 	Reset() error
@@ -673,6 +686,20 @@ type ErrorEvent struct {
 type UserConfirmationRequestEvent struct {
 	ToolCallID string
 	Message    string
+}
+
+// ToolConfirmationRequestEvent represents a detailed request for user confirmation before executing a tool.
+type ToolConfirmationRequestEvent struct {
+	ToolCallID      string                 // ID of the tool call awaiting confirmation
+	Type            string                 // Type of confirmation: "edit", "exec", "info", etc.
+	ToolName        string                 // Name of the tool being called
+	ToolArgs        map[string]interface{} // Arguments to the tool
+	Message         string                 // A human-readable message for the user (e.g., "Apply this change?")
+	FilePath        string                 // For "edit" type, the path to the file being modified
+	FileDiff        string                 // For "edit" type, the diff content to display
+	OriginalContent string                 // For "edit" type, the original content of the file
+	NewContent      string                 // For "edit" type, the proposed new content of the file
+	IsModifying     bool                   // For "edit" type, indicates if it's an in-progress modification (like via external editor)
 }
 
 // GoogleCustomSearchSettings represents the configuration for Google Custom Search.

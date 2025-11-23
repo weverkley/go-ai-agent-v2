@@ -30,3 +30,8 @@ func LogDebugf(format string, args ...interface{}) {
 func LogErrorf(format string, args ...interface{}) {
 	GlobalLogger.LogErrorf(format, args...)
 }
+
+// LogWarnf logs a warning message.
+func LogWarnf(format string, args ...interface{}) {
+	GlobalLogger.LogWarnf(format, args...)
+}

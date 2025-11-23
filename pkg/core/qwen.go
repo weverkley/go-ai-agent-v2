@@ -428,3 +428,9 @@ func (qc *QwenChat) GenerateContentWithTools(ctx context.Context, history []*typ
 func (qc *QwenChat) SetUserConfirmationChannel(ch chan bool) {
 	// No-op
 }
+
+// SetToolConfirmationChannel sets the channel for tool confirmation.
+func (qc *QwenChat) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
+	// Qwen chat does not directly handle tool confirmations, so this is a no-op
+	// For now, it's a placeholder to satisfy the Executor interface.
+}

@@ -34,7 +34,7 @@ var chatService *services.ChatService           // Declare package-level chatSer
 var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
 var MemoryService *services.MemoryService       // Declare package-level memoryService
-var SettingsService *services.SettingsService   // Declare package-level settingsService
+var SettingsService types.SettingsServiceIface // Declare package-level settingsService as interface
 var SessionService *services.SessionService // Declare package-level sessionService
 
 var FSService services.FileSystemService // Declare package-level FileSystemService
@@ -54,7 +54,7 @@ func initServices(projectRoot string) (
 	services.FileSystemService,
 	services.ShellExecutionService, // Changed to interface
 	*extension.Manager,
-	*services.SettingsService,
+	types.SettingsServiceIface, // Changed to interface
 	*services.FileFilteringService,
 ) {
 	workspaceService := services.NewWorkspaceService(projectRoot)
@@ -72,11 +72,11 @@ func initServices(projectRoot string) (
 	return workspaceService, fsService, shellService, extensionManager, settingsService, fileFilteringService
 }
 
-func getTelemetrySettings(settingsService *services.SettingsService) *types.TelemetrySettings {
+func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.TelemetrySettings {
 	return settingsService.GetTelemetrySettings()
 }
 
-func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService *services.SettingsService) *types.ToolRegistry {
+func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
 	return tools.RegisterAllTools(fsService, shellService, settingsService)
 }
 
@@ -85,7 +85,7 @@ func initConfig(
 	telemetrySettings *types.TelemetrySettings,
 	workspaceService *services.WorkspaceService,
 	fileFilteringService *services.FileFilteringService,
-	settingsService *services.SettingsService, // Add settingsService
+	settingsService types.SettingsServiceIface, // Add settingsService
 ) *config.Config {
 	debugModeVal, _ := settingsService.Get("debugMode")
 	debugMode, ok := debugModeVal.(bool)

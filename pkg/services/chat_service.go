@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
@@ -15,17 +16,21 @@ type ChatService struct {
 	executor             core.Executor
 	toolRegistry         types.ToolRegistryInterface
 	history              []*types.Content
-	userConfirmationChan chan bool
+	userConfirmationChan chan bool // Keep for the user_confirm tool
+	ToolConfirmationChan chan types.ToolConfirmationOutcome // New channel for rich confirmation
 	toolCallCounter      int
 	toolErrorCounter     int
-	sessionService       *SessionService // New field
-	sessionID            string          // New field
+	sessionService       *SessionService
+	sessionID            string
+	settingsService      types.SettingsServiceIface // Change to interface
 }
 
 // NewChatService creates a new ChatService.
-func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string) (*ChatService, error) {
-	confirmationChan := make(chan bool, 1)
-	executor.SetUserConfirmationChannel(confirmationChan)
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface) (*ChatService, error) {
+	userConfirmationChan := make(chan bool, 1)
+	toolConfirmationChan := make(chan types.ToolConfirmationOutcome, 1)
+	executor.SetUserConfirmationChannel(userConfirmationChan) // The executor expects a chan bool for user_confirm
+	executor.SetToolConfirmationChannel(toolConfirmationChan) // The executor expects a chan types.ToolConfirmationOutcome for rich tool confirmation
 
 	initialHistory, err := sessionService.LoadHistory(sessionID)
 	if err != nil {
@@ -36,9 +41,11 @@ func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInter
 		executor:             executor,
 		toolRegistry:         toolRegistry,
 		history:              initialHistory,
-		userConfirmationChan: confirmationChan,
+		userConfirmationChan: userConfirmationChan,
+		ToolConfirmationChan: toolConfirmationChan,
 		sessionService:       sessionService,
 		sessionID:            sessionID,
+		settingsService:      settingsService,
 	}
 	// Save the loaded (or empty) history immediately to ensure the session file exists if it's new.
 	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
@@ -95,9 +102,6 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 			// Process all events from the stream for this turn
 			for event := range stream {
-				// Pass the event through to the UI
-				eventChan <- event
-
 				switch e := event.(type) {
 				case types.Part:
 					modelResponseParts = append(modelResponseParts, e)
@@ -132,7 +136,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					cs.toolCallCounter++
 					toolCallID := fmt.Sprintf("tool-call-%d", cs.toolCallCounter)
 
-					// Intercept user_confirm before execution
+					// --- Special handling for user_confirm tool (uses chan bool) ---
 					if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 						message := "Confirmation required."
 						if msg, ok := fc.Args["message"].(string); ok {
@@ -160,37 +164,134 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						continue // Go to next tool call
 					}
 
-					// For all other tools, execute them
+					// --- Generic confirmation for dangerous tools ---
+					isDangerousTool := false
+					for _, dt := range cs.settingsService.GetDangerousTools() {
+						if fc.Name == dt {
+							isDangerousTool = true
+							break
+						}
+					}
+
 					eventChan <- types.ToolCallStartEvent{ToolCallID: toolCallID, ToolName: fc.Name, Args: fc.Args}
 					telemetry.LogDebugf("Received stream event: ToolCallStartEvent (ID: %s, Name: %s, Args: %#v)", toolCallID, fc.Name, fc.Args)
 
-					tool, err := cs.toolRegistry.GetTool(fc.Name)
-					if err != nil {
-						telemetry.LogErrorf("Tool %s not found: %v", fc.Name, err)
-						eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Err: err}
-						telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", toolCallID, fc.Name, "", err)
-						toolResponseParts = append(toolResponseParts, types.Part{
-							FunctionResponse: &types.FunctionResponse{
-								Name: fc.Name,
-								Response: map[string]any{"error": "Tool not found"},
-							},
-						})
-						continue
+					var toolExecutionResult any
+					var toolExecutionError error
+
+					if isDangerousTool {
+						// Build ToolConfirmationRequestEvent
+						confirmationEvent := types.ToolConfirmationRequestEvent{
+								ToolCallID: toolCallID,
+								ToolName:   fc.Name,
+								ToolArgs:   fc.Args,
+								Type:       "exec", // Default type
+								Message:    fmt.Sprintf("Confirm execution of tool '%s'?", fc.Name),
+							}
+
+						switch fc.Name {
+						case types.WRITE_FILE_TOOL_NAME:
+							confirmationEvent.Type = "edit"
+							confirmationEvent.Message = "Apply this change?"
+							if filePath, ok := fc.Args["file_path"].(string); ok {
+								confirmationEvent.FilePath = filePath
+								if newContent, ok := fc.Args["content"].(string); ok {
+									confirmationEvent.NewContent = newContent
+									// Read original content to generate diff
+									originalContentBytes, err := os.ReadFile(filePath)
+									if err == nil {
+										confirmationEvent.OriginalContent = string(originalContentBytes)
+										                                        confirmationEvent.FileDiff = generateDiff(string(originalContentBytes), newContent)
+										                                    } else {
+										                                        telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+										                                    }								}
+							}
+						case types.SMART_EDIT_TOOL_NAME:
+							confirmationEvent.Type = "edit"
+							confirmationEvent.Message = "Apply this change?"
+							if filePath, ok := fc.Args["file_path"].(string); ok {
+								confirmationEvent.FilePath = filePath
+								// Smart edit uses old_string and new_string to define the change
+								oldString, oldOk := fc.Args["old_string"].(string)
+								newString, newOk := fc.Args["new_string"].(string)
+								if oldOk && newOk {
+									// To generate a diff for smart_edit, we need to read the file,
+									// perform the replacement in memory, and then diff.
+									originalContentBytes, err := os.ReadFile(filePath)
+									if err == nil {
+										originalFileContent := string(originalContentBytes)
+										confirmationEvent.OriginalContent = originalFileContent
+										// Perform in-memory replacement for diff generation
+										// This is a simplified approach and assumes single exact match
+										// A more robust solution might need to match `replace` tool's exact logic
+									simulatedNewContent := strings.Replace(originalFileContent, oldString, newString, 1) // Replace once
+										confirmationEvent.NewContent = simulatedNewContent
+										confirmationEvent.FileDiff = generateDiff(originalFileContent, simulatedNewContent)
+									} else {
+										telemetry.LogWarnf("ChatService: Could not read original file content for diff for %s: %v", filePath, err)
+									}
+								}
+							}
+						case types.EXECUTE_COMMAND_TOOL_NAME:
+							confirmationEvent.Type = "exec"
+							if cmd, ok := fc.Args["command"].(string); ok {
+								confirmationEvent.Message = fmt.Sprintf("Allow execution of: '%s'?", cmd)
+							}
+						}
+
+						telemetry.LogDebugf("ChatService: Emitting ToolConfirmationRequestEvent for tool call %s (%s)", toolCallID, fc.Name)
+						eventChan <- confirmationEvent
+						telemetry.LogDebugf("Received stream event: ToolConfirmationRequestEvent (ID: %s, Name: %s)", toolCallID, fc.Name)
+
+						outcome := <-cs.ToolConfirmationChan
+						telemetry.LogDebugf("ChatService: Received tool confirmation response: %s", outcome)
+
+						switch outcome {
+						case types.ToolConfirmationOutcomeProceedOnce:
+							telemetry.LogDebugf("ChatService: User confirmed '%s' (once). Executing tool.", fc.Name)
+							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+						case types.ToolConfirmationOutcomeCancel:
+							telemetry.LogDebugf("ChatService: User cancelled '%s'. Aborting tool execution.", fc.Name)
+							toolExecutionResult = "Tool execution cancelled by user."
+							toolExecutionError = fmt.Errorf("tool execution cancelled by user")
+							cs.toolErrorCounter++
+						case types.ToolConfirmationOutcomeModifyWithEditor:
+							telemetry.LogDebugf("ChatService: User chose to modify '%s' with editor. Aborting tool execution.", fc.Name)
+							toolExecutionResult = "Tool modification chosen by user. Please apply changes manually."
+							toolExecutionError = fmt.Errorf("tool modification with editor chosen by user")
+							cs.toolErrorCounter++
+						case types.ToolConfirmationOutcomeProceedAlways:
+							// TODO: Implement logic to store approval in settingsService
+							telemetry.LogDebugf("ChatService: User confirmed '%s' (always). Not yet implemented. Executing once.", fc.Name)
+							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+						default:
+							telemetry.LogErrorf("ChatService: Unknown confirmation outcome '%s' for tool '%s'. Aborting.", outcome, fc.Name)
+							toolExecutionResult = "Tool execution aborted due to unknown confirmation outcome."
+							toolExecutionError = fmt.Errorf("unknown confirmation outcome")
+							cs.toolErrorCounter++
+						}
+					} else {
+						// Default tool execution (not dangerous or no confirmation needed)
+						toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
 					}
 
-					result, err := tool.Execute(ctx, fc.Args)
-					if err != nil {
-						telemetry.LogErrorf("Error executing tool %s: %v", fc.Name, err)
+					if toolExecutionError != nil {
+						telemetry.LogErrorf("Error executing tool %s: %v", fc.Name, toolExecutionError)
 						cs.toolErrorCounter++
 					}
 
-					eventChan <- types.ToolCallEndEvent{ToolCallID: toolCallID, ToolName: fc.Name, Result: result.ReturnDisplay, Err: err}
-					telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s, Result: %s, Err: %v)", toolCallID, fc.Name, result.ReturnDisplay, err)
+					eventChan <- types.ToolCallEndEvent{
+						ToolCallID: toolCallID,
+						ToolName:   fc.Name,
+						Result:     fmt.Sprintf("%v", toolExecutionResult), // Convert result to string for UI
+						Err:        toolExecutionError,
+					}
+					telemetry.LogDebugf("Received stream event: ToolCallEndEvent (ID: %s, Name: %s)", toolCallID, fc.Name)
 
 					toolResponseParts = append(toolResponseParts, types.Part{
 						FunctionResponse: &types.FunctionResponse{
 							Name:     fc.Name,
-							Response: map[string]any{"result": result.LLMContent, "error": err},
+							Response: map[string]any{"result": toolExecutionResult, "error": toolExecutionError},
 						},
 					})
 				}
@@ -216,9 +317,79 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 				return // Exit the loop
 			}
 		}
-	}()
+	}() // This parenthesis closes the go func()
 
 	return eventChan, nil
+}
+
+// Helper to execute a tool and return its result.
+func executeTool(ctx context.Context, fc *types.FunctionCall, toolRegistry types.ToolRegistryInterface) (any, error) {
+	tool, err := toolRegistry.GetTool(fc.Name)
+	if err != nil {
+		return "Tool not found", fmt.Errorf("tool %s not found: %w", fc.Name, err)
+	}
+
+	result, err := tool.Execute(ctx, fc.Args)
+	if err != nil {
+		return fmt.Sprintf("Error executing tool: %v", err), err
+	}
+	return result.LLMContent, nil
+}
+
+// generateDiff creates a simple diff string between two contents.
+// This is a basic line-by-line diff for display purposes.
+func generateDiff(oldContent, newContent string) string {
+	oldLines := strings.Split(oldContent, "\n")
+	newLines := strings.Split(newContent, "\n")
+
+	// Max length to prevent excessive diffs
+	maxLength := 10
+	if len(oldLines) > maxLength || len(newLines) > maxLength {
+		return "Diff too large to display. Please confirm manually."
+	}
+
+	diff := ""
+	diffAdded := func(s string) string { return fmt.Sprintf("+ %s", s) }
+	diffRemoved := func(s string) string { return fmt.Sprintf("- %s", s) }
+	diffUnchanged := func(s string) string { return fmt.Sprintf("  %s", s) }
+
+	// A very basic diff algorithm for demonstration
+	i, j := 0, 0
+	for i < len(oldLines) && j < len(newLines) {
+		if oldLines[i] == newLines[j] {
+			diff += diffUnchanged(oldLines[i]) + "\n"
+			i++
+			j++
+		} else {
+			// Find where newLines[j] matches in oldLines (if at all)
+			found := false
+			for k := i; k < len(oldLines); k++ {
+				if oldLines[k] == newLines[j] {
+					// new line was inserted before oldLines[k]
+					for l := i; l < k; l++ {
+						diff += diffRemoved(oldLines[l]) + "\n"
+					}
+					i = k
+					found = true
+					break
+				}
+			}
+			if !found {
+				diff += diffAdded(newLines[j]) + "\n"
+				j++
+			}
+		}
+	}
+	for i < len(oldLines) {
+		diff += diffRemoved(oldLines[i]) + "\n"
+		i++
+	}
+	for j < len(newLines) {
+		diff += diffAdded(newLines[j]) + "\n"
+		j++
+	}
+
+	return diff
 }
 
 // GetHistory returns the current chat history.
@@ -241,6 +412,11 @@ func (cs *ChatService) GetUserConfirmationChannel() chan bool {
 	return cs.userConfirmationChan
 }
 
+// GetToolConfirmationChannel returns the channel used for rich tool confirmation responses.
+func (cs *ChatService) GetToolConfirmationChannel() chan types.ToolConfirmationOutcome {
+	return cs.ToolConfirmationChan
+}
+
 // GetToolRegistry returns the tool registry instance.
 func (cs *ChatService) GetToolRegistry() types.ToolRegistryInterface {
 	return cs.toolRegistry
@@ -249,6 +425,11 @@ func (cs *ChatService) GetToolRegistry() types.ToolRegistryInterface {
 // GetExecutor returns the executor instance.
 func (cs *ChatService) GetExecutor() core.Executor {
 	return cs.executor
+}
+
+// GetSettingsService returns the settings service instance.
+func (cs *ChatService) GetSettingsService() types.SettingsServiceIface {
+	return cs.settingsService
 }
 
 // GetToolCallCount returns the total number of tool calls made in the session.

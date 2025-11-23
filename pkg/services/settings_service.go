@@ -23,6 +23,7 @@ type Settings struct {
 	DebugMode      bool                           `json:"debugMode,omitempty"`
 	UserMemory     string                         `json:"userMemory,omitempty"`
 	ApprovalMode   types.ApprovalMode             `json:"approvalMode,omitempty"`
+	DangerousTools []string                       `json:"dangerousTools,omitempty"` // New field
 	ShowMemoryUsage bool                          `json:"showMemoryUsage,omitempty"`
 	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
 	Model          string                         `json:"model,omitempty"`
@@ -42,13 +43,13 @@ func LoadSettings(workspaceDir string) *Settings {
 	settingsPath := getSettingsPath(workspaceDir)
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
-		// Return default settings if file doesn't exist or can't be read
 		return &Settings{
 			ExtensionPaths: []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
 			McpServers:     make(map[string]types.MCPServerConfig),
 			DebugMode:      false,
 			UserMemory:     "",
 			ApprovalMode:   types.ApprovalModeDefault,
+			DangerousTools: []string{"execute_command", "write_file", "smart_edit"}, // Default dangerous tools
 			ShowMemoryUsage: false,
 			TelemetryEnabled: false,
 			Model:          "gemini-pro", // Default model
@@ -76,6 +77,7 @@ func LoadSettings(workspaceDir string) *Settings {
 			DebugMode:      false,
 			UserMemory:     "",
 			ApprovalMode:   types.ApprovalModeDefault,
+			DangerousTools: []string{"execute_command", "write_file", "smart_edit"}, // Default dangerous tools
 			ShowMemoryUsage: false,
 			TelemetryEnabled: false,
 			Model:          "gemini-pro", // Default model
@@ -163,7 +165,7 @@ type SettingsService struct {
 }
 
 // NewSettingsService creates a new SettingsService instance.
-func NewSettingsService(baseDir string) *SettingsService {
+func NewSettingsService(baseDir string) types.SettingsServiceIface {
 	ss := &SettingsService{
 		baseDir: baseDir,
 	}
@@ -204,6 +206,8 @@ func (ss *SettingsService) Get(key string) (interface{}, bool) {
 		return ss.settings.ExtensionPaths, true
 	case "mcpServers":
 		return ss.settings.McpServers, true
+	case "dangerousTools":
+		return ss.settings.DangerousTools, true
 	// Add other settings here
 	default:
 		return nil, false
@@ -236,6 +240,13 @@ func (ss *SettingsService) GetTavilySettings() *types.TavilySettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
 	return ss.settings.Tavily
+}
+
+// GetDangerousTools returns the list of tools that require confirmation.
+func (ss *SettingsService) GetDangerousTools() []string {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.DangerousTools
 }
 
 // GetTelemetryLogPath returns the configured telemetry log file path.
@@ -388,6 +399,12 @@ func (ss *SettingsService) Set(key string, value interface{}) error {
 		} else {
 			return fmt.Errorf("invalid type for mcpServers setting, expected map[string]types.MCPServerConfig")
 		}
+	case "dangerousTools":
+		if v, ok := value.([]string); ok {
+			ss.settings.DangerousTools = v
+		} else {
+			return fmt.Errorf("invalid type for dangerousTools setting, expected []string")
+		}
 	// Add other settings here
 	default:
 		return fmt.Errorf("setting '%s' not found or not settable", key)
@@ -414,6 +431,7 @@ func (ss *SettingsService) AllSettings() map[string]interface{} {
 	all["enabledExtensions"] = ss.settings.EnabledExtensions
 	all["extensionPaths"] = ss.settings.ExtensionPaths
 	all["mcpServers"] = ss.settings.McpServers
+	all["dangerousTools"] = ss.settings.DangerousTools
 	// Add other settings here
 	return all
 }

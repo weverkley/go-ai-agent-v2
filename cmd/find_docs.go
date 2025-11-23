@@ -32,8 +32,8 @@ var findDocsCmd = &cobra.Command{
 	},
 }
 
-// runFindDocsCmd contains the logic for the find-docs command, accepting necessary services.
-func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
+// runFindDocsCmd handles the find-docs command logic.
+func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
 	// Initialize the ToolRegistry
 	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
 

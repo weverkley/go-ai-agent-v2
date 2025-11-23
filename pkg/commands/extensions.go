@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/extension"
-	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
 	"path/filepath"
 	"strings"
 )
@@ -15,11 +15,11 @@ const EXAMPLES_PATH = "/home/wever-kley/Workspace/go-ai-agent-v2/docs/go-ai-agen
 // ExtensionsCommand represents the extensions command group.
 type ExtensionsCommand struct {
 	extensionManager *extension.Manager
-	settingsService  *services.SettingsService
+	settingsService  types.SettingsServiceIface
 }
 
 // NewExtensionsCommand creates a new instance of ExtensionsCommand.
-func NewExtensionsCommand(extensionManager *extension.Manager, settingsService *services.SettingsService) *ExtensionsCommand {
+func NewExtensionsCommand(extensionManager *extension.Manager, settingsService types.SettingsServiceIface) *ExtensionsCommand {
 	return &ExtensionsCommand{
 		extensionManager: extensionManager,
 		settingsService:  settingsService,

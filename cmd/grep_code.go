@@ -26,7 +26,7 @@ var grepCodeCmd = &cobra.Command{
 }
 
 // runGrepCodeCmd contains the logic for the grep-code command, accepting necessary services.
-func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
+func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
 	// Initialize the ToolRegistry
 	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
 

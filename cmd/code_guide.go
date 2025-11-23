@@ -26,8 +26,8 @@ This command acts as a specialized AI prompt to help new engineers understand th
 	},
 }
 
-// runCodeGuideCmd contains the logic for the code-guide command, accepting necessary services.
-func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService *services.SettingsService, shellService services.ShellExecutionService) {
+// runCodeGuideCmd handles the code-guide command logic.
+func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
 	// Initialize FileSystemService and GitService
 	fsService := services.NewFileSystemService()
 
