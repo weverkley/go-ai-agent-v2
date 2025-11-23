@@ -35,14 +35,14 @@ type ChatModel struct {
 	gitService       services.GitService
 	workspaceService *services.WorkspaceService
 	// UI state
-	streamCh        <-chan interface{}
-	isStreaming     bool
-	cancelCtx       context.Context
-	cancelFunc      context.CancelFunc
-	status          string
-	err             error
-	commandExecutor func(args []string) (string, error)
-	activeToolCalls map[string]*ToolCallStatus
+	streamCh                 <-chan interface{}
+	isStreaming              bool
+	cancelCtx                context.Context
+	cancelFunc               context.CancelFunc
+	status                   string
+	err                      error
+	commandExecutor          func(args []string) (string, error)
+	activeToolCalls          map[string]*ToolCallStatus
 	// Styles
 	senderStyle              lipgloss.Style
 	botStyle                 lipgloss.Style
@@ -67,6 +67,7 @@ type ChatModel struct {
 	toolErrorCount int
 	contextFile    string
 	sessionID      string
+	todosSummary   string
 }
 
 func NewChatModel(
@@ -160,6 +161,7 @@ func NewChatModel(
 		toolErrorCount:   0,
 		contextFile:      "", // Initializing as empty string
 		sessionID:        sessionID,
+		todosSummary:     "", // Initialize as empty
 	}
 	if _, err := os.Stat("GOAIAGENT.md"); err == nil {
 		model.contextFile = "GOAIAGENT.md"
@@ -328,6 +330,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Stream started..."
 		case types.ThinkingEvent:
 			m.status = "Thinking..."
+		case types.TodosSummaryUpdateEvent:
+			m.todosSummary = event.Summary
 		case types.ToolCallStartEvent:
 			m.status = "Executing tool..."
 			m.toolCallCount++ // Increment tool call count
@@ -462,8 +466,16 @@ func (m *ChatModel) View() string {
 		contextInfo = lipgloss.NewStyle().
 			PaddingLeft(1).
 			Foreground(lipgloss.Color("240")).
-			Render(fmt.Sprintf("Using: 1 %s file", m.contextFile)) // Fixed comma before Render
+			Render(fmt.Sprintf("Using: 1 %s file", m.contextFile))
 	}
+
+	if m.todosSummary != "" {
+		if contextInfo != "" {
+			contextInfo += lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" | ")
+		}
+		contextInfo += lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render(m.todosSummary)
+	}
+
 	return fmt.Sprintf(
 		"%s\n%s\n%s\n%s",
 		m.viewport.View(),
@@ -472,6 +484,7 @@ func (m *ChatModel) View() string {
 		m.textarea.View(),
 	)
 }
+
 func (m *ChatModel) renderFooter() string {
 	// While streaming or awaiting confirmation, show the spinner and status.
 	if m.isStreaming || m.awaitingConfirmation || m.awaitingToolConfirmation {
@@ -493,7 +506,7 @@ func (m *ChatModel) renderFooter() string {
 			confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
 			finalRender = statusLine + confirmationOptions
 		} else {
-			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)") // Fixed NewNewStyle to NewStyle
+			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
 			finalRender = statusLine + instruction
 		}
 		return m.spinner.View() + " " + finalRender
@@ -503,7 +516,7 @@ func (m *ChatModel) renderFooter() string {
 	// Left side: CWD and Git branch
 	cwd, err := os.Getwd() // Use os.Getwd() directly
 	if err != nil {
-		cwd = "???"
+		cwd = "???'"
 	}
 	baseCwd := filepath.Base(cwd) // Get only the current folder name
 	branch, err := m.gitService.GetCurrentBranch(cwd)

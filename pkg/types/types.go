@@ -660,8 +660,11 @@ type TelemetrySettings struct {
 
 // Streaming Event types for the UI
 type StreamingStartedEvent struct{}
-
 type ThinkingEvent struct{}
+type TodosSummaryUpdateEvent struct {
+	Summary string
+}
+
 
 type ToolCallStartEvent struct {
 	ToolCallID string

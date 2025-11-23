@@ -284,9 +284,21 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
 					}
 
-					if toolExecutionError != nil {
-						telemetry.LogErrorf("Error executing tool %s: %v", fc.Name, toolExecutionError)
-						cs.toolErrorCounter++
+					if toolExecutionError == nil && fc.Name == types.WRITE_TODOS_TOOL_NAME {
+						if todosData, ok := fc.Args["todos"].([]interface{}); ok {
+							total := len(todosData)
+							completed := 0
+							for _, item := range todosData {
+								if todoMap, ok := item.(map[string]interface{}); ok {
+									if status, ok := todoMap["status"].(string); ok && status == "completed" {
+										completed++
+									}
+								}
+							}
+							eventChan <- types.TodosSummaryUpdateEvent{
+								Summary: fmt.Sprintf("Todos %d/%d", completed, total),
+							}
+						}
 					}
 
 					eventChan <- types.ToolCallEndEvent{
