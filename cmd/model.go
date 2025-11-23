@@ -27,15 +27,17 @@ var modelListCmd = &cobra.Command{
 	Short: "List available AI models",
 	Long:  `List all available AI models that can be used with the generate command.`, //nolint:staticcheck
 	Run: func(cmd *cobra.Command, args []string) {
-		models, err := executor.ListModels()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error listing models: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Println("Available AI Models:")
-		for _, model := range models {
-			fmt.Printf("- %s\n", model)
-		}
+		fmt.Fprintf(os.Stderr, "Error: Model list command is not yet functional after refactoring.\n")
+		os.Exit(1)
+		// models, err := executor.ListModels()
+		// if err != nil {
+		// 	fmt.Fprintf(os.Stderr, "Error listing models: %v\n", err)
+		// 	os.Exit(1)
+		// }
+		// fmt.Println("Available AI Models:")
+		// for _, model := range models {
+		// 	fmt.Printf("- %s\n", model)
+		// }
 	},
 }
 

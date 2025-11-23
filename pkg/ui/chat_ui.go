@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+
+	// New import for core package
+	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
@@ -66,7 +69,7 @@ type ChatModel struct {
 	toolErrorCount int
 	contextFile    string
 	sessionID      string
-	todosSummary    string
+	todosSummary   string
 }
 
 func NewChatModel(
@@ -185,6 +188,13 @@ func (m *ChatModel) Close() error {
 func (m *ChatModel) GetStats() (int, int, time.Duration) {
 	return m.toolCallCount, m.toolErrorCount, time.Since(m.startTime)
 }
+
+// SetChatService updates the ChatModel's chatService and executorType.
+func (m *ChatModel) SetChatService(newSvc *services.ChatService, newExecutorType string) {
+	m.chatService = newSvc
+	m.executorType = newExecutorType
+}
+
 func (m *ChatModel) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
@@ -377,6 +387,11 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			errmsg := ErrorMessage{Err: event.Err} // Corrected errmsg to errMsg
 			m.messages = append(m.messages, errmsg)
 			m.logUIMessage(errmsg) // Log error message
+		case types.ModelSwitchEvent:
+			m.executorType = event.NewModel
+			botMsg := BotMessage{Content: fmt.Sprintf("Automatically switched from **%s** to **%s** due to: %s", event.OldModel, event.NewModel, event.Reason)}
+			m.messages = append(m.messages, botMsg)
+			m.logUIMessage(botMsg)
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
@@ -431,12 +446,21 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "settings":
 				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
-					suggestionMsg := SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."}
-					m.messages = append(m.messages, suggestionMsg)
-					m.logUIMessage(suggestionMsg)
+					// Trigger hot-reload of chat service
+					m.status = "Settings changed, reinitializing chat service..."
+					return m, ReinitializeChatCmd(m.chatService, m.sessionService, m.config)
 				}
 			}
 		}
+		m.updateViewport()
+		return m, nil
+	case chatServiceReloadedMsg:
+		m.SetChatService(msg.newService, msg.newExecutorType)
+		m.messages = m.repopulateMessagesFromHistory(m.chatService.GetHistory()) // Repopulate messages from the new service's history
+		m.status = fmt.Sprintf("Switched to executor: %s", msg.newExecutorType)
+		botMsg := BotMessage{Content: fmt.Sprintf("Switched to executor: %s", msg.newExecutorType)}
+		m.messages = append(m.messages, botMsg)
+		m.logUIMessage(botMsg)
 		m.updateViewport()
 		return m, nil
 	}
@@ -474,9 +498,9 @@ func (m *ChatModel) renderFooter() string {
 		var finalRender string
 		if m.awaitingToolConfirmation && m.toolConfirmationRequest != nil {
 			options := "(y: allow once, a: allow always, n: cancel, m: modify)"
-			
+
 			messageStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Width(m.viewport.Width - lipgloss.Width(m.spinner.View()) - 1)
-			
+
 			var finalRender string
 			if m.toolConfirmationRequest.Type == "edit" && m.toolConfirmationRequest.FileDiff != "" {
 				// For edits, show message, options, and then the diff on subsequent lines.
@@ -607,7 +631,7 @@ Available Commands:
 					return m, nil
 				}
 				sessionID := args[2]
-				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService())
+				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.config, nil)
 				if err != nil {
 					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
 					m.updateViewport()
@@ -743,5 +767,54 @@ func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 			return streamErrorMsg{err}
 		}
 		return streamChannelMsg{ch: stream}
+	}
+}
+
+// ReinitializeChatCmd creates a new chat service based on current settings and transfers state.
+func ReinitializeChatCmd(oldChatService *services.ChatService, sessionService *services.SessionService, config types.Config) tea.Cmd {
+	return func() tea.Msg {
+		// 1. Capture the current state from the old chat service
+		chatState := oldChatService.GetState()
+
+		// 2. Read the latest executor and model settings
+		settingsService := oldChatService.GetSettingsService()
+		executorTypeVal, _ := settingsService.Get("executor")
+		executorType, ok := executorTypeVal.(string)
+		if !ok {
+			executorType = "gemini" // Fallback
+		}
+
+		modelVal, _ := settingsService.Get("model")
+		model, ok := modelVal.(string)
+		if !ok {
+			model = "gemini-1.5-pro" // Fallback
+		}
+		appConfig := config.WithModel(model)
+
+		// 3. Create a new Executor instance
+		executorFactory, err := core.NewExecutorFactory(executorType, appConfig)
+		if err != nil {
+			return streamErrorMsg{fmt.Errorf("error creating new executor factory: %w", err)}
+		}
+		newExecutor, err := executorFactory.NewExecutor(appConfig, types.GenerateContentConfig{}, chatState.History) // Pass history for context
+		if err != nil {
+			return streamErrorMsg{fmt.Errorf("error creating new executor: %w", err)}
+		}
+
+		// 4. Create a new ChatService instance, passing the captured state
+		newChatService, err := services.NewChatService(
+			newExecutor,
+			oldChatService.GetToolRegistry(),
+			sessionService,
+			chatState.SessionID,
+			settingsService,
+			appConfig, // Pass the appConfig
+			chatState, // Pass the captured state
+		)
+		if err != nil {
+			return streamErrorMsg{fmt.Errorf("error creating new chat service: %w", err)}
+		}
+
+		return chatServiceReloadedMsg{newService: newChatService, newExecutorType: executorType}
 	}
 }

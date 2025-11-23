@@ -9,6 +9,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/config" // New import
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -68,7 +69,7 @@ func (t *MockUserConfirmTool) Execute(ctx context.Context, args map[string]any) 
 
 
 // setupTestChatService creates a temporary directory and a ChatService instance for testing.
-func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *SessionService, types.ToolRegistryInterface, *MockSettingsService, string, func()) {
+func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *SessionService, types.ToolRegistryInterface, *MockSettingsService, types.Config, string, func()) {
 	projectRoot, err := os.MkdirTemp("", "chat_service_test_*")
 	assert.NoError(t, err)
 
@@ -90,7 +91,9 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 	
 	mockExecutor := &core.MockExecutor{}
 
-	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService)
+	appConfig := config.NewConfig(&config.ConfigParameters{}) // Create a simple mock config
+
+	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService, appConfig, nil)
 	assert.NoError(t, err)
 
 	cleanup := func() {
@@ -98,12 +101,12 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 		mockSettingsService.AssertExpectations(t)
 	}
 
-	return chatService, mockExecutor, sessionService, toolRegistry, mockSettingsService, projectRoot, cleanup
+	return chatService, mockExecutor, sessionService, toolRegistry, mockSettingsService, appConfig, projectRoot, cleanup
 }
 
 func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 	t.Run("User confirms tool execution", func(t *testing.T) {
-		chatService, mockExecutor, _, _, mockSettingsService, projectRoot, cleanup := setupTestChatService(t)
+		chatService, mockExecutor, _, _, mockSettingsService, _, projectRoot, cleanup := setupTestChatService(t)
 		defer cleanup()
 
 		mockExecutor.StreamContentFunc = func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
@@ -137,7 +140,7 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 	})
 
 	t.Run("User cancels tool execution", func(t *testing.T) {
-		chatService, mockExecutor, _, _, mockSettingsService, _, cleanup := setupTestChatService(t)
+		chatService, mockExecutor, _, _, mockSettingsService, _, _, cleanup := setupTestChatService(t)
 		defer cleanup()
 		
 		mockExecutor.StreamContentFunc = func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
@@ -179,7 +182,7 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 }
 func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 	t.Run("User confirms user_confirm tool", func(t *testing.T) {
-		chatService, mockExecutor, _, _, mockSettingsService, _, cleanup := setupTestChatService(t)
+		chatService, mockExecutor, _, _, mockSettingsService, _, _, cleanup := setupTestChatService(t)
 		defer cleanup()
 		mockSettingsService.On("GetDangerousTools").Return([]string{types.USER_CONFIRM_TOOL_NAME}).Once()
 
@@ -216,7 +219,7 @@ func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 
 func TestChatService_SendMessage_ProceedAlways(t *testing.T) {
 	t.Run("User selects Proceed Always for a tool", func(t *testing.T) {
-		chatService, mockExecutor, _, _, mockSettingsService, _, cleanup := setupTestChatService(t)
+		chatService, mockExecutor, _, _, mockSettingsService, _, _, cleanup := setupTestChatService(t)
 		defer cleanup()
 		mockSettingsService.On("GetDangerousTools").Return([]string{types.WRITE_FILE_TOOL_NAME}).Twice()
 

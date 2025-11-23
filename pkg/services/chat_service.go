@@ -2,13 +2,17 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"os"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/telemetry"
+	"go-ai-agent-v2/go-cli/pkg/routing"
 	"go-ai-agent-v2/go-cli/pkg/types"
+
+	"google.golang.org/api/googleapi"
 )
 
 // ChatService orchestrates the interactive chat session, handling the tool-calling loop.
@@ -16,39 +20,50 @@ type ChatService struct {
 	executor             core.Executor
 	toolRegistry         types.ToolRegistryInterface
 	history              []*types.Content
-	userConfirmationChan chan bool                          // Keep for the user_confirm tool
-	ToolConfirmationChan chan types.ToolConfirmationOutcome // New channel for rich confirmation
+	userConfirmationChan chan bool
+	ToolConfirmationChan chan types.ToolConfirmationOutcome
 	toolCallCounter      int
 	toolErrorCounter     int
 	sessionService       *SessionService
 	sessionID            string
-	settingsService      types.SettingsServiceIface // Change to interface
-	proceedAlwaysTools   map[string]bool            // Store tool names for which "Proceed Always" is active
+	settingsService      types.SettingsServiceIface
+	appConfig            types.Config
+	proceedAlwaysTools   map[string]bool
 }
 
 // NewChatService creates a new ChatService.
-func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface) (*ChatService, error) {
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface, appConfig types.Config, initialState *types.ChatState) (*ChatService, error) {
 	userConfirmationChan := make(chan bool, 1)
 	toolConfirmationChan := make(chan types.ToolConfirmationOutcome, 1)
-	executor.SetUserConfirmationChannel(userConfirmationChan) // The executor expects a chan bool for user_confirm
-	executor.SetToolConfirmationChannel(toolConfirmationChan) // The executor expects a chan types.ToolConfirmationOutcome for rich tool confirmation
-
-	initialHistory, err := sessionService.LoadHistory(sessionID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load session history for ID %s: %w", sessionID, err)
-	}
+	executor.SetUserConfirmationChannel(userConfirmationChan)
+	executor.SetToolConfirmationChannel(toolConfirmationChan)
 
 	cs := &ChatService{
 		executor:             executor,
 		toolRegistry:         toolRegistry,
-		history:              initialHistory,
 		userConfirmationChan: userConfirmationChan,
 		ToolConfirmationChan: toolConfirmationChan,
 		sessionService:       sessionService,
 		sessionID:            sessionID,
 		settingsService:      settingsService,
-		proceedAlwaysTools:   make(map[string]bool), // Initialize the map
+		appConfig:            appConfig,             // Assign appConfig
+		proceedAlwaysTools:   make(map[string]bool), // Initialize empty
 	}
+
+	if initialState != nil {
+		cs.history = initialState.History
+		cs.proceedAlwaysTools = initialState.ProceedAlwaysTools
+		cs.toolCallCounter = initialState.ToolCallCounter
+		cs.toolErrorCounter = initialState.ToolErrorCounter
+	} else {
+		initialHistory, err := sessionService.LoadHistory(sessionID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load session history for ID %s: %w", sessionID, err)
+		}
+		cs.history = initialHistory
+		// cs.proceedAlwaysTools already initialized above.
+	}
+
 	// Save the loaded (or empty) history immediately to ensure the session file exists if it's new.
 	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
 		return nil, fmt.Errorf("failed to save initial session history: %w", err)
@@ -77,7 +92,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 		eventChan <- types.StreamingStartedEvent{}
 		telemetry.LogDebugf("Received stream event: StreamingStartedEvent")
 
-		for {
+		for { // Main loop for processing turns
 			telemetry.LogDebugf("ChatService: Top of the loop.")
 			// Check for cancellation at the start of each turn
 			select {
@@ -91,35 +106,110 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			eventChan <- types.ThinkingEvent{}
 			telemetry.LogDebugf("Received stream event: ThinkingEvent")
 
-			// Call the executor to get the model's response stream
-			stream, err := cs.executor.StreamContent(ctx, cs.history...)
-			if err != nil {
-				eventChan <- types.ErrorEvent{Err: err}
-				return
-			}
-
 			var functionCalls []*types.FunctionCall
 			var textResponse strings.Builder
 			var modelResponseParts []types.Part
+			var streamErr error // Declare here to capture errors from StreamContent or stream channel
 
-			// Process all events from the stream for this turn
-			for event := range stream {
-				switch e := event.(type) {
-				case types.Part:
-					modelResponseParts = append(modelResponseParts, e)
-					if e.FunctionCall != nil {
-						functionCalls = append(functionCalls, e.FunctionCall)
+			// Get the model's response stream
+			streamChannel, directErr := cs.executor.StreamContent(ctx, cs.history...)
+			if directErr != nil {
+				streamErr = directErr // Propagate direct error from StreamContent
+			} else {
+				// Process events from the stream channel
+				for event := range streamChannel {
+					switch e := event.(type) {
+					case types.Part:
+						modelResponseParts = append(modelResponseParts, e)
+						if e.FunctionCall != nil {
+							functionCalls = append(functionCalls, e.FunctionCall)
+						}
+						if e.Text != "" {
+							textResponse.WriteString(e.Text)
+						}
+					case types.ErrorEvent:
+						telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", e.Err)
+						streamErr = e.Err        // Store the error from the stream
+						goto EndStreamProcessing // Exit stream processing loop
 					}
-					if e.Text != "" {
-						textResponse.WriteString(e.Text)
+				}
+			}
+
+		EndStreamProcessing: // Label for goto
+
+			if streamErr != nil { // This block now handles errors from StreamContent or from the stream channel
+				currentExecutorName := cs.executor.Name()
+
+				if currentExecutorName == "gemini" {
+					var apiErr *googleapi.Error
+					if errors.As(streamErr, &apiErr) && apiErr.Code == 429 {
+						telemetry.LogDebugf("Gemini Quota Exceeded error detected: %v", streamErr)
+
+						currentExecutorTypeVal, _ := cs.settingsService.Get("executor")
+						currentExecutorType, ok := currentExecutorTypeVal.(string)
+						if !ok {
+							currentExecutorType = "gemini"
+						}
+
+						router := routing.NewModelRouterService(cs.appConfig)
+						routingCtx := &routing.RoutingContext{
+							History:      []string{}, // TODO: Populate with relevant history for routing decisions
+							Request:      userInput,
+							Signal:       ctx,
+							IsFallback:   true,
+							ExecutorType: currentExecutorType,
+						}
+
+						decision, routeErr := router.Route(routingCtx, cs.appConfig)
+						if routeErr != nil || decision == nil || decision.Model == currentExecutorType {
+							eventChan <- types.ErrorEvent{
+								Err: fmt.Errorf("Quota Exceeded for %s. No fallback model found. Please try again later or switch models manually (e.g., /settings set executor qwen).", currentExecutorType),
+							}
+							return
+						}
+
+						telemetry.LogDebugf("Attempting to switch to fallback model: %s (reason: %s)", decision.Model, decision.Metadata["reasoning"])
+
+						eventChan <- types.ModelSwitchEvent{
+							OldModel: currentExecutorType,
+							NewModel: decision.Model,
+							Reason:   fmt.Sprintf("Quota Exceeded. %s", decision.Metadata["reasoning"]),
+						}
+
+						executorFactory, factoryErr := core.NewExecutorFactory(decision.Model, cs.appConfig)
+						if factoryErr != nil {
+							eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create factory for fallback model %s: %w", decision.Model, factoryErr)}
+							return
+						}
+						newExecutor, executorErr := executorFactory.NewExecutor(cs.appConfig, types.GenerateContentConfig{}, cs.history)
+						if executorErr != nil {
+							eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create fallback executor %s: %w", decision.Model, executorErr)}
+							return
+						}
+
+						cs.executor = newExecutor
+						cs.settingsService.Set("executor", decision.Model)
+						cs.settingsService.Set("model", decision.Model)
+
+						eventChan <- types.FinalResponseEvent{Content: fmt.Sprintf("Automatically switched to model **%s**.", decision.Model)}
+						eventChan <- types.ThinkingEvent{}
+
+						continue // Re-attempt streaming with the new executor
+
+					} else {
+						// Other Gemini-specific errors or generic Google API errors
+						eventChan <- types.ErrorEvent{Err: streamErr}
+						return
 					}
-				case types.ErrorEvent:
-					telemetry.LogDebugf("Received stream event: ErrorEvent (Err: %#v)", e.Err)
+				} else {
+					// Generic error handling for other executors or unknown errors
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("Error from executor '%s': %w", currentExecutorName, streamErr)}
 					return
 				}
 			}
 
-			// After the stream is done, decide what to do next
+			// If we reached here, it means there was no error OR a fallback was initiated and we continued.
+			// Now process function calls or final answer.
 			if len(functionCalls) > 0 {
 				telemetry.LogDebugf("ChatService: Received %d tool call(s) from model.", len(functionCalls))
 
@@ -251,9 +341,9 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					})
 				}
 
-				cs.history = append(cs.history, &types.Content{Role: "user", Parts: toolResponseParts})
+				cs.history = append(cs.history, &types.Content{Role: "model", Parts: toolResponseParts})
 				if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
-					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after tool responses: %w", err)}
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after model response with tool calls: %w", err)}
 					return
 				}
 
@@ -390,4 +480,15 @@ func (cs *ChatService) GetToolCallCount() int {
 // GetToolErrorCount returns the total number of tool calls that resulted in an error.
 func (cs *ChatService) GetToolErrorCount() int {
 	return cs.toolErrorCounter
+}
+
+// GetState captures and returns the current state of the ChatService.
+func (cs *ChatService) GetState() *types.ChatState {
+	return &types.ChatState{
+		History:            cs.history,
+		SessionID:          cs.sessionID,
+		ProceedAlwaysTools: cs.proceedAlwaysTools,
+		ToolCallCounter:    cs.toolCallCounter,
+		ToolErrorCounter:   cs.toolErrorCounter,
+	}
 }

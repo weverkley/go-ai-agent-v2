@@ -7,6 +7,7 @@ import (
 	"strings" // New import for strings.TrimSpace
 	"time"    // New import for time
 
+	"go-ai-agent-v2/go-cli/pkg/core" // New import for core package
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 	"go-ai-agent-v2/go-cli/pkg/ui"
@@ -95,13 +96,29 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 		currentSessionID = SessionService.GenerateSessionID()
 	}
 
-	// Use the global Cfg and initialized executor
+	// Use the global Cfg
 	appConfig := Cfg
 	executorTypeVal, _ := settingsService.Get("executor")
 	executorType, _ := executorTypeVal.(string)
 
+	// Create ExecutorFactory
+	executorFactory, err := core.NewExecutorFactory(executorType, appConfig)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Create Executor
+	// generationConfig and startHistory are not directly available here in the current flow
+	// For now, we pass empty or default values. These will be properly managed in Phase 2.
+	executor, err := executorFactory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
+		os.Exit(1)
+	}
+
 	toolRegistry, _ := appConfig.Get("toolRegistry")
-	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID, SettingsService)
+	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID, SettingsService, appConfig, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating chat service: %v\n", err)
 		os.Exit(1)

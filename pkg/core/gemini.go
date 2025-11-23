@@ -19,22 +19,22 @@ type ContentGenerator interface {
 	GenerateContent(prompt string) (string, error)
 }
 
-// GoaiagentChat represents a Go AI Agent chat client.
-type GoaiagentChat struct {
-	client                *genai.Client
-	model                 *genai.GenerativeModel
-	Name                  string
-	generationConfig      types.GenerateContentConfig
-	startHistory          []*types.Content // Changed to generic type
-	toolRegistry          types.ToolRegistryInterface
-	toolCallCounter       int
-	userConfirmationChan  chan bool
-	ToolConfirmationChan  chan types.ToolConfirmationOutcome
-	logger                telemetry.TelemetryLogger // New field for telemetry logger
+// GeminiChat represents a Gemini AI client.
+type GeminiChat struct {
+	client               *genai.Client
+	model                *genai.GenerativeModel
+	modelName            string // Renamed from Name to modelName
+	generationConfig     types.GenerateContentConfig
+	startHistory         []*types.Content // Changed to generic type
+	toolRegistry         types.ToolRegistryInterface
+	toolCallCounter      int
+	userConfirmationChan chan bool
+	ToolConfirmationChan chan types.ToolConfirmationOutcome
+	logger               telemetry.TelemetryLogger // New field for telemetry logger
 }
 
-// NewGoaiagentChat creates a new GoaiagentChat instance.
-func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content, logger telemetry.TelemetryLogger) (Executor, error) {
+// NewGeminiChat creates a new GeminiChat instance.
+func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content, logger telemetry.TelemetryLogger) (Executor, error) {
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
@@ -68,17 +68,17 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 		}
 	}
 
-	return &GoaiagentChat{
-		client:                client,
-		model:                 model,
-		Name:                  modelName,
-		generationConfig:      generationConfig,
-		startHistory:          startHistory,
-		toolRegistry:          geminiChatToolRegistry,
-		toolCallCounter:       0,
-		userConfirmationChan:  make(chan bool, 1),
-		ToolConfirmationChan:  make(chan types.ToolConfirmationOutcome, 1),
-		logger:                logger, // Assign the logger
+	return &GeminiChat{
+		client:               client,
+		model:                model,
+		modelName:            modelName, // Renamed from Name to modelName
+		generationConfig:     generationConfig,
+		startHistory:         startHistory,
+		toolRegistry:         geminiChatToolRegistry,
+		toolCallCounter:      0,
+		userConfirmationChan: make(chan bool, 1),
+		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
+		logger:               logger, // Assign the logger
 	}, nil
 }
 
@@ -226,7 +226,7 @@ func toGenaiType(t string) genai.Type {
 }
 
 // GenerateContent generates content using the Gemini API.
-func (gc *GoaiagentChat) GenerateContent(contents ...*types.Content) (*types.GenerateContentResponse, error) {
+func (gc *GeminiChat) GenerateContent(contents ...*types.Content) (*types.GenerateContentResponse, error) {
 	ctx := context.Background()
 
 	var parts []genai.Part
@@ -254,7 +254,7 @@ func (gc *GoaiagentChat) GenerateContent(contents ...*types.Content) (*types.Gen
 }
 
 // ExecuteTool executes a tool call.
-func (gc *GoaiagentChat) ExecuteTool(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error) {
+func (gc *GeminiChat) ExecuteTool(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error) {
 	if gc.toolRegistry == nil {
 		return types.ToolResult{}, fmt.Errorf("tool registry not initialized")
 	}
@@ -268,7 +268,7 @@ func (gc *GoaiagentChat) ExecuteTool(ctx context.Context, fc *types.FunctionCall
 }
 
 // SendMessageStream generates content using the Gemini API and streams responses.
-func (gc *GoaiagentChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
+func (gc *GeminiChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
 	respChan := make(chan types.StreamResponse)
 
 	// Convert generic history to genai history for the chat session
@@ -334,7 +334,7 @@ func (gc *GoaiagentChat) SendMessageStream(modelName string, messageParams types
 }
 
 // ListModels lists available Gemini models.
-func (gc *GoaiagentChat) ListModels() ([]string, error) {
+func (gc *GeminiChat) ListModels() ([]string, error) {
 	ctx := context.Background()
 
 	var modelNames []string
@@ -353,18 +353,18 @@ func (gc *GoaiagentChat) ListModels() ([]string, error) {
 }
 
 // GetHistory returns the current chat history.
-func (gc *GoaiagentChat) GetHistory() ([]*types.Content, error) {
+func (gc *GeminiChat) GetHistory() ([]*types.Content, error) {
 	return gc.startHistory, nil
 }
 
 // SetHistory sets the chat history.
-func (gc *GoaiagentChat) SetHistory(history []*types.Content) error {
+func (gc *GeminiChat) SetHistory(history []*types.Content) error {
 	gc.startHistory = history
 	return nil
 }
 
 // CompressChat compresses the chat history by replacing it with a summary.
-func (gc *GoaiagentChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
+func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
 	ctx := context.Background()
 
 	telemetry.LogDebugf("CompressChat: len(gc.startHistory) = %d", len(gc.startHistory))
@@ -428,13 +428,18 @@ func (gc *GoaiagentChat) CompressChat(promptId string, force bool) (*types.ChatC
 }
 
 // SetUserConfirmationChannel sets the channel for user confirmation.
-func (gc *GoaiagentChat) SetUserConfirmationChannel(ch chan bool) {
+func (gc *GeminiChat) SetUserConfirmationChannel(ch chan bool) {
 	gc.userConfirmationChan = ch
 }
 
 // SetToolConfirmationChannel sets the channel for tool confirmation.
-func (gc *GoaiagentChat) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
+func (gc *GeminiChat) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
 	gc.ToolConfirmationChan = ch
+}
+
+// Name returns the name of the executor.
+func (gc *GeminiChat) Name() string {
+	return gc.modelName
 }
 
 func toGenaiParts(parts []types.Part) []genai.Part {
@@ -485,8 +490,8 @@ func fromGenaiFunctionCall(fc *genai.FunctionCall) *types.FunctionCall {
 }
 
 // StreamContent sends the chat history to the model and streams back response parts.
-func (gc *GoaiagentChat) StreamContent(ctx context.Context, history ...*types.Content) (<-chan any, error) {
-	telemetry.LogDebugf("GoaiagentChat.StreamContent called")
+func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Content) (<-chan any, error) {
+	telemetry.LogDebugf("GeminiChat.StreamContent called")
 	eventChan := make(chan any)
 
 	go func() {
@@ -553,8 +558,9 @@ func fromGenaiPart(part genai.Part) types.Part {
 	}
 	return genericPart
 }
+
 // GenerateContentWithTools generates content using the Gemini API, including tools.
-func (gc *GoaiagentChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
+func (gc *GeminiChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
 	// Convert []types.Tool to []*types.ToolDefinition
 	toolDefinitions := make([]*types.ToolDefinition, len(tools))
 	for i, tool := range tools {
@@ -591,7 +597,7 @@ func (gc *GoaiagentChat) GenerateContentWithTools(ctx context.Context, history [
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate content with tools: %w", err)
 	}
-	
+
 	// Convert genai response to generic response
 	genericResp := &types.GenerateContentResponse{
 		Candidates: make([]*types.Candidate, len(resp.Candidates)),

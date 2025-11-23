@@ -382,3 +382,8 @@ func (qc *QwenChat) SetUserConfirmationChannel(ch chan bool) {
 func (qc *QwenChat) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
 	qc.ToolConfirmationChan = ch
 }
+
+// Name returns the name of the executor (model name for Qwen).
+func (qc *QwenChat) Name() string {
+	return qc.modelName
+}

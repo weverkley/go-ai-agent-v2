@@ -6,7 +6,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/core"
 
 	"go-ai-agent-v2/go-cli/pkg/extension"
 
@@ -29,7 +28,6 @@ var RootCmd = &cobra.Command{
 
 var Cfg *config.Config
 var executorType string
-var executor core.Executor                      // Declare package-level executor
 var chatService *services.ChatService           // Declare package-level chatService
 var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
@@ -195,37 +193,7 @@ func init() {
 			os.Exit(1)
 		}
 
-		// Get executor type from settings
-		executorTypeVal, _ := SettingsService.Get("executor")
-		executorType, ok := executorTypeVal.(string)
-		if !ok {
-			executorType = "gemini" // Fallback
-		}
-
-		// Allow tests to override the executor
-		if testExecutor := os.Getenv("GO_AI_AGENT_TEST_EXECUTOR"); testExecutor != "" {
-			executorType = testExecutor
-		}
-
-		// Get model from settings
-		modelVal, _ := SettingsService.Get("model")
-		model, ok := modelVal.(string)
-		if !ok {
-			model = config.DEFAULT_GEMINI_MODEL // Fallback
-		}
-		appConfig := Cfg.WithModel(model)
-
-		// Initialize the global executor
-		factory, err := core.NewExecutorFactory(executorType, appConfig)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
-			os.Exit(1)
-		}
-		executor, err = factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
-			os.Exit(1)
-		}
+		// Initialize the global executor (removed as part of dynamic executor refactor)
 
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)

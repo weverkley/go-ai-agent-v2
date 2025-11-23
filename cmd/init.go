@@ -5,9 +5,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"go-ai-agent-v2/go-cli/pkg/core"
-	"go-ai-agent-v2/go-cli/pkg/types"
-
 	"github.com/spf13/cobra"
 )
 
@@ -30,91 +27,94 @@ var initCmd = &cobra.Command{
 			return
 		}
 
-		var generatedContent string
+		// var generatedContent string
 
-		// Check if the global executor is a mock executor.
-		if _, ok := executor.(*core.MockExecutor); ok {
-			fmt.Println("Mock executor detected. Generating mock GOAIAGENT.md content.")
-			generatedContent = `# Project Overview
 
-This is a Go project for the Go AI Agent. It appears to be a command-line interface tool for interacting with AI models.
+		// // Check if the global executor is a mock executor.
+		// if _, ok := executor.(*core.MockExecutor); ok {
+		// 	fmt.Println("Mock executor detected. Generating mock GOAIAGENT.md content.")
+		// 	generatedContent = `# Project Overview
 
-## Building and Running
+		// This is a Go project for the Go AI Agent. It appears to be a command-line interface tool for interacting with AI models.
 
-- To build the project, run: ` + "`go build`" + `
-- To run tests, use: ` + "`go test ./...`" + `
+		// ## Building and Running
 
-## Development Conventions
+		// - To build the project, run: ` + "`go build`" + `
+		// - To run tests, use: ` + "`go test ./...`" + `
 
-- The project uses Go modules for dependency management (` + "`go.mod`" + `).
-- Code seems to be organized into ` + "`cmd`" + ` for main applications and ` + "`pkg`" + ` for shared libraries.
-- Standard Go formatting is expected.
-`
-		} else {
-			fmt.Println("Empty GOAIAGENT.md created. Now analyzing the project to populate it.")
+		// ## Development Conventions
 
-			prompt := `
-You are an AI agent that brings the power of Gemini directly into the terminal. Your task is to analyze the current directory and generate a comprehensive GOAIAGENT.md file to be used as instructional context for future interactions.
+		// - The project uses Go modules for dependency management (` + "`go.mod`" + `).
+		// - Code seems to be organized into ` + "`cmd`" + ` for main applications and ` + "`pkg`" + ` for shared libraries.
+		// - Standard Go formatting is expected.
+		// `
+		// } else {
+		fmt.Println("This command is not yet functional after refactoring. Cannot generate GOAIAGENT.md content with AI.")
+		os.Exit(1)
+		// 	fmt.Println("Empty GOAIAGENT.md created. Now analyzing the project to populate it.")
 
-**Analysis Process:**
+		// 	prompt := `
+		// You are an AI agent that brings the power of Gemini directly into the terminal. Your task is to analyze the current directory and generate a comprehensive GOAIAGENT.md file to be used as instructional context for future interactions.
 
-1.  **Initial Exploration:**
-    *   Start by listing the files and directories to get a high-level overview of the structure.
-        *   Read the README file (e.g., 'README.md', 'README.txt') if it exists. This is often the best place to start.
+		// **Analysis Process:**
 
-    2.  **Iterative Deep Dive (up to 10 files):**
-        *   Based on your initial findings, select a few files that seem most important (e.g., configuration files, main source files, documentation).
-        *   Read them. As you learn more, refine your understanding and decide which files to read next. You don't need to decide all 10 files at once. Let your discoveries guide your exploration.
+		// 1.  **Initial Exploration:**
+		//     *   Start by listing the files and directories to get a high-level overview of the structure.
+		//         *   Read the README file (e.g., 'README.md', 'README.txt') if it exists. This is often the best place to start.
 
-    3.  **Identify Project Type:**
-        *   **Code Project:** Look for clues like 'package.json', 'requirements.txt', 'pom.xml', 'go.mod', 'Cargo.toml', 'build.gradle', or a 'src' directory. If you find them, this is likely a software project.
-        *   **Non-Code Project:** If you don't find code-related files, this might be a directory for documentation, research papers, notes, or something else.
+		//     2.  **Iterative Deep Dive (up to 10 files):**
+		//         *   Based on your initial findings, select a few files that seem most important (e.g., configuration files, main source files, documentation).
+		//         *   Read them. As you learn more, refine your understanding and decide which files to read next. You don't need to decide all 10 files at once. Let your discoveries guide your exploration.
 
-**GOAIAGENT.md Content Generation:**
+		//     3.  **Identify Project Type:**
+		//         *   **Code Project:** Look for clues like 'package.json', 'requirements.txt', 'pom.xml', 'go.mod', 'Cargo.toml', 'build.gradle', or a 'src' directory. If you find them, this is likely a software project.
+		//         *   **Non-Code Project:** If you don't find code-related files, this might be a directory for documentation, research papers, notes, or something else.
 
-**For a Code Project:**
+		// **GOAIAGENT.md Content Generation:**
 
-*   **Project Overview:** Write a clear and concise summary of the project's purpose, main technologies, and architecture.
-*   **Building and Running:** Document the key commands for building, running, and testing the project. Infer these from the files you've read (e.g., 'scripts' in 'package.json', 'Makefile', etc.). If explicit commands cannot be inferred, state that and suggest common commands for the detected project type (e.g., 'npm install && npm start' for Node.js projects).
-*   **Development Conventions:** Describe any coding styles, testing practices, or contribution guidelines you can infer from the codebase.
+		// **For a Code Project:**
 
-**For a Non-Code Project:**
+		// *   **Project Overview:** Write a clear and concise summary of the project's purpose, main technologies, and architecture.
+		// *   **Building and Running:** Document the key commands for building, running, and testing the project. Infer these from the files you've read (e.g., 'scripts' in 'package.json', 'Makefile', etc.). If explicit commands cannot be inferred, state that and suggest common commands for the detected project type (e.g., 'npm install && npm start' for Node.js projects).
+		// *   **Development Conventions:** Describe any coding styles, testing practices, or contribution guidelines you can infer from the codebase.
 
-*   **Directory Overview:** Describe the purpose and contents of the directory. What is it for? What kind of information does it hold?
-*   **Key Files:** List the most important files and briefly explain what they contain.
-*   **Usage:** Explain how the contents of this directory are intended to be used.
+		// **For a Non-Code Project:**
 
-**Final Output:**
+		// *   **Directory Overview:** Describe the purpose and contents of the directory. What is it for? What kind of information does it hold?
+		// *   **Key Files:** List the most important files and briefly explain what they contain.
+		// *   **Usage:** Explain how the contents of this directory are intended to be used.
 
-Write the complete content to the 'GOAIAGENT.md' file. The output must be well-formatted Markdown.
-`
+		// **Final Output:**
 
-			resp, err := executor.GenerateContent(
-				&types.Content{
-					Parts: []types.Part{{Text: prompt}},
-					Role:  "user",
-				},
-			)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Error generating GOAIAGENT.md content: %v\n", err)
-				os.Exit(1)
-			}
+		// Write the complete content to the 'GOAIAGENT.md' file. The output must be well-formatted Markdown.
+		// `
 
-			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
-				for _, part := range resp.Candidates[0].Content.Parts {
-					if part.Text != "" { // Directly access Text field
-						generatedContent += part.Text
-					}
-				}
-			}
-		}
+		// 	resp, err := executor.GenerateContent(
+		// 		&types.Content{
+		// 			Parts: []types.Part{{Text: prompt}},
+		// 			Role:  "user",
+		// 		},
+		// 	)
+		// 	if err != nil {
+		// 		fmt.Fprintf(os.Stderr, "Error generating GOAIAGENT.md content: %v\n", err)
+		// 		os.Exit(1)
+		// 	}
 
-		err = os.WriteFile(geminiMdPath, []byte(generatedContent), 0644)
-		if err != nil {
-			fmt.Printf("Error writing generated content to GOAIAGENT.md: %v\n", err)
-			return
-		}
+		// 	if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+		// 		for _, part := range resp.Candidates[0].Content.Parts {
+		// 			if part.Text != "" { // Directly access Text field
+		// 				generatedContent += part.Text
+		// 			}
+		// 		}
+		// 	}
+		// }
 
-		fmt.Println("GOAIAGENT.md populated with generated content.")
+		// err = os.WriteFile(geminiMdPath, []byte(generatedContent), 0644)
+		// if err != nil {
+		// 	fmt.Printf("Error writing generated content to GOAIAGENT.md: %v\n", err)
+		// 	return
+		// }
+
+		// fmt.Println("GOAIAGENT.md populated with generated content.")
 	},
 }

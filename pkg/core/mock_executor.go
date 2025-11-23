@@ -361,3 +361,8 @@ func (m *MockExecutor) SetUserConfirmationChannel(ch chan bool) {
 func (m *MockExecutor) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
 	m.ToolConfirmationChan = ch
 }
+
+// Name returns the name of the executor.
+func (m *MockExecutor) Name() string {
+	return "mock"
+}
