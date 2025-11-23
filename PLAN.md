@@ -74,7 +74,7 @@ The core application logic has been successfully migrated to the new Go architec
     *   Refactor `getSuggestedModel` to be more generic and implement the `ClassifierStrategy` for more intelligent model routing.
 
 5.  **Core Commands & Services:**
-    *   Add validation for `executor` and `model` settings in the `settings` command.
+    - [COMPLETED] Add validation for `executor` and `model` settings in the `settings` command.
     *   Implement full CRUD operations for MCP server management (`mcp` command).
     *   Implement secure, OS-specific storage and clearing of API keys for the `auth` command.
 
