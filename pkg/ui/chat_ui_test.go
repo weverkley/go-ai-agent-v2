@@ -38,59 +38,7 @@ func (m *MockShellExecutionService) KillAllProcesses() {
 }
 
 // MockSettingsService is a mock implementation of types.SettingsServiceIface
-type MockSettingsService struct {
-	mock.Mock
-}
 
-func (m *MockSettingsService) Get(key string) (interface{}, bool) {
-	args := m.Called(key)
-	return args.Get(0), args.Bool(1)
-}
-
-func (m *MockSettingsService) GetTelemetrySettings() *types.TelemetrySettings {
-	args := m.Called()
-	return args.Get(0).(*types.TelemetrySettings)
-}
-
-func (m *MockSettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSearchSettings {
-	args := m.Called()
-	return args.Get(0).(*types.GoogleCustomSearchSettings)
-}
-
-func (m *MockSettingsService) GetWebSearchProvider() types.WebSearchProvider {
-	args := m.Called()
-	return args.Get(0).(types.WebSearchProvider)
-}
-
-func (m *MockSettingsService) GetTavilySettings() *types.TavilySettings {
-	args := m.Called()
-	return args.Get(0).(*types.TavilySettings)
-}
-
-func (m *MockSettingsService) Set(key string, value interface{}) error {
-	args := m.Called(key, value)
-	return args.Error(0)
-}
-
-func (m *MockSettingsService) AllSettings() map[string]interface{} {
-	args := m.Called()
-	return args.Get(0).(map[string]interface{})
-}
-
-func (m *MockSettingsService) Reset() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *MockSettingsService) Save() error {
-	args := m.Called()
-	return args.Error(0)
-}
-
-func (m *MockSettingsService) GetDangerousTools() []string {
-	args := m.Called()
-	return args.Get(0).([]string)
-}
 
 // --- Helper for creating a test model ---
 func setupTestSessionService(t *testing.T) (*services.SessionService, func()) {
@@ -118,8 +66,9 @@ func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 	appConfig := config.NewConfig(&config.ConfigParameters{})
 
 	// Setup mock settings service
-	mockSettingsService := new(MockSettingsService)
+	mockSettingsService := new(services.MockSettingsService)
 	mockSettingsService.On("GetDangerousTools").Return([]string{}).Maybe()
+	mockSettingsService.On("GetWorkspaceDir").Return("").Maybe()
 
 	sessionService, cleanup := setupTestSessionService(t)
 	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.

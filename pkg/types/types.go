@@ -507,6 +507,7 @@ type SettingsServiceIface interface {
 	GetWebSearchProvider() WebSearchProvider
 	GetTavilySettings() *TavilySettings
 	GetDangerousTools() []string // New method
+	GetWorkspaceDir() string
 	Set(key string, value interface{}) error
 	AllSettings() map[string]interface{}
 	Reset() error

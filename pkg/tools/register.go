@@ -39,7 +39,7 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	if err := registry.Register(NewMemoryTool()); err != nil {
 		telemetry.LogErrorf("Error registering MemoryTool: %v", err)
 	}
-	if err := registry.Register(NewWriteTodosTool()); err != nil {
+	if err := registry.Register(NewWriteTodosTool(settingsService)); err != nil {
 		telemetry.LogErrorf("Error registering WriteTodosTool: %v", err)
 	}
 	if err := registry.Register(NewListDirectoryTool(fs)); err != nil {

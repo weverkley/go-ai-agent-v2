@@ -22,50 +22,58 @@ type Todo struct {
 // WriteTodosTool represents the write-todos tool.
 type WriteTodosTool struct {
 	*types.BaseDeclarativeTool
+	settingsService types.SettingsServiceIface
 }
 
 // NewWriteTodosTool creates a new instance of WriteTodosTool.
-func NewWriteTodosTool() *WriteTodosTool {
+func NewWriteTodosTool(settingsService types.SettingsServiceIface) *WriteTodosTool {
 	return &WriteTodosTool{
-			types.NewBaseDeclarativeTool(
-				types.WRITE_TODOS_TOOL_NAME,
-				"Write Todos",
-				"This tool can help you list out the current subtasks that are required to be completed for a given user request.",
-				types.KindOther,
-				(&types.JsonSchemaObject{
-					Type: "object",
-				}).SetProperties(map[string]*types.JsonSchemaProperty{
-					"todos": &types.JsonSchemaProperty{
-						Type:        "array",
-						Description: "The complete list of todo items. This will replace the existing list.",
-						Items: (&types.JsonSchemaObject{
-							Type: "object",
-						}).SetProperties(map[string]*types.JsonSchemaProperty{
-							"description": &types.JsonSchemaProperty{
-								Type:        "string",
-								Description: "The description of the task.",
-							},
-							"status": &types.JsonSchemaProperty{
-								Type:        "string",
-								Description: "The current status of the task.",
-								Enum:        []string{"pending", "in_progress", "completed", "cancelled"},
-							},
-						}).SetRequired([]string{"description", "status"}),
-					},
-				}).SetRequired([]string{"todos"}),
-				false, // isOutputMarkdown
-				false, // canUpdateOutput
-				nil,   // MessageBus
-			),	}
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.WRITE_TODOS_TOOL_NAME,
+			"Write Todos",
+			"This tool can help you list out the current subtasks that are required to be completed for a given user request.",
+			types.KindOther,
+			(&types.JsonSchemaObject{
+				Type: "object",
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"todos": &types.JsonSchemaProperty{
+					Type:        "array",
+					Description: "The complete list of todo items. This will replace the existing list.",
+					Items: (&types.JsonSchemaObject{
+						Type: "object",
+					}).SetProperties(map[string]*types.JsonSchemaProperty{
+						"description": &types.JsonSchemaProperty{
+							Type:        "string",
+							Description: "The description of the task.",
+						},
+						"status": &types.JsonSchemaProperty{
+							Type:        "string",
+							Description: "The current status of the task.",
+							Enum:        []string{"pending", "in_progress", "completed", "cancelled"},
+						},
+					}).SetRequired([]string{"description", "status"}),
+				},
+			}).SetRequired([]string{"todos"}),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
+		settingsService: settingsService,
+	}
 }
 
-// getTodosFilePath returns the path to the TODOS.md file.
-func getTodosFilePath() (string, error) {
-	homeDir, err := osUserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("failed to get user home directory: %w", err)
+// getTodosFilePath returns the path to the TODOS.md file within the workspace.
+func (t *WriteTodosTool) getTodosFilePath() (string, error) {
+	workspaceDir := t.settingsService.GetWorkspaceDir()
+	if workspaceDir == "" {
+		// Fallback or error if workspace directory is not available
+		homeDir, err := osUserHomeDir()
+		if err != nil {
+			return "", fmt.Errorf("failed to get user home directory: %w", err)
+		}
+		return filepath.Join(homeDir, ".goaiagent", TODOS_FILENAME), nil
 	}
-	return filepath.Join(homeDir, ".goaiagent", TODOS_FILENAME), nil
+	return filepath.Join(workspaceDir, ".goaiagent", TODOS_FILENAME), nil
 }
 
 // Execute writes the todos to a file.
@@ -99,14 +107,14 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 	// Validate todos
 	inProgressCount := 0
 	for _, todo := range todos {
-			if todo.Description == "" {
-				return types.ToolResult{
-					Error: &types.ToolError{
-						Message: "Each todo must have a non-empty description",
-						Type:    types.ToolErrorTypeExecutionFailed,
-					},
-				}, fmt.Errorf("each todo must have a non-empty description")
-			}
+		if todo.Description == "" {
+			return types.ToolResult{
+				Error: &types.ToolError{
+					Message: "Each todo must have a non-empty description",
+					Type:    types.ToolErrorTypeExecutionFailed,
+				},
+			}, fmt.Errorf("each todo must have a non-empty description")
+		}
 		if !t.isValidTodoStatus(todo.Status) { // Call isValidTodoStatus as a method
 			return types.ToolResult{
 				Error: &types.ToolError{
@@ -129,7 +137,7 @@ func (t *WriteTodosTool) Execute(ctx context.Context, args map[string]any) (type
 		}, fmt.Errorf("only one task can be \"in_progress\" at a time")
 	}
 
-	todosFilePath, err := getTodosFilePath()
+	todosFilePath, err := t.getTodosFilePath()
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{

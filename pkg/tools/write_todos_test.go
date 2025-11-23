@@ -6,56 +6,59 @@ import (
 	"os"
 	"testing"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWriteTodosTool_Execute(t *testing.T) {
-	tool := NewWriteTodosTool()
-
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func(tempDir string)
-		expectedLLMContent string
+		name                string
+		args                map[string]any
+		setupMock           func(mockService *services.MockSettingsService, tempDir string)
+		expectedLLMContent  string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError       string
 	}{
 		{
 			name:          "missing todos argument",
 			args:          map[string]any{},
-			setupMock:     func(tempDir string) {},
+			setupMock:     func(mockService *services.MockSettingsService, tempDir string) {},
 			expectedError: "invalid or missing 'todos' argument",
 		},
 		{
 			name:          "invalid todo item format",
 			args:          map[string]any{"todos": []any{"not a map"}},
-			setupMock:     func(tempDir string) {},
+			setupMock:     func(mockService *services.MockSettingsService, tempDir string) {},
 			expectedError: "invalid todo item format",
 		},
 		{
 			name:          "todo with empty description",
 			args:          map[string]any{"todos": []any{map[string]any{"description": "", "status": "pending"}}},
-			setupMock:     func(tempDir string) {},
+			setupMock:     func(mockService *services.MockSettingsService, tempDir string) {},
 			expectedError: "each todo must have a non-empty description",
 		},
 		{
 			name:          "todo with invalid status",
 			args:          map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "invalid"}}},
-			setupMock:     func(tempDir string) {},
+			setupMock:     func(mockService *services.MockSettingsService, tempDir string) {},
 			expectedError: "invalid todo status: invalid",
 		},
 		{
-			name:          "multiple in_progress tasks",
-			args:          map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "in_progress"}, map[string]any{"description": "Task 2", "status": "in_progress"}}},
-			setupMock:     func(tempDir string) {},
+			name: "multiple in_progress tasks",
+			args: map[string]any{"todos": []any{
+				map[string]any{"description": "Task 1", "status": "in_progress"},
+				map[string]any{"description": "Task 2", "status": "in_progress"},
+			}},
+			setupMock:     func(mockService *services.MockSettingsService, tempDir string) {},
 			expectedError: "only one task can be \"in_progress\" at a time",
 		},
 		{
-			name: "get user home dir fails",
+			name: "fallback to home dir fails",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
-			setupMock: func(tempDir string) {
+			setupMock: func(mockService *services.MockSettingsService, tempDir string) {
+				mockService.On("GetWorkspaceDir").Return("").Once()
 				testMockUserHomeDir = func() (string, error) { return "", fmt.Errorf("home dir error") }
 			},
 			expectedError: "failed to get user home directory: home dir error",
@@ -63,8 +66,8 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 		{
 			name: "create todos directory fails",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
-			setupMock: func(tempDir string) {
-				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+			setupMock: func(mockService *services.MockSettingsService, tempDir string) {
+				mockService.On("GetWorkspaceDir").Return(tempDir).Once()
 				testMockMkdirAll = func(path string, perm os.FileMode) error { return fmt.Errorf("mkdir error") }
 			},
 			expectedError: "failed to create todos directory: mkdir error",
@@ -72,8 +75,8 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 		{
 			name: "write todos file fails",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
-			setupMock: func(tempDir string) {
-				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+			setupMock: func(mockService *services.MockSettingsService, tempDir string) {
+				mockService.On("GetWorkspaceDir").Return(tempDir).Once()
 				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
 				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error { return fmt.Errorf("write file error") }
 			},
@@ -82,8 +85,8 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 		{
 			name: "successful write - empty todos",
 			args: map[string]any{"todos": []any{}},
-			setupMock: func(tempDir string) {
-				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+			setupMock: func(mockService *services.MockSettingsService, tempDir string) {
+				mockService.On("GetWorkspaceDir").Return(tempDir).Once()
 				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
 				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					assert.Equal(t, "", string(data))
@@ -96,8 +99,8 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 		{
 			name: "successful write - single todo",
 			args: map[string]any{"todos": []any{map[string]any{"description": "Task 1", "status": "pending"}}},
-			setupMock: func(tempDir string) {
-				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+			setupMock: func(mockService *services.MockSettingsService, tempDir string) {
+				mockService.On("GetWorkspaceDir").Return(tempDir).Once()
 				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
 				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := "# ToDo List\n\n1. [pending] Task 1\n"
@@ -114,8 +117,8 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 				map[string]any{"description": "Task 1", "status": "completed"},
 				map[string]any{"description": "Task 2", "status": "in_progress"},
 			}},
-			setupMock: func(tempDir string) {
-				testMockUserHomeDir = func() (string, error) { return tempDir, nil }
+			setupMock: func(mockService *services.MockSettingsService, tempDir string) {
+				mockService.On("GetWorkspaceDir").Return(tempDir).Once()
 				testMockMkdirAll = func(path string, perm os.FileMode) error { return nil }
 				testMockWriteFile = func(name string, data []byte, perm os.FileMode) error {
 					expectedContent := "# ToDo List\n\n1. [completed] Task 1\n2. [in_progress] Task 2\n"
@@ -131,12 +134,16 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			tempDir := t.TempDir()
-			// First, set up the specific mocks for this test case.
-			tt.setupMock(tempDir)
+			mockService := new(services.MockSettingsService)
+			tool := NewWriteTodosTool(mockService)
 
-			// Then, apply the configured mocks to the package variables.
+			// Setup mocks
+			tt.setupMock(mockService, tempDir)
 			setupOsMocks()
-			t.Cleanup(teardownOsMocks)
+			t.Cleanup(func() {
+				teardownOsMocks()
+				mockService.AssertExpectations(t)
+			})
 
 			result, err := tool.Execute(context.Background(), tt.args)
 

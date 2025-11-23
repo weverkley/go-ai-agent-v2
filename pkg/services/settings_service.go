@@ -242,6 +242,13 @@ func (ss *SettingsService) GetTavilySettings() *types.TavilySettings {
 	return ss.settings.Tavily
 }
 
+// GetWorkspaceDir returns the base directory for the settings service.
+func (ss *SettingsService) GetWorkspaceDir() string {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.baseDir
+}
+
 // GetDangerousTools returns the list of tools that require confirmation.
 func (ss *SettingsService) GetDangerousTools() []string {
 	ss.mu.RLock()

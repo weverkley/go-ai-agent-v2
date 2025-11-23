@@ -42,7 +42,7 @@ var todosCmd = &cobra.Command{
 			})
 		}
 
-		writeTodosTool := tools.NewWriteTodosTool()
+		writeTodosTool := tools.NewWriteTodosTool(SettingsService)
 		result, err := writeTodosTool.Execute(context.Background(), map[string]any{
 			"todos": todosForExecute,
 		})

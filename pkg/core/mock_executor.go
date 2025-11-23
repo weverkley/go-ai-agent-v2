@@ -133,12 +133,12 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
-						"todos": []map[string]interface{}{
-							{"description": "Create api.js with basic Express server.", "status": "in_progress"},
-							{"description": "Add GET /todos endpoint.", "status": "pending"},
-							{"description": "Add POST /todos endpoint.", "status": "pending"},
-							{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
-							{"description": "Provide final instructions.", "status": "pending"},
+						"todos": []interface{}{
+							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "in_progress"},
+							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
 						},
 					},
 				}}
@@ -160,12 +160,12 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
-						"todos": []map[string]interface{}{
-							{"description": "Create api.js with basic Express server.", "status": "completed"},
-							{"description": "Add GET /todos endpoint.", "status": "in_progress"},
-							{"description": "Add POST /todos endpoint.", "status": "pending"},
-							{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
-							{"description": "Provide final instructions.", "status": "pending"},
+						"todos": []interface{}{
+							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "in_progress"},
+							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
 						},
 					},
 				}}
@@ -186,12 +186,12 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
-						"todos": []map[string]interface{}{
-							{"description": "Create api.js with basic Express server.", "status": "completed"},
-							{"description": "Add GET /todos endpoint.", "status": "completed"},
-							{"description": "Add POST /todos endpoint.", "status": "in_progress"},
-							{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
-							{"description": "Provide final instructions.", "status": "pending"},
+						"todos": []interface{}{
+							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "completed"},
+							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "in_progress"},
+							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
 						},
 					},
 				}}
@@ -212,12 +212,12 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
-						"todos": []map[string]interface{}{
-							{"description": "Create api.js with basic Express server.", "status": "completed"},
-							{"description": "Add GET /todos endpoint.", "status": "completed"},
-							{"description": "Add POST /todos endpoint.", "status": "completed"},
-							{"description": "Add GET /todos/:id endpoint.", "status": "in_progress"},
-							{"description": "Provide final instructions.", "status": "pending"},
+						"todos": []interface{}{
+							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "completed"},
+							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "in_progress"},
+							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
 						},
 					},
 				}}
@@ -248,12 +248,12 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
-						"todos": []map[string]interface{}{
-							{"description": "Create api.js with basic Express server.", "status": "completed"},
-							{"description": "Add GET /todos endpoint.", "status": "completed"},
-							{"description": "Add POST /todos endpoint.", "status": "completed"},
-							{"description": "Add GET /todos/:id endpoint.", "status": "completed"},
-							{"description": "Provide final instructions.", "status": "completed"},
+						"todos": []interface{}{
+							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "completed"},
+							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "completed"},
+							map[string]interface{}{"description": "Provide final instructions.", "status": "completed"},
 						},
 					},
 				}}

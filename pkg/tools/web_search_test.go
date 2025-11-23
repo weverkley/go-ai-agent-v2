@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/stretchr/testify/assert"
@@ -15,61 +16,16 @@ import (
 	"google.golang.org/api/option"
 )
 
-// MockSettingsService is a mock implementation of the methods of services.SettingsService
-// that WebSearchTool depends on.
-type MockSettingsService struct {
-	GetGoogleCustomSearchSettingsFunc func() *types.GoogleCustomSearchSettings
-	GetWebSearchProviderFunc          func() types.WebSearchProvider
-	GetTavilySettingsFunc             func() *types.TavilySettings
-	GetDangerousToolsFunc             func() []string // New field
-}
-
-func (m *MockSettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSearchSettings {
-	if m.GetGoogleCustomSearchSettingsFunc != nil {
-		return m.GetGoogleCustomSearchSettingsFunc()
-	}
-	return &types.GoogleCustomSearchSettings{}
-}
-
-func (m *MockSettingsService) GetWebSearchProvider() types.WebSearchProvider {
-	if m.GetWebSearchProviderFunc != nil {
-		return m.GetWebSearchProviderFunc()
-	}
-	return ""
-}
-
-func (m *MockSettingsService) GetTavilySettings() *types.TavilySettings {
-	if m.GetTavilySettingsFunc != nil {
-		return m.GetTavilySettingsFunc()
-	}
-	return &types.TavilySettings{}
-}
-
-func (m *MockSettingsService) GetDangerousTools() []string {
-	if m.GetDangerousToolsFunc != nil {
-		return m.GetDangerousToolsFunc()
-	}
-	return []string{} // Default to empty slice
-}
-
-// Dummy implementations for other methods of services.SettingsService to satisfy the interface if needed
-func (m *MockSettingsService) Get(key string) (interface{}, bool) { return nil, false }
-func (m *MockSettingsService) GetTelemetrySettings() *types.TelemetrySettings { return nil }
-func (m *MockSettingsService) Set(key string, value interface{}) error { return nil }
-func (m *MockSettingsService) AllSettings() map[string]interface{} { return nil }
-func (m *MockSettingsService) Reset() error { return nil }
-func (m *MockSettingsService) Save() error { return nil }
-
 func TestNewWebSearchTool(t *testing.T) {
-	mockSettingsService := &MockSettingsService{} // Use the concrete mock
-	tool := NewWebSearchTool(mockSettingsService, nil, nil) // Pass nil for http.Client and factory
+	mockSettingsService := &services.MockSettingsService{}
+	tool := NewWebSearchTool(mockSettingsService, nil, nil)
 
 	assert.NotNil(t, tool)
 	assert.Equal(t, "web_search", tool.Name())
 	assert.Equal(t, "Performs a web search using Google Search (via the Gemini API) and returns the results.", tool.Description())
 	assert.NotNil(t, tool.settingsService)
-	assert.NotNil(t, tool.httpClient) // Should be http.DefaultClient
-	assert.NotNil(t, tool.googleCustomSearchServiceFactory) // Should be default factory
+	assert.NotNil(t, tool.httpClient)
+	assert.NotNil(t, tool.googleCustomSearchServiceFactory)
 }
 
 func TestWebSearchTool_searchWithGoogle(t *testing.T) {
@@ -105,7 +61,7 @@ func TestWebSearchTool_searchWithGoogle(t *testing.T) {
 			svc, _ := customsearch.NewService(ctx, option.WithHTTPClient(mockClient), option.WithAPIKey(key))
 			return svc, nil
 		}
-		tool := NewWebSearchTool(&MockSettingsService{}, nil, mockGoogleServiceFactory)
+		tool := NewWebSearchTool(&services.MockSettingsService{}, nil, mockGoogleServiceFactory)
 		result, err := tool.searchWithGoogle(ctx, query, apiKey, cxId)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "Web search results for \"test query\" (Google Custom Search):")
@@ -128,14 +84,14 @@ func TestWebSearchTool_searchWithGoogle(t *testing.T) {
 			svc, _ := customsearch.NewService(ctx, option.WithHTTPClient(mockClient), option.WithAPIKey(key))
 			return svc, nil
 		}
-		tool := NewWebSearchTool(&MockSettingsService{}, nil, mockGoogleServiceFactory)
+		tool := NewWebSearchTool(&services.MockSettingsService{}, nil, mockGoogleServiceFactory)
 		result, err := tool.searchWithGoogle(ctx, query, apiKey, cxId)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "No search results found for query: \"test query\" (Google Custom Search)")
 	})
 
 	t.Run("Missing API key", func(t *testing.T) {
-		tool := NewWebSearchTool(&MockSettingsService{}, nil, nil) // Factory won't be called
+		tool := NewWebSearchTool(&services.MockSettingsService{}, nil, nil)
 		result, err := tool.searchWithGoogle(ctx, query, "", cxId)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "API key or CX ID is not set")
@@ -156,7 +112,7 @@ func TestWebSearchTool_searchWithGoogle(t *testing.T) {
 			svc, _ := customsearch.NewService(ctx, option.WithHTTPClient(mockClient), option.WithAPIKey(key))
 			return svc, nil
 		}
-		tool := NewWebSearchTool(&MockSettingsService{}, nil, mockGoogleServiceFactory)
+		tool := NewWebSearchTool(&services.MockSettingsService{}, nil, mockGoogleServiceFactory)
 		result, err := tool.searchWithGoogle(ctx, query, apiKey, cxId)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Failed to perform custom search")
@@ -193,12 +149,11 @@ func TestWebSearchTool_searchWithTavily(t *testing.T) {
 		defer server.Close()
 
 		mockHttpClient := &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-			// Redirect to our test server
 			req.URL.Host = strings.TrimPrefix(server.URL, "http://")
 			req.URL.Scheme = "http"
 			return server.Client().Transport.RoundTrip(req)
 		})}
-		tool := NewWebSearchTool(&MockSettingsService{}, mockHttpClient, nil)
+		tool := NewWebSearchTool(&services.MockSettingsService{}, mockHttpClient, nil)
 		result, err := tool.searchWithTavily(ctx, query, apiKey)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "Web search results for \"test query\" (Tavily):")
@@ -221,14 +176,14 @@ func TestWebSearchTool_searchWithTavily(t *testing.T) {
 			req.URL.Scheme = "http"
 			return server.Client().Transport.RoundTrip(req)
 		})}
-		tool := NewWebSearchTool(&MockSettingsService{}, mockHttpClient, nil)
+		tool := NewWebSearchTool(&services.MockSettingsService{}, mockHttpClient, nil)
 		result, err := tool.searchWithTavily(ctx, query, apiKey)
 		assert.NoError(t, err)
 		assert.Contains(t, result, "No search results found for query: \"test query\" (Tavily)")
 	})
 
 	t.Run("Missing API key", func(t *testing.T) {
-		tool := NewWebSearchTool(&MockSettingsService{}, nil, nil) // HTTP client won't be used
+		tool := NewWebSearchTool(&services.MockSettingsService{}, nil, nil)
 		result, err := tool.searchWithTavily(ctx, query, "")
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Tavily API key is not set")
@@ -247,7 +202,7 @@ func TestWebSearchTool_searchWithTavily(t *testing.T) {
 			req.URL.Scheme = "http"
 			return server.Client().Transport.RoundTrip(req)
 		})}
-		tool := NewWebSearchTool(&MockSettingsService{}, mockHttpClient, nil)
+		tool := NewWebSearchTool(&services.MockSettingsService{}, mockHttpClient, nil)
 		result, err := tool.searchWithTavily(ctx, query, apiKey)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "Tavily API returned non-200 status")
@@ -260,15 +215,12 @@ func TestWebSearchTool_Execute(t *testing.T) {
 	query := "test query"
 
 	t.Run("Google Custom Search Provider - Success", func(t *testing.T) {
-		mockSettingsService := &MockSettingsService{
-			GetWebSearchProviderFunc: func() types.WebSearchProvider { return types.WebSearchProviderGoogleCustomSearch },
-			GetGoogleCustomSearchSettingsFunc: func() *types.GoogleCustomSearchSettings {
-				return &types.GoogleCustomSearchSettings{
-					ApiKey: "test-google-api-key",
-					CxId:   "test-google-cx-id",
-				}
-			},
-		}
+		mockSettingsService := &services.MockSettingsService{}
+		mockSettingsService.On("GetWebSearchProvider").Return(types.WebSearchProviderGoogleCustomSearch)
+		mockSettingsService.On("GetGoogleCustomSearchSettings").Return(&types.GoogleCustomSearchSettings{
+			ApiKey: "test-google-api-key",
+			CxId:   "test-google-cx-id",
+		})
 
 		mockGoogleServiceFactory := func(ctx context.Context, key string) (*customsearch.Service, error) {
 			mockClient := &http.Client{
@@ -299,17 +251,15 @@ func TestWebSearchTool_Execute(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, result.LLMContent, "Google Result 1")
 		assert.Contains(t, result.ReturnDisplay, "Google Result 1")
+		mockSettingsService.AssertExpectations(t)
 	})
 
 	t.Run("Tavily Provider - Success", func(t *testing.T) {
-		mockSettingsService := &MockSettingsService{
-			GetWebSearchProviderFunc: func() types.WebSearchProvider { return types.WebSearchProviderTavily },
-			GetTavilySettingsFunc: func() *types.TavilySettings {
-				return &types.TavilySettings{
-					ApiKey: "test-tavily-api-key",
-				}
-			},
-		}
+		mockSettingsService := &services.MockSettingsService{}
+		mockSettingsService.On("GetWebSearchProvider").Return(types.WebSearchProviderTavily)
+		mockSettingsService.On("GetTavilySettings").Return(&types.TavilySettings{
+			ApiKey: "test-tavily-api-key",
+		})
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -328,7 +278,6 @@ func TestWebSearchTool_Execute(t *testing.T) {
 
 		mockHttpClient := &http.Client{
 			Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
-				// Redirect to our test server
 				req.URL.Host = strings.TrimPrefix(server.URL, "http://")
 				req.URL.Scheme = "http"
 				return server.Client().Transport.RoundTrip(req)
@@ -341,22 +290,23 @@ func TestWebSearchTool_Execute(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, result.LLMContent, "Tavily Result 1")
 		assert.Contains(t, result.ReturnDisplay, "Tavily Result 1")
+		mockSettingsService.AssertExpectations(t)
 	})
 
 	t.Run("Unsupported Provider", func(t *testing.T) {
-		mockSettingsService := &MockSettingsService{
-			GetWebSearchProviderFunc: func() types.WebSearchProvider { return types.WebSearchProvider("unsupported") },
-		}
+		mockSettingsService := &services.MockSettingsService{}
+		mockSettingsService.On("GetWebSearchProvider").Return(types.WebSearchProvider("unsupported"))
 
 		tool := NewWebSearchTool(mockSettingsService, nil, nil)
 		_, err := tool.Execute(ctx, map[string]any{"query": query})
 
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "unsupported web search provider: unsupported")
+		mockSettingsService.AssertExpectations(t)
 	})
 
 	t.Run("Missing Query", func(t *testing.T) {
-		mockSettingsService := &MockSettingsService{} // Not called for this test
+		mockSettingsService := &services.MockSettingsService{}
 
 		tool := NewWebSearchTool(mockSettingsService, nil, nil)
 		_, err := tool.Execute(ctx, map[string]any{"query": ""})
