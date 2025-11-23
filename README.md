@@ -18,6 +18,7 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
 
 - **Multi-Executor Support**: A flexible, factory-based architecture allows the application to be independent of any single AI provider.
     - **Interface-Driven**: Core logic is built against a common `Executor` interface.
+    - **Unified Tool Handling**: Executors (Gemini, Qwen, Mock) now stream raw model responses, including `FunctionCall`s, back to the `ChatService`. The `ChatService` then orchestrates the actual tool execution, user confirmations, and conversation history management.
     - **Pluggable Backends**: Concrete implementations for Google Gemini (`gemini.go`) and Qwen-compatible endpoints (`qwen.go`) can be selected at runtime.
 
 - **Extensible Tool System**: A robust, declarative system for adding new capabilities to the agent.
@@ -25,9 +26,9 @@ Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built w
     - **Centrally Registered**: All tools are instantiated and registered in a central `ToolRegistry`, which is then provided to the active executor.
 
 - **Special Tool: User Confirmation**: A unique tool, `user_confirm`, is available to the agent for seeking explicit user approval before proceeding with an action.
-    - **Intercepted by ChatService**: Unlike other tools, `user_confirm` is not executed directly. Instead, the `ChatService` intercepts the tool call and triggers a `ToolConfirmationRequestEvent`.
-    - **UI Interaction**: The `ChatUI` listens for this event and displays a confirmation prompt to the user.
-    - **User Response**: The user's response (e.g., 'y' for yes, 'n' for no) is then sent back to the `ChatService`, which determines whether to proceed with the action or cancel it.
+    - **Centralized Orchestration**: The `ChatService` centrally orchestrates all user confirmation flows. When a `user_confirm` (or any other dangerous tool) is called, the `ChatService` intercepts it and triggers a `ToolConfirmationRequestEvent`.
+    - **UI Interaction**: The `ChatUI` listens for this event and displays a rich, interactive confirmation prompt to the user.
+    - **User Response**: The user's response (e.g., 'y' for allow once, 'a' for allow always, 'n' for cancel) is sent back to the `ChatService`, which then determines whether to proceed with the action, store a preference, or cancel the execution.
 
 - **Hierarchical Sub-Agent Framework**: A powerful system for delegating complex tasks to specialized, autonomous agents that run non-interactively.
     - **Agent Blueprints**: The `AgentDefinition` struct allows for creating detailed blueprints for sub-agents, specifying their purpose, allowed tools, and system prompts.

@@ -113,6 +113,7 @@ type QwenChat struct {
 	modelName    string
 	startHistory []*types.Content
 	toolRegistry types.ToolRegistryInterface
+	ToolConfirmationChan chan types.ToolConfirmationOutcome
 }
 
 // NewQwenChat creates a new QwenChat instance.
@@ -148,6 +149,7 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 		modelName:    modelName,
 		startHistory: startHistory,
 		toolRegistry: qwenChatToolRegistry,
+		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
 	}, nil
 }
 
@@ -158,22 +160,19 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 	go func() {
 		defer close(eventChan)
 
-		eventChan <- types.StreamingStartedEvent{}
-		eventChan <- types.ThinkingEvent{}
-
-		historyMessages, err := toOpenAIMessages(qc.startHistory)
+		historyMessages, err := toOpenAIMessages(contents[:len(contents)-1])
 		if err != nil {
 			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert history: %w", err)}
 			return
 		}
 		
-		requestMessages, err := toOpenAIMessages(contents)
+		lastMessage, err := toOpenAIMessages(contents[len(contents)-1:])
 		if err != nil {
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert request contents: %w", err)}
+			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert last message: %w", err)}
 			return
 		}
 
-		messages := append(historyMessages, requestMessages...)
+		messages := append(historyMessages, lastMessage...)
 
 		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
@@ -207,8 +206,6 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 		}
 		defer stream.Close()
 
-		var accumulatedText string
-		var toolCalls []openai.ToolCall
 		for {
 			response, err := stream.Recv()
 			if errors.Is(err, io.EOF) {
@@ -221,90 +218,28 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 
 			if len(response.Choices) > 0 {
 				delta := response.Choices[0].Delta
-				accumulatedText += delta.Content
+				if delta.Content != "" {
+					eventChan <- types.Part{Text: delta.Content}
+				}
 				if delta.ToolCalls != nil {
-					toolCalls = append(toolCalls, delta.ToolCalls...)
+					for _, tc := range delta.ToolCalls {
+						var args map[string]any
+						// Unmarshal only if Arguments is not empty
+						if tc.Function.Arguments != "" {
+							if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+								eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to unmarshal tool arguments: %w", err)}
+								return
+							}
+						}
+						eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+							ID:   tc.ID,
+							Name: tc.Function.Name,
+							Args: args,
+						}}
+					}
 				}
 			}
 		}
-
-		if len(toolCalls) > 0 {
-			// Execute tool calls
-			var toolResponses []openai.ChatCompletionMessage
-			for _, tc := range toolCalls {
-				var args map[string]any
-				if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
-					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to unmarshal tool arguments: %w", err)}
-					return
-				}
-
-				toolCallID := "mock-id-for-qwen" // Generate a mock ID
-				eventChan <- types.ToolCallStartEvent{
-					ToolCallID: toolCallID,
-					ToolName:   tc.Function.Name,
-					Args:       args,
-				}
-
-				toolResult, err := qc.ExecuteTool(ctx, &types.FunctionCall{Name: tc.Function.Name, Args: args})
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: fmt.Errorf("error executing tool %s: %w", tc.Function.Name, err)}
-					return
-				}
-
-				eventChan <- types.ToolCallEndEvent{
-					ToolCallID: toolCallID,
-					ToolName:   tc.Function.Name,
-					Result:     toolResult.ReturnDisplay,
-					Err:        err,
-				}
-
-				responseBytes, err := json.Marshal(map[string]interface{}{"result": toolResult.LLMContent})
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to marshal tool result: %w", err)}
-					return
-				}
-
-				toolResponses = append(toolResponses, openai.ChatCompletionMessage{
-					Role:       openai.ChatMessageRoleTool,
-					Content:    string(responseBytes),
-					ToolCallID: tc.ID,
-				})
-			}
-
-			// Send tool responses back to the model
-			messages = append(messages, toolResponses...)
-			req = openai.ChatCompletionRequest{
-				Model:    qc.modelName,
-				Messages: messages,
-				Stream:   true,
-			}
-
-			stream, err = qc.client.CreateChatCompletionStream(ctx, req)
-			if err != nil {
-				eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create Qwen stream after tool call: %w", err)}
-				return
-			}
-			defer stream.Close()
-
-			accumulatedText = ""
-			for {
-				response, err := stream.Recv()
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				if err != nil {
-					eventChan <- types.ErrorEvent{Err: fmt.Errorf("error receiving Qwen stream after tool call: %w", err)}
-					return
-				}
-
-				if len(response.Choices) > 0 {
-					delta := response.Choices[0].Delta
-					accumulatedText += delta.Content
-				}
-			}
-		}
-
-		eventChan <- types.FinalResponseEvent{Content: accumulatedText}
 	}()
 
 	return eventChan, nil
@@ -431,6 +366,5 @@ func (qc *QwenChat) SetUserConfirmationChannel(ch chan bool) {
 
 // SetToolConfirmationChannel sets the channel for tool confirmation.
 func (qc *QwenChat) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
-	// Qwen chat does not directly handle tool confirmations, so this is a no-op
-	// For now, it's a placeholder to satisfy the Executor interface.
+	qc.ToolConfirmationChan = ch
 }

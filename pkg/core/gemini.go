@@ -28,6 +28,7 @@ type GoaiagentChat struct {
 	toolRegistry          types.ToolRegistryInterface
 	toolCallCounter       int
 	userConfirmationChan  chan bool
+	ToolConfirmationChan  chan types.ToolConfirmationOutcome // New channel for rich confirmation
 }
 
 // NewGoaiagentChat creates a new GoaiagentChat instance.
@@ -74,6 +75,7 @@ func NewGoaiagentChat(cfg types.Config, generationConfig types.GenerateContentCo
 		toolRegistry:          geminiChatToolRegistry,
 		toolCallCounter:       0,
 		userConfirmationChan:  make(chan bool, 1),
+		ToolConfirmationChan:  make(chan types.ToolConfirmationOutcome, 1), // Initialize
 	}, nil
 }
 
@@ -429,9 +431,7 @@ func (gc *GoaiagentChat) SetUserConfirmationChannel(ch chan bool) {
 
 // SetToolConfirmationChannel sets the channel for tool confirmation.
 func (gc *GoaiagentChat) SetToolConfirmationChannel(ch chan types.ToolConfirmationOutcome) {
-	// Gemini chat does not directly handle tool confirmations, so this is a no-op
-	// Or, if there's a specific way Gemini would interact with tool confirmations, implement it here.
-	// For now, it's a placeholder to satisfy the Executor interface.
+	gc.ToolConfirmationChan = ch
 }
 
 func toGenaiParts(parts []types.Part) []genai.Part {
