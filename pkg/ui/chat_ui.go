@@ -35,14 +35,14 @@ type ChatModel struct {
 	gitService       services.GitService
 	workspaceService *services.WorkspaceService
 	// UI state
-	streamCh                 <-chan interface{}
-	isStreaming              bool
-	cancelCtx                context.Context
-	cancelFunc               context.CancelFunc
-	status                   string
-	err                      error
-	commandExecutor          func(args []string) (string, error)
-	activeToolCalls          map[string]*ToolCallStatus
+	streamCh        <-chan interface{}
+	isStreaming     bool
+	cancelCtx       context.Context
+	cancelFunc      context.CancelFunc
+	status          string
+	err             error
+	commandExecutor func(args []string) (string, error)
+	activeToolCalls map[string]*ToolCallStatus
 	// Styles
 	senderStyle              lipgloss.Style
 	botStyle                 lipgloss.Style
@@ -56,7 +56,6 @@ type ChatModel struct {
 	modelStyle               lipgloss.Style
 	logFile                  *os.File
 	logWriter                *bufio.Writer
-	awaitingConfirmation     bool
 	toolConfirmationRequest  *types.ToolConfirmationRequestEvent
 	awaitingToolConfirmation bool
 	commandHistory           []string
@@ -67,7 +66,7 @@ type ChatModel struct {
 	toolErrorCount int
 	contextFile    string
 	sessionID      string
-	todosSummary   string
+	todosSummary    string
 }
 
 func NewChatModel(
@@ -127,41 +126,44 @@ func NewChatModel(
 	}
 	logWriter := bufio.NewWriter(logFile)
 	model := &ChatModel{
-		viewport:         vp,
-		textarea:         ta,
-		spinner:          s,
-		messages:         createInitialMessages(),
-		chatService:      chatService,
-		sessionService:   sessionService,
-		executorType:     executorType,
-		config:           config,
-		shellService:     shellService,
-		gitService:       gitService,
-		workspaceService: workspaceService,
-		isStreaming:      false,
-		status:           "Ready",
-		commandExecutor:  commandExecutor,
-		activeToolCalls:  make(map[string]*ToolCallStatus),
-		senderStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
-		botStyle:         lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
-		toolStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
-		errorStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
-		statusStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		footerStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
-		suggestionStyle:  lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
-		pathStyle:        lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
-		branchStyle:      lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
-		modelStyle:       lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
-		logFile:          logFile,
-		logWriter:        logWriter,
-		commandHistory:   []string{},
-		historyIndex:     0,
-		startTime:        time.Now(),
-		toolCallCount:    0,
-		toolErrorCount:   0,
-		contextFile:      "", // Initializing as empty string
-		sessionID:        sessionID,
-		todosSummary:     "", // Initialize as empty
+		viewport:                 vp,
+		textarea:                 ta,
+		spinner:                  s,
+		messages:                 createInitialMessages(),
+		chatService:              chatService,
+		sessionService:           sessionService,
+		executorType:             executorType,
+		config:                   config,
+		shellService:             shellService,
+		gitService:               gitService,
+		workspaceService:         workspaceService,
+		isStreaming:              false,
+		status:                   "Ready",
+		commandExecutor:          commandExecutor,
+		activeToolCalls:          make(map[string]*ToolCallStatus),
+		senderStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+		botStyle:                 lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+		toolStyle:                lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
+		errorStyle:               lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+		statusStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		footerStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+		suggestionStyle:          lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+		pathStyle:                lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
+		branchStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+		modelStyle:               lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
+		logFile:                  logFile,
+		logWriter:                logWriter,
+		toolConfirmationRequest:  nil,
+		awaitingToolConfirmation: false,
+		commandHistory:           []string{},
+		historyIndex:             0,
+		// Session stats
+		startTime:      time.Now(),
+		toolCallCount:  0,
+		toolErrorCount: 0,
+		contextFile:    "", // Initializing as empty string
+		sessionID:      sessionID,
+		todosSummary:   "", // Initialize as empty
 	}
 	if _, err := os.Stat("GOAIAGENT.md"); err == nil {
 		model.contextFile = "GOAIAGENT.md"
@@ -223,24 +225,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	}
-	// Handle simple user_confirm prompt
-	if keyMsg, ok := msg.(tea.KeyMsg); ok && m.awaitingConfirmation {
-		switch keyMsg.String() {
-		case "c", "C":
-			m.awaitingConfirmation = false
-			m.status = "User confirmed. Resuming..."
-			m.chatService.GetUserConfirmationChannel() <- true
-			return m, waitForEvent(m.streamCh)
-		case "x", "X":
-			m.awaitingConfirmation = false
-			m.status = "User cancelled. Resuming..."
-			m.chatService.GetUserConfirmationChannel() <- false
-			return m, waitForEvent(m.streamCh)
-		default:
-			// For any other key, just ignore it and don't pass it to the text area.
-			return m, nil
-		}
-	}
 	m.textarea, cmd = m.textarea.Update(msg)
 	cmds = append(cmds, cmd)
 	m.viewport, cmd = m.viewport.Update(msg)
@@ -251,7 +235,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, spinnerCmd = m.spinner.Update(msg)
 		return m, spinnerCmd
 	case tickMsg:
-		// This is just to trigger a re-render for the timer.
+		// This is just to trigger a re-render for the timer
 		return m, tea.Tick(time.Second, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		})
@@ -354,21 +338,6 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.messages = append(m.messages, group)
 			}
 			group.ToolCalls[event.ToolCallID] = tcStatus
-		case types.UserConfirmationRequestEvent:
-			// Add a message to the UI indicating confirmation is needed
-			suggestionMsg := SuggestionMessage{Content: fmt.Sprintf("Confirmation required for tool '%s': %s (c: continue, x: cancel)", types.USER_CONFIRM_TOOL_NAME, event.Message)}
-			m.messages = append(m.messages, suggestionMsg)
-			m.logUIMessage(suggestionMsg)
-			m.awaitingConfirmation = true
-			m.status = "Awaiting user confirmation..."
-			// Add a dummy tool call status for user_confirm to activeToolCalls
-			m.activeToolCalls[event.ToolCallID] = &ToolCallStatus{
-				ToolName: types.USER_CONFIRM_TOOL_NAME,
-				Args:     map[string]interface{}{"message": event.Message},
-				Status:   "Executing", // Mark as executing to be found by confirmation logic
-			}
-			m.updateViewport()
-			return m, nil // Stop waiting for stream events, but allow other ticks to continue
 		case types.ToolConfirmationRequestEvent: // NEW: Rich tool confirmation
 			telemetry.LogDebugf("Received stream event: ToolConfirmationRequestEvent (ID: %s, Name: %s)", event.ToolCallID, event.ToolName)
 			m.toolConfirmationRequest = &event
@@ -487,7 +456,7 @@ func (m *ChatModel) View() string {
 
 func (m *ChatModel) renderFooter() string {
 	// While streaming or awaiting confirmation, show the spinner and status.
-	if m.isStreaming || m.awaitingConfirmation || m.awaitingToolConfirmation {
+	if m.isStreaming || m.awaitingToolConfirmation {
 		statusLine := lipgloss.NewStyle().Foreground(lipgloss.Color("12")).Render(m.status) // Always blue in active state
 		var finalRender string
 		if m.awaitingToolConfirmation && m.toolConfirmationRequest != nil {
@@ -502,9 +471,6 @@ func (m *ChatModel) renderFooter() string {
 			} else {
 				finalRender = lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(m.toolConfirmationRequest.Message) + " " + lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(options)
 			}
-		} else if m.awaitingConfirmation {
-			confirmationOptions := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(" (c: continue, x: cancel)")
-			finalRender = statusLine + confirmationOptions
 		} else {
 			instruction := lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" (Press ESC to stop)")
 			finalRender = statusLine + instruction
@@ -571,7 +537,9 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	// Remove the leading slash for Cobra
 	commandString := strings.TrimPrefix(input, "/")
 	args := strings.Fields(commandString)
-	// --- UI-only commands ---
+	// ---
+	// UI-only commands
+	// ---
 	if len(args) > 0 {
 		switch args[0] {
 		case "clear":
@@ -640,7 +608,9 @@ Available Commands:
 			}
 		}
 	}
-	// --- Safety Check ---
+	// ---
+	// Safety Check
+	// ---
 	if len(args) > 0 {
 		switch args[0] {
 		case "chat", "exec", "generate":
@@ -653,7 +623,9 @@ Available Commands:
 			return m, nil
 		}
 	}
-	// --- End Safety Check ---
+	// ---
+	// End Safety Check
+	// ---
 	telemetry.LogDebugf("Executing command asynchronously: %s with args: %v", commandString, args)
 	m.status = fmt.Sprintf("Executing `/%s`...", commandString)
 	m.isStreaming = true
@@ -716,7 +688,9 @@ func (m *ChatModel) repopulateMessagesFromHistory(history []*types.Content) []Me
 	return newMessages
 }
 
-// --- Commands ---
+// ---
+// Commands
+// ---
 func (m *ChatModel) logUIMessage(msg Message) {
 	if m.logWriter == nil {
 		return

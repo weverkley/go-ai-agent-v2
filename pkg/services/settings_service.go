@@ -18,24 +18,24 @@ const (
 
 // Settings represents the application settings.
 type Settings struct {
-	ExtensionPaths []string                       `json:"extensionPaths"`
-	McpServers     map[string]types.MCPServerConfig `json:"mcpServers,omitempty"`
-	DebugMode      bool                           `json:"debugMode,omitempty"`
-	UserMemory     string                         `json:"userMemory,omitempty"`
-	ApprovalMode   types.ApprovalMode             `json:"approvalMode,omitempty"`
-	DangerousTools []string                       `json:"dangerousTools,omitempty"` // New field
-	ShowMemoryUsage bool                          `json:"showMemoryUsage,omitempty"`
-	TelemetryEnabled bool                          `json:"telemetryEnabled,omitempty"`
-	Model          string                         `json:"model,omitempty"`
-	Executor       string                         `json:"executor,omitempty"`
-	Proxy          string                         `json:"proxy,omitempty"`
-	EnabledExtensions map[types.SettingScope][]string `json:"enabledExtensions,omitempty"`
-	ToolDiscoveryCommand string `json:"toolDiscoveryCommand,omitempty"`
-	ToolCallCommand      string `json:"toolCallCommand,omitempty"`
-	Telemetry      *types.TelemetrySettings       `json:"telemetry,omitempty"`
-	GoogleCustomSearch *types.GoogleCustomSearchSettings `json:"googleCustomSearch,omitempty"`
-	WebSearchProvider  types.WebSearchProvider    `json:"webSearchProvider,omitempty"`
-	Tavily             *types.TavilySettings      `json:"tavily,omitempty"`
+	ExtensionPaths       []string                          `json:"extensionPaths"`
+	McpServers           map[string]types.MCPServerConfig  `json:"mcpServers,omitempty"`
+	DebugMode            bool                              `json:"debugMode,omitempty"`
+	UserMemory           string                            `json:"userMemory,omitempty"`
+	ApprovalMode         types.ApprovalMode                `json:"approvalMode,omitempty"`
+	DangerousTools       []string                          `json:"dangerousTools,omitempty"` // New field
+	ShowMemoryUsage      bool                              `json:"showMemoryUsage,omitempty"`
+	TelemetryEnabled     bool                              `json:"telemetryEnabled,omitempty"`
+	Model                string                            `json:"model,omitempty"`
+	Executor             string                            `json:"executor,omitempty"`
+	Proxy                string                            `json:"proxy,omitempty"`
+	EnabledExtensions    map[types.SettingScope][]string   `json:"enabledExtensions,omitempty"`
+	ToolDiscoveryCommand string                            `json:"toolDiscoveryCommand,omitempty"`
+	ToolCallCommand      string                            `json:"toolCallCommand,omitempty"`
+	Telemetry            *types.TelemetrySettings          `json:"telemetry,omitempty"`
+	GoogleCustomSearch   *types.GoogleCustomSearchSettings `json:"googleCustomSearch,omitempty"`
+	WebSearchProvider    types.WebSearchProvider           `json:"webSearchProvider,omitempty"`
+	Tavily               *types.TavilySettings             `json:"tavily,omitempty"`
 }
 
 // LoadSettings loads the application settings from various sources.
@@ -44,18 +44,18 @@ func LoadSettings(workspaceDir string) *Settings {
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
 		return &Settings{
-			ExtensionPaths: []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
-			McpServers:     make(map[string]types.MCPServerConfig),
-			DebugMode:      false,
-			UserMemory:     "",
-			ApprovalMode:   types.ApprovalModeDefault,
-			DangerousTools: []string{"execute_command", "write_file", "smart_edit"}, // Default dangerous tools
-			ShowMemoryUsage: false,
-			TelemetryEnabled: false,
-			Model:          "gemini-pro", // Default model
-			Executor:       "gemini",     // Default executor
-			Proxy:          "",
-			EnabledExtensions: make(map[types.SettingScope][]string),
+			ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
+			McpServers:           make(map[string]types.MCPServerConfig),
+			DebugMode:            false,
+			UserMemory:           "",
+			ApprovalMode:         types.ApprovalModeDefault,
+			DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME}, // Default dangerous tools
+			ShowMemoryUsage:      false,
+			TelemetryEnabled:     false,
+			Model:                "gemini-pro", // Default model
+			Executor:             "gemini",     // Default executor
+			Proxy:                "",
+			EnabledExtensions:    make(map[types.SettingScope][]string),
 			ToolDiscoveryCommand: "",
 			ToolCallCommand:      "",
 			Telemetry: &types.TelemetrySettings{
@@ -72,18 +72,18 @@ func LoadSettings(workspaceDir string) *Settings {
 		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
 		// Return default settings on parsing error
 		return &Settings{
-			ExtensionPaths: []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
-			McpServers:     make(map[string]types.MCPServerConfig),
-			DebugMode:      false,
-			UserMemory:     "",
-			ApprovalMode:   types.ApprovalModeDefault,
-			DangerousTools: []string{"execute_command", "write_file", "smart_edit"}, // Default dangerous tools
-			ShowMemoryUsage: false,
-			TelemetryEnabled: false,
-			Model:          "gemini-pro", // Default model
-			Executor:       "gemini",     // Default executor
-			Proxy:          "",
-			EnabledExtensions: make(map[types.SettingScope][]string),
+			ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
+			McpServers:           make(map[string]types.MCPServerConfig),
+			DebugMode:            false,
+			UserMemory:           "",
+			ApprovalMode:         types.ApprovalModeDefault,
+			DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME}, // Default dangerous tools
+			ShowMemoryUsage:      false,
+			TelemetryEnabled:     false,
+			Model:                "gemini-pro", // Default model
+			Executor:             "gemini",     // Default executor
+			Proxy:                "",
+			EnabledExtensions:    make(map[types.SettingScope][]string),
 			ToolDiscoveryCommand: "",
 			ToolCallCommand:      "",
 			Telemetry: &types.TelemetrySettings{
@@ -159,9 +159,9 @@ func SaveSettings(workspaceDir string, settings *Settings) error {
 
 // SettingsService manages application settings.
 type SettingsService struct {
-	mu        sync.RWMutex
-	settings  *Settings
-	baseDir   string // Base directory to resolve settings file
+	mu       sync.RWMutex
+	settings *Settings
+	baseDir  string // Base directory to resolve settings file
 }
 
 // NewSettingsService creates a new SettingsService instance.

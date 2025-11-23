@@ -62,6 +62,7 @@ func (t *MockUserConfirmTool) Parameters() *types.JsonSchemaObject {
 }
 func (t *MockUserConfirmTool) ServerName() string { return "mock" }
 func (t *MockUserConfirmTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
+	// This tool is intercepted by the ChatService, so this Execute method shouldn't be called in the tests.
 	return types.ToolResult{}, fmt.Errorf("user_confirm Execute should not be called directly")
 }
 
@@ -94,6 +95,7 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 
 	cleanup := func() {
 		os.RemoveAll(projectRoot)
+		mockSettingsService.AssertExpectations(t)
 	}
 
 	return chatService, mockExecutor, sessionService, toolRegistry, mockSettingsService, projectRoot, cleanup
@@ -132,7 +134,6 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 				chatService.ToolConfirmationChan <- types.ToolConfirmationOutcomeProceedOnce
 			}
 		}
-		mockSettingsService.AssertExpectations(t)
 	})
 
 	t.Run("User cancels tool execution", func(t *testing.T) {
@@ -174,13 +175,13 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 
 		assert.Error(t, endEvent.Err)
 		assert.Contains(t, endEvent.Result, "Tool execution cancelled by user")
-		mockSettingsService.AssertExpectations(t)
 	})
 }
 func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 	t.Run("User confirms user_confirm tool", func(t *testing.T) {
 		chatService, mockExecutor, _, _, mockSettingsService, _, cleanup := setupTestChatService(t)
 		defer cleanup()
+		mockSettingsService.On("GetDangerousTools").Return([]string{types.USER_CONFIRM_TOOL_NAME}).Once()
 
 		mockExecutor.StreamContentFunc = func(currentCtx context.Context, contents ...*types.Content) (<-chan any, error) {
 			eventChan := make(chan any)
@@ -202,15 +203,14 @@ func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 		assert.NoError(t, err)
 
 		for event := range eventChan {
-			if _, ok := event.(types.UserConfirmationRequestEvent); ok {
-				chatService.GetUserConfirmationChannel() <- true
+			if _, ok := event.(types.ToolConfirmationRequestEvent); ok {
+				chatService.GetToolConfirmationChannel() <- types.ToolConfirmationOutcomeProceedOnce
 			}
 		}
 		
 		history := chatService.GetHistory()
 		assert.Len(t, history, 4)
-		assert.Contains(t, history[2].Parts[0].FunctionResponse.Response["result"], "continue")
-		mockSettingsService.AssertExpectations(t)
+		assert.Equal(t, "continue", history[2].Parts[0].FunctionResponse.Response["result"].(map[string]interface{})["result"])
 	})
 }
 
@@ -273,6 +273,5 @@ func TestChatService_SendMessage_ProceedAlways(t *testing.T) {
 			}
 		}
 		assert.False(t, confirmationRequested, "Tool confirmation should NOT be requested for the second call.")
-		mockSettingsService.AssertExpectations(t)
 	})
 }

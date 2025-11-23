@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
@@ -222,67 +221,4 @@ func TestUpdate_StreamingEvents(t *testing.T) {
 	assert.False(t, chatModel.isStreaming)
 	assert.Equal(t, "Ready", chatModel.status)
 	assert.Nil(t, cmd)
-}
-
-
-func TestUpdate_UserConfirmationFlow(t *testing.T) {
-	// Setup
-	executor := &core.MockExecutor{}
-	model := newTestModel(t, executor)
-	model.isStreaming = true // We must be streaming to receive a confirmation request
-
-	// 1. Simulate the executor sending a UserConfirmationRequestEvent
-	confirmationEvent := types.UserConfirmationRequestEvent{
-		ToolCallID: "confirm-123",
-		Message:    "Do you want to proceed?",
-	}
-	newModel, cmd := model.Update(streamEventMsg{event: confirmationEvent})
-
-	// Assert: Model is now awaiting confirmation
-	chatModel, ok := newModel.(*ChatModel)
-	assert.True(t, ok)
-	assert.True(t, chatModel.awaitingConfirmation)
-	assert.Equal(t, "Awaiting user confirmation...", chatModel.status)
-	assert.Nil(t, cmd) // Should be nil now, as the stream listener is paused
-
-	// 2. Simulate user pressing 'c' to confirm
-	newModel, cmd = chatModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
-	chatModel, ok = newModel.(*ChatModel)
-	assert.True(t, ok)
-
-	// Assert: Model is no longer awaiting confirmation and is resuming
-	assert.False(t, chatModel.awaitingConfirmation)
-	assert.Equal(t, "User confirmed. Resuming...", chatModel.status)
-	assert.NotNil(t, cmd) // Should return a waitForEvent command
-
-	// Assert: The confirmation was sent to the service's channel
-	select {
-	case confirmed := <-model.chatService.GetUserConfirmationChannel():
-		assert.True(t, confirmed)
-	case <-time.After(1 * time.Second):
-		t.Fatal("timed out waiting for confirmation")
-	}
-
-	// 3. Simulate user pressing 'x' to cancel
-	model.isStreaming = true
-	model.awaitingConfirmation = false // Reset state
-	newModel, _ = model.Update(streamEventMsg{event: confirmationEvent})
-	chatModel, _ = newModel.(*ChatModel) // Enter confirmation state again
-
-	newModel, cmd = chatModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
-	chatModel, ok = newModel.(*ChatModel)
-	assert.True(t, ok)
-
-	// Assert: Model is no longer awaiting and is cancelled
-	assert.False(t, chatModel.awaitingConfirmation)
-	assert.Equal(t, "User cancelled. Resuming...", chatModel.status)
-	assert.NotNil(t, cmd)
-
-	// Assert: The cancellation was sent to the service's channel
-	select {
-	case confirmed := <-model.chatService.GetUserConfirmationChannel():
-		assert.False(t, confirmed)
-	case <-time.After(1 * time.Second):
-		t.Fatal("timed out waiting for cancellation")
-	}
 }

@@ -138,34 +138,6 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					cs.toolCallCounter++
 					toolCallID := fmt.Sprintf("tool-call-%d", cs.toolCallCounter)
 
-					// --- Special handling for user_confirm tool (uses chan bool) ---
-					if fc.Name == types.USER_CONFIRM_TOOL_NAME {
-						message := "Confirmation required."
-						if msg, ok := fc.Args["message"].(string); ok {
-							message = msg
-						}
-
-						telemetry.LogDebugf("ChatService: Emitting UserConfirmationRequestEvent for tool call %s", toolCallID)
-						eventChan <- types.UserConfirmationRequestEvent{ToolCallID: toolCallID, Message: message}
-						telemetry.LogDebugf("Received stream event: UserConfirmationRequestEvent (ID: %s, Message: %s)", toolCallID, message)
-
-						confirmed := <-cs.userConfirmationChan
-						telemetry.LogDebugf("ChatService: Received user confirmation response: %t", confirmed)
-
-						result := "cancel"
-						if confirmed {
-							result = "continue"
-						}
-
-						toolResponseParts = append(toolResponseParts, types.Part{
-							FunctionResponse: &types.FunctionResponse{
-								Name:     fc.Name,
-								Response: map[string]any{"result": result},
-							},
-						})
-						continue // Go to next tool call
-					}
-
 					// --- Generic confirmation for dangerous tools ---
 					isDangerousTool := false
 					for _, dt := range cs.settingsService.GetDangerousTools() {
@@ -185,7 +157,13 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						// Check if "Proceed Always" is active for this tool
 						if cs.proceedAlwaysTools[fc.Name] {
 							telemetry.LogDebugf("ChatService: Proceeding automatically for tool '%s' (Proceed Always).", fc.Name)
-							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
+								// If proceed always is set for user_confirm, just act as if user clicked "continue"
+								toolExecutionResult = map[string]any{"result": "continue"}
+								toolExecutionError = nil
+							} else {
+								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							}
 						} else {
 							// Build ToolConfirmationRequestEvent
 							confirmationEvent := types.ToolConfirmationRequestEvent{
@@ -197,6 +175,11 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							}
 
 							switch fc.Name {
+							case types.USER_CONFIRM_TOOL_NAME:
+								confirmationEvent.Type = "info"
+								if msg, ok := fc.Args["message"].(string); ok {
+									confirmationEvent.Message = msg
+								}
 							case types.WRITE_FILE_TOOL_NAME:
 								confirmationEvent.Type = "edit"
 								confirmationEvent.Message = "Apply this change?"
@@ -255,23 +238,35 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							telemetry.LogDebugf("ChatService: Received tool confirmation response: %s", outcome)
 
 							switch outcome {
-							case types.ToolConfirmationOutcomeProceedOnce:
-								telemetry.LogDebugf("ChatService: User confirmed '%s' (once). Executing tool.", fc.Name)
-								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							case types.ToolConfirmationOutcomeProceedOnce, types.ToolConfirmationOutcomeProceedAlways:
+								if outcome == types.ToolConfirmationOutcomeProceedAlways {
+									telemetry.LogDebugf("ChatService: User confirmed '%s' (always). Storing preference and executing.", fc.Name)
+									cs.proceedAlwaysTools[fc.Name] = true // Store the preference
+								} else {
+									telemetry.LogDebugf("ChatService: User confirmed '%s' (once). Executing.", fc.Name)
+								}
+
+								if fc.Name == types.USER_CONFIRM_TOOL_NAME {
+									toolExecutionResult = map[string]any{"result": "continue"}
+									toolExecutionError = nil
+								} else {
+									toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+								}
 							case types.ToolConfirmationOutcomeCancel:
 								telemetry.LogDebugf("ChatService: User cancelled '%s'. Aborting tool execution.", fc.Name)
-								toolExecutionResult = "Tool execution cancelled by user."
-								toolExecutionError = fmt.Errorf("tool execution cancelled by user")
+								if fc.Name == types.USER_CONFIRM_TOOL_NAME {
+									toolExecutionResult = map[string]any{"result": "cancel"}
+									toolExecutionError = nil
+								} else {
+									toolExecutionResult = "Tool execution cancelled by user."
+									toolExecutionError = fmt.Errorf("tool execution cancelled by user")
+								}
 								cs.toolErrorCounter++
 							case types.ToolConfirmationOutcomeModifyWithEditor:
 								telemetry.LogDebugf("ChatService: User chose to modify '%s' with editor. Aborting tool execution.", fc.Name)
 								toolExecutionResult = "Tool modification chosen by user. Please apply changes manually."
 								toolExecutionError = fmt.Errorf("tool modification with editor chosen by user")
 								cs.toolErrorCounter++
-							case types.ToolConfirmationOutcomeProceedAlways:
-								telemetry.LogDebugf("ChatService: User confirmed '%s' (always). Storing preference and executing tool.", fc.Name)
-								cs.proceedAlwaysTools[fc.Name] = true // Store the preference
-								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
 							default:
 								telemetry.LogErrorf("ChatService: Unknown confirmation outcome '%s' for tool '%s'. Aborting.", outcome, fc.Name)
 								toolExecutionResult = "Tool execution aborted due to unknown confirmation outcome."
