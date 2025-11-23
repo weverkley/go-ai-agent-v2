@@ -87,7 +87,10 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 	}
 
 	go func() {
-		defer close(eventChan)
+		defer func() {
+			telemetry.LogDebugf("ChatService: Closing eventChan.")
+			close(eventChan)
+		}()
 
 		eventChan <- types.StreamingStartedEvent{}
 		telemetry.LogDebugf("Received stream event: StreamingStartedEvent")
@@ -136,6 +139,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			}
 
 		EndStreamProcessing: // Label for goto
+			telemetry.LogDebugf("ChatService: Entered EndStreamProcessing block.")
 
 			if streamErr != nil { // This block now handles errors from StreamContent or from the stream channel
 				currentExecutorName := cs.executor.Name()
@@ -148,8 +152,24 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						currentExecutorTypeVal, _ := cs.settingsService.Get("executor")
 						currentExecutorType, ok := currentExecutorTypeVal.(string)
 						if !ok {
-							currentExecutorType = "gemini"
+							currentExecutorType = "gemini" // Default to gemini if not found
 						}
+
+						// Extract base executor type from the full model name
+						baseExecutorType := currentExecutorType
+						if strings.HasPrefix(currentExecutorType, "gemini") {
+							baseExecutorType = "gemini"
+						} else if strings.HasPrefix(currentExecutorType, "qwen") {
+							baseExecutorType = "qwen"
+						}
+
+						currentModelVal, _ := cs.settingsService.Get("model") // Get the currently configured model
+						currentModelStr, ok := currentModelVal.(string)
+						if !ok {
+							currentModelStr = "unknown" // Default if not found or not a string
+						}
+						telemetry.LogDebugf("ChatService: currentModel for routing decision: %s", currentModelStr)
+
 
 						router := routing.NewModelRouterService(cs.appConfig)
 						routingCtx := &routing.RoutingContext{
@@ -157,7 +177,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							Request:      userInput,
 							Signal:       ctx,
 							IsFallback:   true,
-							ExecutorType: currentExecutorType,
+							ExecutorType: baseExecutorType, // Use the derived base type
 						}
 
 						decision, routeErr := router.Route(routingCtx, cs.appConfig)

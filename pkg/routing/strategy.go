@@ -2,8 +2,9 @@ package routing
 
 import (
 	"context"
-	"fmt" // Added
-	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
+	"fmt"
+	"go-ai-agent-v2/go-cli/pkg/telemetry" // Re-add telemetry import
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"strings"
 )
 
@@ -95,6 +96,7 @@ func (s *FallbackStrategy) Name() string {
 }
 
 func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
+	telemetry.LogDebugf("FallbackStrategy.Route called")
 	if !ctx.IsFallback {
 		return nil, nil // Not a fallback scenario, pass to the next strategy.
 	}
@@ -109,11 +111,13 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 	}
 
 	suggester, ok := modelSuggesters[ctx.ExecutorType]
+	telemetry.LogDebugf("FallbackStrategy: ctx.ExecutorType=%s, suggester found=%t", ctx.ExecutorType, ok)
 	if !ok {
 		return nil, nil // No suggester for this executor type.
 	}
 
 	suggestedModel, ok := suggester(currentModel)
+	telemetry.LogDebugf("FallbackStrategy: currentModel=%s, suggestedModel=%s, suggestion made=%t", currentModel, suggestedModel, ok)
 	if !ok {
 		return nil, nil // No suggestion available.
 	}
@@ -129,15 +133,22 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 
 var modelSuggesters = map[string]func(string) (string, bool){
 	"gemini": func(currentModel string) (string, bool) {
+		telemetry.LogDebugf("Gemini Suggester: currentModel=%s", currentModel)
 		parts := strings.Split(currentModel, "/")
 		modelName := parts[len(parts)-1]
+		telemetry.LogDebugf("Gemini Suggester: modelName=%s", modelName)
+
+		isPro := strings.Contains(modelName, "pro")
+		isFlash := strings.Contains(modelName, "flash")
+		telemetry.LogDebugf("Gemini Suggester: isPro=%t, isFlash=%t", isPro, isFlash)
 
 		switch {
-		case strings.Contains(modelName, "pro"):
+		case isPro:
 			return "gemini-1.5-flash", true
-		case strings.Contains(modelName, "flash"):
+		case isFlash:
 			return "gemini-1.5-flash-latest", true
 		default:
+			telemetry.LogDebugf("Gemini Suggester: No suggestion found for modelName=%s", modelName)
 			return "", false
 		}
 	},
