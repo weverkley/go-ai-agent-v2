@@ -155,8 +155,12 @@ func TestWriteTodosTool_Execute(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, tt.expectedLLMContent, result.LLMContent)
 				assert.Equal(t, tt.expectedReturnDisplay, result.ReturnDisplay)
+				// Assert the new structured LLMContent
+				llmContentMap, ok := result.LLMContent.(map[string]interface{})
+				assert.True(t, ok, "LLMContent should be a map")
+				assert.Equal(t, true, llmContentMap["success"])
+				assert.Contains(t, llmContentMap["message"], "Successfully")
 			}
 		})
 	}

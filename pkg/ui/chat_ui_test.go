@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
@@ -221,4 +222,95 @@ func TestUpdate_StreamingEvents(t *testing.T) {
 	assert.False(t, chatModel.isStreaming)
 	assert.Equal(t, "Ready", chatModel.status)
 	assert.Nil(t, cmd)
+}
+
+func TestUpdate_ToolConfirmationFlow(t *testing.T) {
+	// Helper function to run a sub-test for each confirmation outcome
+	testConfirmation := func(t *testing.T, key rune, expectedOutcome types.ToolConfirmationOutcome) {
+		// Setup
+		executor := &core.MockExecutor{}
+		model := newTestModel(t, executor)
+		model.isStreaming = true // We must be streaming to receive a confirmation request
+		model.streamCh = make(chan any) // Ensure streamCh is not nil
+
+		// 1. Simulate the service sending a ToolConfirmationRequestEvent
+		confirmationEvent := types.ToolConfirmationRequestEvent{
+			ToolCallID: "confirm-123",
+			ToolName:   "test-tool",
+			Message:    "Do you want to proceed?",
+		}
+		newModel, cmd := model.Update(streamEventMsg{event: confirmationEvent})
+
+		// Assert: Model is now awaiting confirmation
+		chatModel, ok := newModel.(*ChatModel)
+		assert.True(t, ok)
+		assert.True(t, chatModel.awaitingToolConfirmation)
+		assert.Equal(t, "Awaiting tool confirmation...", chatModel.status)
+		assert.NotNil(t, chatModel.toolConfirmationRequest)
+		assert.Nil(t, cmd) // Should be nil now, as the stream listener is paused
+
+		// 2. Simulate user pressing the key
+		newModel, cmd = chatModel.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{key}})
+		chatModel, ok = newModel.(*ChatModel)
+		assert.True(t, ok)
+
+		// Assert: Model is no longer awaiting confirmation and is resuming
+		assert.False(t, chatModel.awaitingToolConfirmation)
+		assert.Contains(t, chatModel.status, "Resuming...")
+		assert.NotNil(t, cmd) // Should return a waitForEvent command
+
+		// Assert: The confirmation was sent to the service's channel
+		select {
+		case outcome := <-model.chatService.GetToolConfirmationChannel():
+			assert.Equal(t, expectedOutcome, outcome)
+		case <-time.After(1 * time.Second):
+			t.Fatalf("timed out waiting for confirmation outcome '%s'", expectedOutcome)
+		}
+	}
+
+	t.Run("user confirms with 'y'", func(t *testing.T) {
+		testConfirmation(t, 'y', types.ToolConfirmationOutcomeProceedOnce)
+	})
+	t.Run("user confirms with 'Y'", func(t *testing.T) {
+		testConfirmation(t, 'Y', types.ToolConfirmationOutcomeProceedOnce)
+	})
+	t.Run("user confirms always with 'a'", func(t *testing.T) {
+		testConfirmation(t, 'a', types.ToolConfirmationOutcomeProceedAlways)
+	})
+	t.Run("user confirms always with 'A'", func(t *testing.T) {
+		testConfirmation(t, 'A', types.ToolConfirmationOutcomeProceedAlways)
+	})
+	t.Run("user cancels with 'n'", func(t *testing.T) {
+		testConfirmation(t, 'n', types.ToolConfirmationOutcomeCancel)
+	})
+	t.Run("user cancels with 'N'", func(t *testing.T) {
+		testConfirmation(t, 'N', types.ToolConfirmationOutcomeCancel)
+	})
+	t.Run("user cancels with 'esc'", func(t *testing.T) {
+		// Setup for esc is slightly different as it uses KeyType
+		executor := &core.MockExecutor{}
+		model := newTestModel(t, executor)
+		model.isStreaming = true
+		model.streamCh = make(chan any)
+		confirmationEvent := types.ToolConfirmationRequestEvent{ToolCallID: "confirm-esc", ToolName: "test-tool", Message: "..."}
+		newModel, _ := model.Update(streamEventMsg{event: confirmationEvent})
+		chatModel, _ := newModel.(*ChatModel)
+		
+		newModel, _ = chatModel.Update(tea.KeyMsg{Type: tea.KeyEsc})
+		chatModel, _ = newModel.(*ChatModel)
+
+		assert.False(t, chatModel.awaitingToolConfirmation)
+		select {
+		case outcome := <-model.chatService.GetToolConfirmationChannel():
+			assert.Equal(t, types.ToolConfirmationOutcomeCancel, outcome)
+		case <-time.After(1 * time.Second):
+			t.Fatal("timed out waiting for confirmation outcome 'Cancel'")
+		}
+	})
+	t.Run("user modifies with 'm'", func(t *testing.T) {
+		testConfirmation(t, 'm', types.ToolConfirmationOutcomeModifyWithEditor)
+	})
+	t.Run("user modifies with 'M'", func(t *testing.T) {
+		testConfirmation(t, 'M', types.ToolConfirmationOutcomeModifyWithEditor)
+	})
 }

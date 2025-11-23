@@ -55,16 +55,15 @@ func TestGenerateStream(t *testing.T) {
 	eventChan, err := qwenChat.StreamContent(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
 	assert.NoError(t, err)
 
-	var events []any
+	var receivedParts []types.Part
 	for event := range eventChan {
-		events = append(events, event)
+		if part, ok := event.(types.Part); ok {
+			receivedParts = append(receivedParts, part)
+		}
 	}
 
-	assert.Len(t, events, 3)
-	assert.IsType(t, types.StreamingStartedEvent{}, events[0])
-	assert.IsType(t, types.ThinkingEvent{}, events[1])
-	assert.IsType(t, types.FinalResponseEvent{}, events[2])
-	assert.Equal(t, "Hello", events[2].(types.FinalResponseEvent).Content)
+	assert.Len(t, receivedParts, 1)
+	assert.Equal(t, "Hello", receivedParts[0].Text)
 }
 
 type TestTool struct {
@@ -76,19 +75,12 @@ func (t *TestTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 }
 
 func TestGenerateStreamWithToolCalling(t *testing.T) {
-	callCount := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
-		if callCount == 0 {
-			// First call: return tool call
-			fmt.Fprintln(w, "data: {\"id\":\"chatcmpl-123\",\"object\":\"chat.completion.chunk\",\"created\":1694268190,\"model\":\"qwen-turbo\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"call_123\",\"type\":\"function\",\"function\":{\"name\":\"test_tool\",\"arguments\":\"{\\\"arg1\\\":\\\"val1\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}")
-			fmt.Fprintln(w, "data: [DONE]")
-		} else {
-			// Second call: return final response
-			fmt.Fprintln(w, "data: {\"id\":\"chatcmpl-456\",\"object\":\"chat.completion.chunk\",\"created\":1694268191,\"model\":\"qwen-turbo\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"content\":\"Final response\"},\"finish_reason\":\"stop\"}]}")
-			fmt.Fprintln(w, "data: [DONE]")
-		}
-		callCount++
+		// The server now only needs to return the tool call delta.
+		// The ChatService is responsible for executing it and re-prompting.
+		fmt.Fprintln(w, "data: {\"id\":\"chatcmpl-123\",\"object\":\"chat.completion.chunk\",\"created\":1694268190,\"model\":\"qwen-turbo\",\"choices\":[{\"index\":0,\"delta\":{\"role\":\"assistant\",\"tool_calls\":[{\"index\":0,\"id\":\"call_123\",\"type\":\"function\",\"function\":{\"name\":\"test_tool\",\"arguments\":\"{\\\"arg1\\\":\\\"val1\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}]}")
+		fmt.Fprintln(w, "data: [DONE]")
 	}))
 	defer server.Close()
 
@@ -100,27 +92,8 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 	client := openai.NewClientWithConfig(openaiConfig)
 
 	toolRegistry := types.NewToolRegistry()
-	tool := &TestTool{
-		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"test_tool",
-			"Test Tool",
-			"A tool for testing",
-			types.KindOther,
-			&types.JsonSchemaObject{
-				Type: "object",
-				Properties: map[string]*types.JsonSchemaProperty{
-					"arg1": &types.JsonSchemaProperty{
-						Type:        "string",
-						Description: "An argument",
-					},
-				},
-			},
-			false,
-			false,
-			nil,
-		),
-	}
-	toolRegistry.Register(tool)
+	// No need to register the tool here anymore for this test,
+	// as the executor is not executing it.
 
 	qwenChat := &QwenChat{
 		client:       client,
@@ -131,16 +104,17 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 	eventChan, err := qwenChat.StreamContent(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
 	assert.NoError(t, err)
 
-	var events []any
+	var receivedParts []types.Part
 	for event := range eventChan {
-		events = append(events, event)
+		if part, ok := event.(types.Part); ok {
+			receivedParts = append(receivedParts, part)
+		}
 	}
 
-	assert.Len(t, events, 5)
-	assert.IsType(t, types.StreamingStartedEvent{}, events[0])
-	assert.IsType(t, types.ThinkingEvent{}, events[1])
-	assert.IsType(t, types.ToolCallStartEvent{}, events[2])
-	assert.IsType(t, types.ToolCallEndEvent{}, events[3])
-	assert.IsType(t, types.FinalResponseEvent{}, events[4])
-	assert.Equal(t, "Final response", events[4].(types.FinalResponseEvent).Content)
+	// We expect exactly one part: the function call.
+	assert.Len(t, receivedParts, 1)
+	assert.NotNil(t, receivedParts[0].FunctionCall)
+	assert.Equal(t, "test_tool", receivedParts[0].FunctionCall.Name)
+	assert.Equal(t, "call_123", receivedParts[0].FunctionCall.ID)
+	assert.Equal(t, "val1", receivedParts[0].FunctionCall.Args["arg1"])
 }
