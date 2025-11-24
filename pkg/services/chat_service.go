@@ -142,15 +142,13 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			telemetry.LogDebugf("ChatService: Entered EndStreamProcessing block.")
 
 			if streamErr != nil { // This block now handles errors from StreamContent or from the stream channel
-				currentExecutorName := cs.executor.Name()
-
-				telemetry.LogDebugf("ChatService: Currently handling errors for executor '%s'.", currentExecutorName)
-
 				currentExecutorTypeVal, _ := cs.settingsService.Get("executor")
 				currentExecutorType, ok := currentExecutorTypeVal.(string)
 				if !ok {
 					currentExecutorType = "gemini" // Default to gemini if not found
 				}
+
+				telemetry.LogDebugf("ChatService: Currently handling errors for executor '%s'.", currentExecutorType)
 
 				// Check if the current executor type (e.g., "gemini" or "qwen") is gemini
 				if currentExecutorType == "gemini" {
@@ -205,7 +203,18 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							Reason:   fmt.Sprintf("Quota Exceeded. %s", decision.Metadata["reasoning"]),
 						}
 
-						executorFactory, factoryErr := core.NewExecutorFactory(decision.Model, cs.appConfig)
+						// Determine the base executor type from the model name
+						fallbackExecutorType := ""
+						if strings.HasPrefix(decision.Model, "gemini") {
+							fallbackExecutorType = "gemini"
+						} else if strings.HasPrefix(decision.Model, "qwen") {
+							fallbackExecutorType = "qwen"
+						} else {
+							eventChan <- types.ErrorEvent{Err: fmt.Errorf("unknown executor type for fallback model %s", decision.Model)}
+							return
+						}
+
+						executorFactory, factoryErr := core.NewExecutorFactory(fallbackExecutorType, cs.appConfig)
 						if factoryErr != nil {
 							eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create factory for fallback model %s: %w", decision.Model, factoryErr)}
 							return
@@ -232,7 +241,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					}
 				} else {
 					// Generic error handling for other executors or unknown errors
-					eventChan <- types.ErrorEvent{Err: fmt.Errorf("Error from executor '%s': %w", currentExecutorName, streamErr)}
+					eventChan <- types.ErrorEvent{Err: fmt.Errorf("Error from executor '%s': %w", currentExecutorType, streamErr)}
 					return
 				}
 			}

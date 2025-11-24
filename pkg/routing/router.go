@@ -26,7 +26,7 @@ func (s *CompositeStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routi
 		decision, err := strategy.Route(ctx, cfg)
 		if err != nil {
 			// Log the error and continue to the next strategy
-			// telemetry.LogDebugf("Routing strategy %s failed: %v", strategy.Name(), err) // Assuming telemetry is available
+			telemetry.LogDebugf("Routing strategy %s failed: %v", strategy.Name(), err) // Assuming telemetry is available
 			continue
 		}
 		if decision != nil {

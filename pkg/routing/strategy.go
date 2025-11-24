@@ -44,11 +44,15 @@ func (s *DefaultStrategy) Name() string {
 func (s *DefaultStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	modelVal, ok := cfg.Get("model")
 	if !ok || modelVal == nil {
-		return nil, fmt.Errorf("model not found in config")
+		err := fmt.Errorf("model not found in config")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	model, ok := modelVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("model in config is not a string")
+		err := fmt.Errorf("model in config is not a string")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	return &RoutingDecision{
 		Model: model,
@@ -73,7 +77,9 @@ func (s *OverrideStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 	}
 	model, ok := modelVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("model in config is not a string")
+		err := fmt.Errorf("model in config is not a string")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	if model == "auto" {
 		return nil, nil // Pass to the next strategy
@@ -103,11 +109,15 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 
 	currentModelVal, ok := cfg.Get("model")
 	if !ok || currentModelVal == nil {
-		return nil, fmt.Errorf("current model not found in config for fallback strategy")
+		err := fmt.Errorf("current model not found in config for fallback strategy")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	currentModel, ok := currentModelVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("current model in config is not a string for fallback strategy")
+		err := fmt.Errorf("current model in config is not a string for fallback strategy")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 
 	suggester, ok := modelSuggesters[ctx.ExecutorType]
@@ -144,9 +154,9 @@ var modelSuggesters = map[string]func(string) (string, bool){
 
 		switch {
 		case isPro:
-			return "gemini-1.5-flash", true
+			return "gemini-flash", true
 		case isFlash:
-			return "gemini-1.5-flash-latest", true
+			return "gemini-flash-lite", true
 		default:
 			telemetry.LogDebugf("Gemini Suggester: No suggestion found for modelName=%s", modelName)
 			return "", false
@@ -186,4 +196,3 @@ func (s *ClassifierStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Rout
 
 	return nil, nil // Pass to the next strategy.
 }
-
