@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
-	"os"
+	"os" // Re-add this import
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/core"
@@ -259,8 +259,10 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 				var toolResponseParts []types.Part
 				for _, fc := range functionCalls {
-					cs.toolCallCounter++
-					toolCallID := fmt.Sprintf("tool-call-%d", cs.toolCallCounter)
+					var toolExecutionResult any = nil    // Initialized here
+					var toolExecutionError error = nil // Initialized here
+					cs.toolCallCounter++ // Still increment for stats
+					toolCallID := fc.ID  // Use the ID from the function call
 
 					// --- Generic confirmation for dangerous tools ---
 					isDangerousTool := false
@@ -273,9 +275,6 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 					eventChan <- types.ToolCallStartEvent{ToolCallID: toolCallID, ToolName: fc.Name, Args: fc.Args}
 					telemetry.LogDebugf("Received stream event: ToolCallStartEvent (ID: %s, Name: %s, Args: %#v)", toolCallID, fc.Name, fc.Args)
-
-					var toolExecutionResult any
-					var toolExecutionError error
 
 					if isDangerousTool {
 						if cs.proceedAlwaysTools[fc.Name] {
@@ -307,7 +306,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 									confirmationEvent.FilePath = filePath
 									if newContent, ok := fc.Args["content"].(string); ok {
 										confirmationEvent.NewContent = newContent
-										originalContentBytes, err := os.ReadFile(filePath)
+										originalContentBytes, err := os.ReadFile(filePath) // This still imports "os"
 										if err == nil {
 											confirmationEvent.OriginalContent = string(originalContentBytes)
 											confirmationEvent.FileDiff = generateDiff(string(originalContentBytes), newContent)
@@ -373,13 +372,14 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 					toolResponseParts = append(toolResponseParts, types.Part{
 						FunctionResponse: &types.FunctionResponse{
+							ID:       toolCallID, // Add the ID from the function call
 							Name:     fc.Name,
 							Response: map[string]any{"result": toolExecutionResult, "error": toolExecutionError},
 						},
 					})
 				}
 
-				cs.history = append(cs.history, &types.Content{Role: "model", Parts: toolResponseParts})
+				cs.history = append(cs.history, &types.Content{Role: "tool", Parts: toolResponseParts}) // Change role to "tool"
 				if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
 					eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to save history after model response with tool calls: %w", err)}
 					return

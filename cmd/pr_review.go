@@ -23,14 +23,14 @@ var prReviewCmd = &cobra.Command{
 It evaluates code quality, adherence to standards, and readiness for merging, providing detailed feedback or approval messages.`, 
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		runPrReviewCmd(cmd, args, SettingsService, ShellService)
+		runPrReviewCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
 	},
 }
 
 // runPrReviewCmd contains the logic for the pr-review command, accepting necessary services.
-func runPrReviewCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
+func runPrReviewCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService, workspaceService *services.WorkspaceService) {
 	// Initialize the ToolRegistry
-	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
+	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService, workspaceService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {

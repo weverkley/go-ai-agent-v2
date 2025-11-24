@@ -111,3 +111,10 @@ func (ws *WorkspaceService) Load() error {
 	}
 	return nil
 }
+
+// GetProjectRoot returns the base directory of the workspace (project root).
+func (ws *WorkspaceService) GetProjectRoot() string {
+	ws.mu.RLock()
+	defer ws.mu.RUnlock()
+	return ws.baseDir
+}

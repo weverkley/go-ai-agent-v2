@@ -9,7 +9,7 @@ import (
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(fs services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
+func RegisterAllTools(fs services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
 
 	if err := registry.Register(NewGrepTool()); err != nil {
@@ -21,7 +21,7 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	if err := registry.Register(NewReadFileTool()); err != nil {
 		telemetry.LogErrorf("Error registering ReadFileTool: %v", err)
 	}
-	if err := registry.Register(NewWriteFileTool(fs)); err != nil {
+	if err := registry.Register(NewWriteFileTool(fs, workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering WriteFileTool: %v", err)
 	}
 	if err := registry.Register(NewReadManyFilesTool(fs)); err != nil {

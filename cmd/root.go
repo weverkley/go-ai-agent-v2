@@ -74,8 +74,8 @@ func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.Tel
 	return settingsService.GetTelemetrySettings()
 }
 
-func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
-	return tools.RegisterAllTools(fsService, shellService, settingsService)
+func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
+	return tools.RegisterAllTools(fsService, shellService, settingsService, workspaceService)
 }
 
 func initConfig(
@@ -134,7 +134,7 @@ func registerCommands() {
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(smartEditCmd)
 	grepCodeCmd.Run = func(cmd *cobra.Command, args []string) {
-		runGrepCodeCmd(cmd, args, SettingsService, ShellService)
+		runGrepCodeCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
 	}
 	RootCmd.AddCommand(grepCodeCmd)
 	RootCmd.AddCommand(readManyFilesCmd)
@@ -183,7 +183,7 @@ func init() {
 		var fileFilteringService *services.FileFilteringService
 		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
-		toolRegistry := registerTools(FSService, ShellService, SettingsService)
+		toolRegistry := registerTools(FSService, ShellService, SettingsService, WorkspaceService)
 		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
 
 		// Initialize SessionService now that Cfg is available
