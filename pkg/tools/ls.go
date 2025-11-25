@@ -29,7 +29,7 @@ func NewLsTool() *LsTool {
 							Type:        "string",
 							Description: "The path to the directory to list.",
 						},
-					}),
+					}).SetRequired([]string{"path"}),
 					false, // isOutputMarkdown
 					false, // canUpdateOutput
 					nil,   // MessageBus

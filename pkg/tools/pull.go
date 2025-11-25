@@ -25,15 +25,19 @@ func NewPullTool(gitService services.GitService) *PullTool {
 		(&types.JsonSchemaObject{
 			Type: "object",
 		}).SetProperties(map[string]*types.JsonSchemaProperty{
-			"remote_name": &types.JsonSchemaProperty{
+			"dir": {
 				Type:        "string",
-				Description: "The name of the Git remote (e.g., 'origin'). Defaults to 'origin'.",
+				Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
 			},
-			"branch_name": &types.JsonSchemaProperty{
+			"remote_name": {
 				Type:        "string",
-				Description: "The name of the branch to pull. Defaults to the current branch.",
+				Description: "Optional: The name of the Git remote (e.g., 'origin'). Defaults to 'origin'.",
 			},
-		}),
+			"branch_name": {
+				Type:        "string",
+				Description: "Optional: The name of the branch to pull. Defaults to the current branch of the remote.",
+			},
+		}).SetRequired([]string{"dir"}),
 		false, // isOutputMarkdown
 		false, // canUpdateOutput
 		nil,   // MessageBus
@@ -49,18 +53,36 @@ func (t *PullTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		return types.ToolResult{}, fmt.Errorf("missing or invalid 'dir' argument")
 	}
 
-	err := t.gitService.Pull(dir, "")
+	remoteName, _ := args["remote_name"].(string)
+	branchName, _ := args["branch_name"].(string)
+
+	ref := ""
+	if remoteName != "" && branchName != "" {
+		ref = fmt.Sprintf("%s/%s", remoteName, branchName)
+	} else if branchName != "" {
+		ref = branchName
+	}
+	// If remoteName is provided but branchName is not, the tool will pull the default branch of that remote.
+	// If neither are provided, gitService.Pull will likely default to the current branch's upstream.
+
+	err := t.gitService.Pull(dir, ref)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
-				Message: fmt.Sprintf("Failed to pull changes in %s: %v", dir, err),
+				Message: fmt.Sprintf("Failed to pull changes in %s (ref: %s): %v", dir, ref, err),
 				Type:    types.ToolErrorTypeExecutionFailed,
 			},
-		}, fmt.Errorf("failed to pull changes in %s: %w", dir, err)
+		}, fmt.Errorf("failed to pull changes in %s (ref: %s): %w", dir, ref, err)
 	}
 
+	successMessage := fmt.Sprintf("Successfully pulled latest changes in %s", dir)
+	if ref != "" {
+		successMessage += fmt.Sprintf(" for ref '%s'", ref)
+	}
+	successMessage += "."
+
 	return types.ToolResult{
-		LLMContent:    fmt.Sprintf("Successfully pulled latest changes in %s.", dir),
-		ReturnDisplay: fmt.Sprintf("Successfully pulled latest changes in %s.", dir),
+		LLMContent:    successMessage,
+		ReturnDisplay: successMessage,
 	}, nil
 }

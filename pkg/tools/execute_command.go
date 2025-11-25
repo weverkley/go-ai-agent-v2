@@ -25,16 +25,21 @@ func NewExecuteCommandTool(shellService services.ShellExecutionService) *Execute
 		types.KindOther,
 		&types.JsonSchemaObject{
 			Type: "object",
-					Properties: map[string]*types.JsonSchemaProperty{
-						"command": &types.JsonSchemaProperty{
-							Type:        "string",
-							Description: "The shell command to execute.",
-						},
-						"dir_path": &types.JsonSchemaProperty{
-							Type:        "string",
-							Description: "Optional: The directory to execute the command in. Defaults to the current working directory.",
-						},
-					},			Required: []string{"command"},
+			Properties: map[string]*types.JsonSchemaProperty{
+				"command": {
+					Type:        "string",
+					Description: "The shell command to execute.",
+				},
+				"dir": {
+					Type:        "string",
+					Description: "Optional: The directory to execute the command in. Defaults to the current working directory.",
+				},
+				"background": {
+					Type:        "boolean",
+					Description: "Optional: Whether to execute the command in the background. Defaults to false.",
+				},
+			},
+			Required: []string{"command"},
 		},
 		false, // isOutputMarkdown
 		false, // canUpdateOutput

@@ -23,8 +23,13 @@ func NewGetCurrentBranchTool(gitService services.GitService) *GetCurrentBranchTo
 		"Retrieves the name of the current Git branch.",
 		types.KindOther,
 		(&types.JsonSchemaObject{
-			Type:       "object",
-		}).SetProperties(map[string]*types.JsonSchemaProperty{}),
+			Type: "object",
+		}).SetProperties(map[string]*types.JsonSchemaProperty{
+			"dir": {
+				Type:        "string",
+				Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
+			},
+		}).SetRequired([]string{"dir"}),
 		false, // isOutputMarkdown
 		false, // canUpdateOutput
 		nil,   // MessageBus

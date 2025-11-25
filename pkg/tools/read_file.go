@@ -29,7 +29,7 @@ func NewReadFileTool() *ReadFileTool {
 				Properties: map[string]*types.JsonSchemaProperty{
 					"absolute_path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt').",
 					},
 					"offset": &types.JsonSchemaProperty{
 						Type:        "number",

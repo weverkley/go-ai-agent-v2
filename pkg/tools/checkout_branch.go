@@ -25,11 +25,15 @@ func NewCheckoutBranchTool(gitService services.GitService) *CheckoutBranchTool {
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{
-				"branch_name": &types.JsonSchemaProperty{
+				"branch_name": {
 					Type:        "string",
 					Description: "The name of the Git branch to checkout.",
 				},
-			}).SetRequired([]string{"branch_name"}),
+				"dir": {
+					Type:        "string",
+					Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
+				},
+			}).SetRequired([]string{"branch_name", "dir"}),
 			false, // isOutputMarkdown
 			false, // canUpdateOutput
 			nil,   // MessageBus

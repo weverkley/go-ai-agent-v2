@@ -31,7 +31,7 @@ func NewWriteTodosTool(settingsService types.SettingsServiceIface) *WriteTodosTo
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			types.WRITE_TODOS_TOOL_NAME,
 			"Write Todos",
-			"This tool can help you list out the current subtasks that are required to be completed for a given user request.",
+			"Creates or replaces the full list of subtasks required to complete a user request.",
 			types.KindOther,
 			(&types.JsonSchemaObject{
 				Type: "object",

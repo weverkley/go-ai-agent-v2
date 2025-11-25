@@ -15,11 +15,11 @@ const WRITE_FILE_TOOL_NAME = "write_file"
 type WriteFileTool struct {
 	*types.BaseDeclarativeTool
 	fileSystemService services.FileSystemService
-	workspaceService  *services.WorkspaceService // Add this field
+	workspaceService  types.WorkspaceServiceIface // Change to interface
 }
 
 // NewWriteFileTool creates a new WriteFileTool.
-func NewWriteFileTool(fileSystemService services.FileSystemService, workspaceService *services.WorkspaceService) *WriteFileTool {
+func NewWriteFileTool(fileSystemService services.FileSystemService, workspaceService types.WorkspaceServiceIface) *WriteFileTool {
 	return &WriteFileTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			WRITE_FILE_TOOL_NAME,
@@ -31,7 +31,7 @@ func NewWriteFileTool(fileSystemService services.FileSystemService, workspaceSer
 				Properties: map[string]*types.JsonSchemaProperty{
 					"file_path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The path to the file to write to. This should be a relative path to the current working directory (e.g., 'hello.html', 'src/main.js'). Absolute paths are not recommended.",
+						Description: "The path to the file to write to, relative to the project root (e.g., 'hello.html', 'src/main.js').",
 					},
 					"content": &types.JsonSchemaProperty{
 						Type:        "string",

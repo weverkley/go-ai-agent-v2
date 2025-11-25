@@ -34,16 +34,16 @@ func TestFindUnusedCodeTool_Execute(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:          "missing directory argument",
+			name:          "missing dir_path argument",
 			args:          map[string]any{},
 			setupMock:     func() {},
-			expectedError: "missing or invalid 'directory' argument",
+			expectedError: "missing or invalid 'dir_path' argument",
 		},
 		{
-			name:          "empty directory argument",
-			args:          map[string]any{"directory": ""},
+			name:          "empty dir_path argument",
+			args:          map[string]any{"dir_path": ""},
 			setupMock:     func() {},
-			expectedError: "missing or invalid 'directory' argument",
+			expectedError: "missing or invalid 'dir_path' argument",
 		},
 		// {
 		// 	name: "find unused functions fails",

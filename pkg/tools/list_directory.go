@@ -26,30 +26,31 @@ func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 					&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{
-					"dir_path": &types.JsonSchemaProperty{
+					"path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The path to the directory to list",
+						Description: "The path to the directory to list.",
 					},
 					"ignore": &types.JsonSchemaProperty{
 						Type:        "array",
 						Description: "List of glob patterns to ignore",
 						Items:       &types.JsonSchemaObject{Type: "string"},
 					},
-					                    "file_filtering_options": &types.JsonSchemaProperty{
-					                        Type:        "object",
-					                        Description: "Optional: Whether to respect ignore patterns from .gitignore or .geminiignore",
-					                        Properties: map[string]*types.JsonSchemaProperty{
-					                            "respect_git_ignore": &types.JsonSchemaProperty{
-					                                Type:        "boolean",
-					                                Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
-					                            },
-					                            "respect_gemini_ignore": &types.JsonSchemaProperty{
-					                                Type:        "boolean",
-					                                Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
-					                            },
-					                        },
-					                    },				},
-				Required: []string{"dir_path"},
+					"file_filtering_options": &types.JsonSchemaProperty{
+						Type:        "object",
+						Description: "Optional: Whether to respect ignore patterns from .gitignore or .geminiignore",
+						Properties: map[string]*types.JsonSchemaProperty{
+							"respect_git_ignore": &types.JsonSchemaProperty{
+								Type:        "boolean",
+								Description: "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
+							},
+							"respect_gemini_ignore": &types.JsonSchemaProperty{
+								Type:        "boolean",
+								Description: "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true.",
+							},
+						},
+					},
+				},
+				Required: []string{"path"},
 			},
 		false, // isOutputMarkdown
 		false, // canUpdateOutput
