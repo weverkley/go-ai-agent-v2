@@ -31,6 +31,9 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	if err := registry.Register(NewExecuteCommandTool(shellService)); err != nil {
 		telemetry.LogErrorf("Error registering ExecuteCommandTool: %v", err)
 	}
+	if err := registry.Register(NewRunTestsTool(shellService, fs)); err != nil {
+		telemetry.LogErrorf("Error registering RunTestsTool: %v", err)
+	}
 	// File system tools
 	if err := registry.Register(NewGrepTool()); err != nil {
 		telemetry.LogErrorf("Error registering GrepTool: %v", err)
@@ -60,6 +63,12 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	if err := registry.Register(NewFindUnusedCodeTool()); err != nil {
 		telemetry.LogErrorf("Error registering FindUnusedCodeTool: %v", err)
 	}
+	if err := registry.Register(NewFindReferencesTool()); err != nil {
+		telemetry.LogErrorf("Error registering FindReferencesTool: %v", err)
+	}
+	if err := registry.Register(NewRenameSymbolTool()); err != nil {
+		telemetry.LogErrorf("Error registering RenameSymbolTool: %v", err)
+	}
 	if err := registry.Register(NewExtractFunctionTool(fs)); err != nil {
 		telemetry.LogErrorf("Error registering ExtractFunctionTool: %v", err)
 	}
@@ -79,6 +88,9 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	}
 	if err := registry.Register(NewPullTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering PullTool: %v", err)
+	}
+	if err := registry.Register(NewGitCommitTool(services.NewGitService())); err != nil {
+		telemetry.LogErrorf("Error registering GitCommitTool: %v", err)
 	}
 
 	return registry

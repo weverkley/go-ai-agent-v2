@@ -41,6 +41,16 @@ func (m *MockGitService) DeleteBranch(dir string, branchName string) error {
 	return args.Error(0)
 }
 
+func (m *MockGitService) StageFiles(dir string, files []string) error {
+	args := m.Called(dir, files)
+	return args.Error(0)
+}
+
+func (m *MockGitService) Commit(dir, message string) error {
+	args := m.Called(dir, message)
+	return args.Error(0)
+}
+
 func (m *MockGitService) Clone(url string, directory string, ref string) error {
 	args := m.Called(url, directory, ref)
 	return args.Error(0)

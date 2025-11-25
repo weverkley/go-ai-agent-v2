@@ -38,6 +38,11 @@ const (
 	FIND_UNUSED_CODE_TOOL_NAME   = "find_unused_code"
 	EXTRACT_FUNCTION_TOOL_NAME   = "extract_function"
 	WRITE_FILE_TOOL_NAME         = "write_file"
+	RUN_TESTS_TOOL_NAME          = "run_tests"
+	FIND_REFERENCES_TOOL_NAME    = "find_references"
+	RENAME_SYMBOL_TOOL_NAME      = "rename_symbol"
+	CODEBASE_INVESTIGATOR_TOOL_NAME = "codebase_investigator"
+	GIT_COMMIT_TOOL_NAME         = "git_commit"
 )
 
 // MCPServerStatus represents the connection status of an MCP server.
@@ -611,6 +616,15 @@ func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []*F
 
 // CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
 type CodebaseInvestigatorSettings struct {
+	Enabled        bool   `json:"enabled,omitempty"`
+	Model          string `json:"model,omitempty"`
+	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
+	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
+	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
+}
+
+// TestWriterSettings represents settings for the Test Writer agent.
+type TestWriterSettings struct {
 	Enabled        bool   `json:"enabled,omitempty"`
 	Model          string `json:"model,omitempty"`
 	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`

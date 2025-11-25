@@ -39,7 +39,7 @@ func loadPromptsFromFile(filePath string) (map[string]string, error) {
 	return prompts, nil
 }
 
-var prompts map[string]string
+var codebaseInvestigatorPrompts map[string]string
 
 func init() {
 	var err error
@@ -49,7 +49,7 @@ func init() {
 	}
 	// The path to the prompts file is relative to the current file.
 	promptsFilePath := filepath.Join(filepath.Dir(filename), "codebase_investigator_prompts.md")
-	prompts, err = loadPromptsFromFile(promptsFilePath)
+	codebaseInvestigatorPrompts, err = loadPromptsFromFile(promptsFilePath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load codebase investigator prompts from %s: %v", promptsFilePath, err))
 	}
@@ -59,11 +59,11 @@ func init() {
 var CodebaseInvestigatorAgent = AgentDefinition{
 	Name:        "codebase_investigator",
 	DisplayName: "Codebase Investigator Agent",
-	Description: prompts["Description"],
+	Description: codebaseInvestigatorPrompts["Description"],
 	InputConfig: InputConfig{
 		Inputs: map[string]InputParameter{
 			"objective": {
-				Description: prompts["Objective Description"],
+				Description: codebaseInvestigatorPrompts["Objective Description"],
 				Type:        "string",
 				Required:    true,
 			},
@@ -103,7 +103,7 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 	},
 
 	PromptConfig: PromptConfig{
-		Query:        prompts["Query"],
-		SystemPrompt: prompts["System Prompt"],
+		Query:        codebaseInvestigatorPrompts["Query"],
+		SystemPrompt: codebaseInvestigatorPrompts["System Prompt"],
 	},
 }
