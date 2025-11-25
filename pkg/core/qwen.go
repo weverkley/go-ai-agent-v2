@@ -136,8 +136,10 @@ type QwenChat struct {
 
 // NewQwenChat creates a new QwenChat instance.
 func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content, logger telemetry.TelemetryLogger) (Executor, error) {
+	logger.LogDebugf("NewQwenChat: Initializing...")
 	apiKey := os.Getenv("QWEN_API_KEY")
 	if apiKey == "" {
+		logger.LogErrorf("NewQwenChat: QWEN_API_KEY environment variable not set")
 		return nil, fmt.Errorf("QWEN_API_KEY environment variable not set")
 	}
 
@@ -161,49 +163,43 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 			qwenChatToolRegistry = tr
 		}
 	}
-
+	logger.LogDebugf("NewQwenChat: Initialization complete for model '%s'.", modelName)
 	return &QwenChat{
 		client:               client,
 		modelName:            modelName,
 		startHistory:         startHistory,
 		toolRegistry:         qwenChatToolRegistry,
 		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
-		logger:               logger, // Assign the logger
+		logger:               logger,
 	}, nil
 }
 
-// StreamContent implements the streaming generation for QwenChat.
 func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 	eventChan := make(chan any)
 
 	go func() {
 		defer close(eventChan)
+		qc.logger.LogDebugf("QwenExecutor: StreamContent goroutine started.")
 
-		historyMessages, err := toOpenAIMessages(contents[:len(contents)-1], qc.logger)
-		if err != nil {
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert history: %w", err)}
+		if len(contents) == 0 {
+			qc.logger.LogErrorf("QwenExecutor: StreamContent called with no content.")
+			eventChan <- types.ErrorEvent{Err: fmt.Errorf("QwenExecutor: StreamContent called with no content")}
 			return
 		}
 
-		lastMessage, err := toOpenAIMessages(contents[len(contents)-1:], qc.logger)
+		messages, err := toOpenAIMessages(contents, qc.logger)
 		if err != nil {
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert last message: %w", err)}
+			qc.logger.LogErrorf("QwenExecutor: toOpenAIMessages failed: %v", err)
+			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert messages: %w", err)}
 			return
 		}
-
-		messages := append(historyMessages, lastMessage...)
-
-		// Extract and log the prompt from the last message before sending
-		if len(messages) > 0 {
-			lastMsgForLog := messages[len(messages)-1]
-			if lastMsgForLog.Content != "" {
-				qc.logger.LogPrompt(lastMsgForLog.Content)
-			}
-		}
+		qc.logger.LogDebugf("QwenExecutor: Converted %d messages for OpenAI API.", len(messages))
 
 		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
+			qc.logger.LogDebugf("QwenExecutor: Building OpenAI tools...")
 			openaiTools = toOpenAITools(qc.toolRegistry, qc.logger)
+			qc.logger.LogDebugf("QwenExecutor: Finished building %d tools.", len(openaiTools))
 		}
 
 		req := openai.ChatCompletionRequest{
@@ -213,26 +209,32 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 			Tools:    openaiTools,
 		}
 
+		qc.logger.LogDebugf("QwenExecutor: Calling CreateChatCompletionStream...")
 		stream, err := qc.client.CreateChatCompletionStream(ctx, req)
 		if err != nil {
+			qc.logger.LogErrorf("QwenExecutor: CreateChatCompletionStream failed: %v", err)
 			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create Qwen stream: %w", err)}
 			return
 		}
 		defer stream.Close()
+		qc.logger.LogDebugf("QwenExecutor: Stream created. Waiting for response...")
 
 		toolCallBuffers := make(map[string]strings.Builder)
 		toolCallNames := make(map[string]string)
-		var lastToolCallId string // To track the ID of the tool call currently being streamed
+		var lastToolCallId string
 
 		for {
 			response, err := stream.Recv()
 			if errors.Is(err, io.EOF) {
+				qc.logger.LogDebugf("QwenExecutor: Stream finished (EOF).")
 				break
 			}
 			if err != nil {
+				qc.logger.LogErrorf("QwenExecutor: Error receiving from stream: %v", err)
 				eventChan <- types.ErrorEvent{Err: fmt.Errorf("error receiving Qwen stream: %w", err)}
 				return
 			}
+			qc.logger.LogDebugf("QwenExecutor: Received a response chunk.")
 
 			if len(response.Choices) > 0 {
 				delta := response.Choices[0].Delta
@@ -240,69 +242,55 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 					eventChan <- types.Part{Text: delta.Content}
 				}
 				if delta.ToolCalls != nil {
-					// Accumulate tool call arguments across chunks
 					for _, tc := range delta.ToolCalls {
 						currentID := tc.ID
 						currentName := tc.Function.Name
-
-						// If tc.ID is empty, it's a continuation of the previous tool call
 						if currentID == "" {
 							if lastToolCallId != "" {
-								currentID = lastToolCallId // Use the last known ID
+								currentID = lastToolCallId
 							} else {
-								// This should ideally not happen if the first chunk always has an ID
-								qc.logger.LogWarnf("Qwen StreamContent: Received ToolCall with empty ID and no lastToolCallId, arguments: '%s'", tc.Function.Arguments)
-								continue // Skip this chunk if we can't identify the tool call
+								qc.logger.LogWarnf("QwenExecutor: Received ToolCall with empty ID and no lastToolCallId, arguments: '%s'", tc.Function.Arguments)
+								continue
 							}
 						}
-
-						// Append arguments to the buffer for the determined ID
 						builder := toolCallBuffers[currentID]
 						builder.WriteString(tc.Function.Arguments)
 						toolCallBuffers[currentID] = builder
-
-						// Store the name if present (usually in the first chunk, or if it's explicitly repeated)
 						if currentName != "" {
 							toolCallNames[currentID] = currentName
 						}
-
-						// Update lastToolCallId if a non-empty ID was encountered
 						if tc.ID != "" {
 							lastToolCallId = tc.ID
 						}
 					}
 				}
 
-				// Check if the message is finished, then process any accumulated tool calls
-				if response.Choices[0].FinishReason == openai.FinishReasonToolCalls || response.Choices[0].FinishReason == openai.FinishReasonStop || errors.Is(err, io.EOF) {
+				if response.Choices[0].FinishReason == openai.FinishReasonToolCalls || response.Choices[0].FinishReason == openai.FinishReasonStop {
+					qc.logger.LogDebugf("QwenExecutor: Stream received finish reason: %s. Processing %d buffered tool calls.", response.Choices[0].FinishReason, len(toolCallBuffers))
 					for id, builder := range toolCallBuffers {
 						jsonArgs := builder.String()
 						var args map[string]any
 						if jsonArgs != "" {
 							if err := json.Unmarshal([]byte(jsonArgs), &args); err != nil {
+								qc.logger.LogErrorf("QwenExecutor: Failed to unmarshal tool arguments for ID %s: %v", id, err)
 								eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to unmarshal accumulated tool arguments for ID %s: %w, args: '%s'", id, err, jsonArgs)}
-								// Do not return here, try to process other tool calls
 								continue
 							}
 						}
-						// Retrieve the name from the stored map
 						name := toolCallNames[id]
+						qc.logger.LogDebugf("QwenExecutor: Sending complete tool call '%s' (ID: %s)", name, id)
 						eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 							ID:   id,
 							Name: name,
 							Args: args,
 						}}
-						// Clear the buffer for this tool call after processing
 						delete(toolCallBuffers, id)
 						delete(toolCallNames, id)
-					}
-					// If EOF is received, we break the loop.
-					if errors.Is(err, io.EOF) {
-						break
 					}
 				}
 			}
 		}
+		qc.logger.LogDebugf("QwenExecutor: Finished processing stream.")
 	}()
 
 	return eventChan, nil

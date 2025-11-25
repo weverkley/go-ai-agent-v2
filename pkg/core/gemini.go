@@ -26,13 +26,16 @@ type GeminiChat struct {
 }
 
 func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfig, startHistory []*types.Content, logger telemetry.TelemetryLogger) (Executor, error) {
+	logger.LogDebugf("NewGeminiChat: Initializing...")
 	apiKey := os.Getenv("GEMINI_API_KEY")
 	if apiKey == "" {
+		logger.LogErrorf("NewGeminiChat: GEMINI_API_KEY environment variable not set")
 		return nil, fmt.Errorf("GEMINI_API_KEY environment variable not set")
 	}
 	ctx := context.Background()
 	client, err := genai.NewClient(ctx, option.WithAPIKey(apiKey))
 	if err != nil {
+		logger.LogErrorf("NewGeminiChat: Failed to create genai.NewClient: %v", err)
 		return nil, fmt.Errorf("failed to create Go AI Agent client: %w", err)
 	}
 	modelVal, _ := cfg.Get("model")
@@ -47,7 +50,7 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 			toolRegistry = tr
 		}
 	}
-
+	logger.LogDebugf("NewGeminiChat: Initialization complete for model '%s'.", modelName)
 	return &GeminiChat{
 		client:               client,
 		model:                model,
@@ -90,32 +93,36 @@ func toGenaiContents(contents []*types.Content) []*genai.Content {
 }
 
 func fromGenaiPart(part genai.Part, logger telemetry.TelemetryLogger) types.Part {
-	logger.LogDebugf("Processing a response part of type %T", part)
+	logger.LogDebugf("GeminiExecutor: Processing a response part of type %T", part)
 	var genericPart types.Part
 	switch p := part.(type) {
 	case genai.Text:
 		genericPart.Text = string(p)
-	case genai.FunctionCall: // CORRECTED: Was *genai.FunctionCall
+	case genai.FunctionCall:
 		genericPart.FunctionCall = &types.FunctionCall{Name: p.Name, Args: p.Args}
 	case *genai.FunctionResponse:
 		genericPart.FunctionResponse = &types.FunctionResponse{Name: p.Name, Response: p.Response}
 	case genai.Blob:
 		genericPart.InlineData = &types.InlineData{MimeType: p.MIMEType, Data: string(p.Data)}
 	default:
-		logger.LogWarnf("Unhandled genai.Part type: %T", p)
+		logger.LogWarnf("GeminiExecutor: Unhandled genai.Part type: %T", p)
 	}
 	return genericPart
 }
 
 func buildGeminiTools(toolRegistry types.ToolRegistryInterface, logger telemetry.TelemetryLogger) []*genai.Tool {
+	logger.LogDebugf("buildGeminiTools: Building tools from registry.")
 	if toolRegistry == nil {
+		logger.LogWarnf("buildGeminiTools: Tool registry is nil.")
 		return nil
 	}
 	allTools := toolRegistry.GetAllTools()
 	if allTools == nil {
+		logger.LogWarnf("buildGeminiTools: No tools found in registry.")
 		return nil
 	}
-
+	
+	// ... (rest of function is unchanged)
 	var convertObject func(obj *types.JsonSchemaObject) *genai.Schema
 	var convertProperty func(prop *types.JsonSchemaProperty) *genai.Schema
 	var toGenaiType func(t string) genai.Type
@@ -190,6 +197,7 @@ func buildGeminiTools(toolRegistry types.ToolRegistryInterface, logger telemetry
 			},
 		})
 	}
+	logger.LogDebugf("buildGeminiTools: Finished building %d tools.", len(genaiTools))
 	return genaiTools
 }
 
@@ -198,6 +206,8 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 
 	go func() {
 		defer close(eventChan)
+		gc.logger.LogDebugf("GeminiExecutor: StreamContent goroutine started.")
+
 		model := gc.client.GenerativeModel(gc.modelName)
 		model.SetTemperature(gc.generationConfig.Temperature)
 		model.SetTopP(gc.generationConfig.TopP)
@@ -209,7 +219,11 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 		cs := model.StartChat()
 		
 		if len(history) > 1 {
-			cs.History = toGenaiContents(history[:len(history)-1])
+			historyToSet := history[:len(history)-1]
+			gc.logger.LogDebugf("GeminiExecutor: Setting chat history with %d previous messages.", len(historyToSet))
+			cs.History = toGenaiContents(historyToSet)
+		} else {
+			gc.logger.LogDebugf("GeminiExecutor: No previous history to set.")
 		}
 		
 		var lastParts []genai.Part
@@ -219,21 +233,27 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 				lastParts = convertedContent.Parts
 			}
 		} else {
+			gc.logger.LogErrorf("GeminiExecutor: StreamContent called with empty history.")
 			eventChan <- types.ErrorEvent{Err: fmt.Errorf("StreamContent called with empty history")}
 			return
 		}
+		gc.logger.LogDebugf("GeminiExecutor: Sending last message with %d parts.", len(lastParts))
 		
 		iter := cs.SendMessageStream(ctx, lastParts...)
+		gc.logger.LogDebugf("GeminiExecutor: SendMessageStream called. Waiting for response...")
 
 		for {
 			resp, err := iter.Next()
 			if err == iterator.Done {
+				gc.logger.LogDebugf("GeminiExecutor: Stream iterator finished (Done).")
 				break
 			}
 			if err != nil {
+				gc.logger.LogErrorf("GeminiExecutor: Error receiving from Gemini stream: %v", err)
 				eventChan <- types.ErrorEvent{Err: err}
 				return
 			}
+			gc.logger.LogDebugf("GeminiExecutor: Received a response chunk from Gemini stream.")
 			
 			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 				for _, part := range resp.Candidates[0].Content.Parts {
@@ -241,6 +261,7 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 				}
 			}
 		}
+		gc.logger.LogDebugf("GeminiExecutor: Finished processing Gemini stream.")
 	}()
 
 	return eventChan, nil
