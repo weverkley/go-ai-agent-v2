@@ -193,15 +193,12 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 
 		messages := append(historyMessages, lastMessage...)
 
-		// Extract and log the prompt before sending
-		var promptBuilder strings.Builder
-		for _, msg := range messages {
-			if msg.Content != "" {
-				promptBuilder.WriteString(msg.Content)
+		// Extract and log the prompt from the last message before sending
+		if len(messages) > 0 {
+			lastMsgForLog := messages[len(messages)-1]
+			if lastMsgForLog.Content != "" {
+				qc.logger.LogPrompt(lastMsgForLog.Content)
 			}
-		}
-		if promptBuilder.Len() > 0 {
-			qc.logger.LogPrompt(promptBuilder.String())
 		}
 
 		var openaiTools []openai.Tool
