@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"os" // Add os import
 	"go-ai-agent-v2/go-cli/pkg/mcp"
 	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
+	"os"                              // Add os import
 
 	"github.com/spf13/cobra"
 )

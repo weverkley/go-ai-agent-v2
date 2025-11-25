@@ -3,8 +3,8 @@ package cmd
 import (
 	"context" // Add context import
 	"fmt"
-	"strings" // Import strings package
 	"go-ai-agent-v2/go-cli/pkg/types" // Add types import
+	"strings"                         // Import strings package
 
 	"github.com/spf13/cobra"
 )

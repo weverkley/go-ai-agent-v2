@@ -19,25 +19,50 @@ const (
 
 // Tool names
 const (
-	LS_TOOL_NAME                = "ls"
-	READ_FILE_TOOL_NAME         = "read_file"
-	GLOB_TOOL_NAME              = "glob"
-	GREP_TOOL_NAME              = "grep"
-	SMART_EDIT_TOOL_NAME        = "smart_edit"
-	WEB_FETCH_TOOL_NAME         = "web_fetch"
-	WEB_SEARCH_TOOL_NAME        = "web_search"
-	MEMORY_TOOL_NAME            = "memory"
-	WRITE_TODOS_TOOL_NAME       = "write_todos"
-	LIST_DIRECTORY_TOOL_NAME    = "list_directory"
-	GET_CURRENT_BRANCH_TOOL_NAME = "get_current_branch"
-	GET_REMOTE_URL_TOOL_NAME    = "get_remote_url"
-	CHECKOUT_BRANCH_TOOL_NAME   = "checkout_branch"
-	PULL_TOOL_NAME              = "pull"
-	EXECUTE_COMMAND_TOOL_NAME   = "execute_command"
-	READ_MANY_FILES_TOOL_NAME   = "read_many_files"
-	FIND_UNUSED_CODE_TOOL_NAME  = "find_unused_code"
-	EXTRACT_FUNCTION_TOOL_NAME  = "extract_function"
-	WRITE_FILE_TOOL_NAME        = "write_file"
+	LS_TOOL_NAME                      = "ls"
+	READ_FILE_TOOL_NAME               = "read_file"
+	READ_FILE_TOOL_DISPLAY_NAME       = "Read File"
+	GLOB_TOOL_NAME                    = "glob"
+	GLOB_TOOL_DISPLAY_NAME            = "Glob"
+	GREP_TOOL_NAME                    = "grep"
+	GREP_TOOL_DISPLAY_NAME            = "Grep"
+	SMART_EDIT_TOOL_NAME              = "smart_edit"
+	SMART_EDIT_TOOL_DISPLAY_NAME      = "Smart Edit"
+	WEB_FETCH_TOOL_NAME               = "web_fetch"
+	WEB_FETCH_TOOL_DISPLAY_NAME       = "Web Fetch"
+	WEB_SEARCH_TOOL_NAME              = "web_search"
+	WEB_SEARCH_TOOL_DISPLAY_NAME      = "Web Search"
+	MEMORY_TOOL_NAME                  = "memory"
+	MEMORY_TOOL_DISPLAY_NAME          = "Memory"
+	WRITE_TODOS_TOOL_NAME             = "write_todos"
+	LIST_DIRECTORY_TOOL_NAME          = "list_directory"
+	GET_CURRENT_BRANCH_TOOL_NAME      = "get_current_branch"
+	GET_REMOTE_URL_TOOL_NAME          = "get_remote_url"
+	CHECKOUT_BRANCH_TOOL_NAME         = "checkout_branch"
+	PULL_TOOL_NAME                    = "pull"
+	EXECUTE_COMMAND_TOOL_NAME         = "execute_command"
+	READ_MANY_FILES_TOOL_NAME         = "read_many_files"
+	READ_MANY_FILES_TOOL_DISPLAY_NAME = "Read Many Files"
+	FIND_UNUSED_CODE_TOOL_NAME        = "find_unused_code"
+	EXTRACT_FUNCTION_TOOL_NAME        = "extract_function"
+	WRITE_FILE_TOOL_NAME              = "write_file"
+	RUN_TESTS_TOOL_NAME               = "run_tests"
+	FIND_REFERENCES_TOOL_NAME         = "find_references"
+	RENAME_SYMBOL_TOOL_NAME           = "rename_symbol"
+	CODEBASE_INVESTIGATOR_TOOL_NAME   = "codebase_investigator"
+	GIT_COMMIT_TOOL_NAME              = "git_commit"
+
+	// Agent names
+	TEST_WRITER_AGENT_NAME         = "test_writer"
+	TEST_WRITER_AGENT_DISPLAY_NAME = "Test Writer Agent"
+	REFACTOR_AGENT_NAME            = "refactor_agent"
+	REFACTOR_AGENT_DISPLAY_NAME    = "Refactor Agent"
+)
+
+// Executor Types
+const (
+	ExecutorTypeQwen   = "qwen"
+	ExecutorTypeGemini = "goaiagent"
 )
 
 // MCPServerStatus represents the connection status of an MCP server.
@@ -138,7 +163,7 @@ type StreamResponse struct {
 
 // FileFilteringOptions for filtering files.
 type FileFilteringOptions struct {
-	RespectGitIgnore    *bool `json:"respectGitIgnore,omitempty"`
+	RespectGitIgnore       *bool `json:"respectGitIgnore,omitempty"`
 	RespectGoaiagentIgnore *bool `json:"respectGoaiagentIgnore,omitempty"`
 }
 
@@ -275,23 +300,22 @@ const (
 type AgentTerminateMode string
 
 const (
-	AgentTerminateModeAborted AgentTerminateMode = "ABORTED"
-	AgentTerminateModeError   AgentTerminateMode = "ERROR"
-	AgentTerminateModeGoal    AgentTerminateMode = "GOAL"
+	AgentTerminateModeAborted  AgentTerminateMode = "ABORTED"
+	AgentTerminateModeError    AgentTerminateMode = "ERROR"
+	AgentTerminateModeGoal     AgentTerminateMode = "GOAL"
 	AgentTerminateModeMaxTurns AgentTerminateMode = "MAX_TURNS"
-	AgentTerminateModeTimeout AgentTerminateMode = "TIMEOUT"
+	AgentTerminateModeTimeout  AgentTerminateMode = "TIMEOUT"
 )
 
 const (
-	TASK_COMPLETE_TOOL_NAME = "task_complete"
-	USER_CONFIRM_TOOL_NAME  = "user_confirm"
+	TASK_COMPLETE_TOOL_NAME              = "task_complete"
+	USER_CONFIRM_TOOL_NAME               = "user_confirm"
 	TOOL_CONFIRMATION_RESPONSE_TOOL_NAME = "tool_confirmation_response"
 )
 
 const (
 	ApprovalModeDefault ApprovalMode = "DEFAULT"
 )
-
 
 // ToolCallConfirmationDetails represents details for tool call confirmation.
 type ToolCallConfirmationDetails struct {
@@ -314,15 +338,25 @@ type Content struct {
 	Role  string `json:"role"`
 }
 
-	// EditorType represents the type of editor.
-	type EditorType string
+// EditorType represents the type of editor.
+type EditorType string
 
-	// ChatCompressionResult represents the result of a chat compression operation.
-	type ChatCompressionResult struct {
-		OriginalTokenCount int    `json:"originalTokenCount"`
-		NewTokenCount      int    `json:"newTokenCount"`
-		CompressionStatus  string `json:"compressionStatus"`
-	}
+// ChatCompressionResult represents the result of a chat compression operation.
+type ChatCompressionResult struct {
+	OriginalTokenCount int    `json:"originalTokenCount"`
+	NewTokenCount      int    `json:"newTokenCount"`
+	CompressionStatus  string `json:"compressionStatus"`
+}
+
+// ChatState represents the transferable state of a chat session.
+type ChatState struct {
+	History            []*Content
+	SessionID          string
+	ProceedAlwaysTools map[string]bool
+	ToolCallCounter    int
+	ToolErrorCounter   int
+}
+
 // ToolCallResponseInfo represents the response information for a tool call.
 type ToolCallResponseInfo struct {
 	CallID        string             `json:"callId"`
@@ -348,9 +382,9 @@ type FunctionDeclaration struct {
 
 // JsonSchemaObject defines the structure for a JSON Schema object.
 type JsonSchemaObject struct {
-	Type       string                        `json:"type"` // "object"
+	Type       string                         `json:"type"` // "object"
 	Properties map[string]*JsonSchemaProperty `json:"properties"`
-	Required   []string                      `json:"required,omitempty"`
+	Required   []string                       `json:"required,omitempty"`
 }
 
 // NewJsonSchemaObject creates a new instance of JsonSchemaObject with type "object".
@@ -375,12 +409,12 @@ func (jso *JsonSchemaObject) SetRequired(required []string) *JsonSchemaObject {
 
 // JsonSchemaProperty defines the structure for a property within a JsonSchemaObject.
 type JsonSchemaProperty struct {
-	Type        string                        `json:"type"` // "string", "number", "integer", "boolean", "array", "object"
-	Description string                        `json:"description"`
-	Items       *JsonSchemaObject             `json:"items,omitempty"` // Changed to JsonSchemaObject for arrays of objects
+	Type        string                         `json:"type"` // "string", "number", "integer", "boolean", "array", "object"
+	Description string                         `json:"description"`
+	Items       *JsonSchemaObject              `json:"items,omitempty"` // Changed to JsonSchemaObject for arrays of objects
 	Properties  map[string]*JsonSchemaProperty `json:"properties,omitempty"`
-	Required    []string                      `json:"required,omitempty"`
-	Enum        []string                      `json:"enum,omitempty"` // Added Enum field
+	Required    []string                       `json:"required,omitempty"`
+	Enum        []string                       `json:"enum,omitempty"` // Added Enum field
 }
 
 // Tool is the interface that all tools must implement.
@@ -479,6 +513,11 @@ type WorkspaceContext interface {
 	GetDirectories() []string
 }
 
+// WorkspaceServiceIface defines the interface for workspace-related operations used by tools.
+type WorkspaceServiceIface interface {
+	GetProjectRoot() string
+}
+
 // Config defines the interface for application configuration.
 type Config interface {
 	Get(key string) (interface{}, bool)
@@ -519,8 +558,6 @@ type ToolRegistry struct {
 	mu    sync.RWMutex
 	tools map[string]Tool
 }
-
-
 
 // GoaiagentDirProvider provides the path to the .goaiagent directory.
 type GoaiagentDirProvider interface {
@@ -597,11 +634,17 @@ func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []*F
 	return declarations
 }
 
-
-
-
 // CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
 type CodebaseInvestigatorSettings struct {
+	Enabled        bool   `json:"enabled,omitempty"`
+	Model          string `json:"model,omitempty"`
+	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
+	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
+	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
+}
+
+// TestWriterSettings represents settings for the Test Writer agent.
+type TestWriterSettings struct {
 	Enabled        bool   `json:"enabled,omitempty"`
 	Model          string `json:"model,omitempty"`
 	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
@@ -665,7 +708,6 @@ type TodosSummaryUpdateEvent struct {
 	Summary string
 }
 
-
 type ToolCallStartEvent struct {
 	ToolCallID string
 	ToolName   string
@@ -679,12 +721,29 @@ type ToolCallEndEvent struct {
 	Err        error
 }
 
+const (
+	ActivityTypeThoughtChunk         = "THOUGHT_CHUNK"
+	ActivityTypeError                = "ERROR"
+	ActivityTypeToolCallStart        = "TOOL_CALL_START"
+	ActivityTypeToolCallEnd          = "TOOL_CALL_END"
+	ActivityTypeProtocolViolation    = "protocol_violation"
+	ActivityTypeToolCallUnauthorized = "tool_call_unauthorized"
+	ActivityTypeToolCall             = "tool_call"
+)
+
 type FinalResponseEvent struct {
 	Content string
 }
 
 type ErrorEvent struct {
 	Err error
+}
+
+// ModelSwitchEvent is sent when the model is switched, e.g., due to fallback.
+type ModelSwitchEvent struct {
+	OldModel string
+	NewModel string
+	Reason   string
 }
 
 type UserConfirmationRequestEvent struct {

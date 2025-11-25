@@ -16,19 +16,21 @@ var compressCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Println("Compressing chat history...")
 
-		// Check if there's a Go AI Agent client available
-		if executor == nil {
-			fmt.Fprintf(os.Stderr, "Error: Go AI Agent client not initialized. Cannot compress chat history.\n")
-			os.Exit(1)
-		}
+		// // Check if there's a Go AI Agent client available
+		// if executor == nil {
+		// 	fmt.Fprintf(os.Stderr, "Error: Go AI Agent client not initialized. Cannot compress chat history.\n")
+		// 	os.Exit(1)
+		// }
 
-		// Call CompressChat method
-		result, err := executor.CompressChat("", false)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error compressing chat history: %v\n", err)
-			os.Exit(1)
-		}
+		// // Call CompressChat method
+		// result, err := executor.CompressChat("", false)
+		// if err != nil {
+		// 	fmt.Fprintf(os.Stderr, "Error compressing chat history: %v\n", err)
+		// 	os.Exit(1)
+		// }
 
-		fmt.Printf("Chat history compressed successfully. Original tokens: %d, New tokens: %d\n", result.OriginalTokenCount, result.NewTokenCount)
+		// fmt.Printf("Chat history compressed successfully. Original tokens: %d, New tokens: %d\n", result.OriginalTokenCount, result.NewTokenCount)
+		fmt.Fprintf(os.Stderr, "Error: Compress command is not yet functional after refactoring. Use /clear in interactive chat for now.\n")
+		os.Exit(1)
 	},
 }

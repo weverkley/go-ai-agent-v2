@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath" // Added
-	"runtime" // Added
+	"runtime"       // Added
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
@@ -39,7 +39,8 @@ func loadPromptsFromFile(filePath string) (map[string]string, error) {
 	return prompts, nil
 }
 
-var prompts map[string]string
+var codebaseInvestigatorPrompts map[string]string
+
 func init() {
 	var err error
 	_, filename, _, ok := runtime.Caller(0)
@@ -48,7 +49,7 @@ func init() {
 	}
 	// The path to the prompts file is relative to the current file.
 	promptsFilePath := filepath.Join(filepath.Dir(filename), "codebase_investigator_prompts.md")
-	prompts, err = loadPromptsFromFile(promptsFilePath)
+	codebaseInvestigatorPrompts, err = loadPromptsFromFile(promptsFilePath)
 	if err != nil {
 		panic(fmt.Sprintf("failed to load codebase investigator prompts from %s: %v", promptsFilePath, err))
 	}
@@ -56,15 +57,15 @@ func init() {
 
 // CodebaseInvestigatorAgent defines the Codebase Investigator subagent.
 var CodebaseInvestigatorAgent = AgentDefinition{
-	Name:        "codebase_investigator",
+	Name:        types.CODEBASE_INVESTIGATOR_TOOL_NAME,
 	DisplayName: "Codebase Investigator Agent",
-	Description: prompts["Description"],
+	Description: codebaseInvestigatorPrompts["Description"],
 	InputConfig: InputConfig{
 		Inputs: map[string]InputParameter{
 			"objective": {
-				Description: prompts["Objective Description"],
-				Type:     "string",
-				Required: true,
+				Description: codebaseInvestigatorPrompts["Objective Description"],
+				Type:        "string",
+				Required:    true,
 			},
 		},
 	},
@@ -85,9 +86,9 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 	},
 
 	ModelConfig: ModelConfig{
-		Model:        config.DEFAULT_GEMINI_MODEL, // Assuming DEFAULT_GEMINI_MODEL is defined in config
-		Temperature:  0.1,
-		TopP:         0.95,
+		Model:          config.DEFAULT_GEMINI_MODEL, // Assuming DEFAULT_GEMINI_MODEL is defined in config
+		Temperature:    0.1,
+		TopP:           0.95,
 		ThinkingBudget: -1,
 	},
 
@@ -102,7 +103,7 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 	},
 
 	PromptConfig: PromptConfig{
-		Query: prompts["Query"],
-		SystemPrompt: prompts["System Prompt"],
+		Query:        codebaseInvestigatorPrompts["Query"],
+		SystemPrompt: codebaseInvestigatorPrompts["System Prompt"],
 	},
 }

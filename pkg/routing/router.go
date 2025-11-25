@@ -2,7 +2,8 @@ package routing
 
 import (
 	"fmt"
-	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
+	"go-ai-agent-v2/go-cli/pkg/telemetry"
+	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // CompositeStrategy attempts a list of child strategies in order.
@@ -25,7 +26,7 @@ func (s *CompositeStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routi
 		decision, err := strategy.Route(ctx, cfg)
 		if err != nil {
 			// Log the error and continue to the next strategy
-			// telemetry.LogDebugf("Routing strategy %s failed: %v", strategy.Name(), err) // Assuming telemetry is available
+			telemetry.LogDebugf("Routing strategy %s failed: %v", strategy.Name(), err) // Assuming telemetry is available
 			continue
 		}
 		if decision != nil {
@@ -41,13 +42,17 @@ type ModelRouterService struct {
 }
 
 func NewModelRouterService(cfg types.Config) *ModelRouterService {
-	// Initialize the composite strategy with the desired priority order.
-	strategy := NewCompositeStrategy(
+	telemetry.LogDebugf("NewModelRouterService called: Initializing routing strategies.")
+	strategies := []RoutingStrategy{
 		&FallbackStrategy{},
 		&OverrideStrategy{},
 		&ClassifierStrategy{},
 		&DefaultStrategy{},
-	)
+	}
+	for i, s := range strategies {
+		telemetry.LogDebugf("Strategy %d: %s", i, s.Name())
+	}
+	strategy := NewCompositeStrategy(strategies...)
 	return &ModelRouterService{
 		strategy: strategy,
 	}

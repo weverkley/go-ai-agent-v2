@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
@@ -21,7 +22,7 @@ func init() {
 var webSearchCmd = &cobra.Command{
 	Use:   "web-search",
 	Short: "Performs a web search using Google Search",
-	Long:  `Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.`, 
+	Long:  `Performs a web search using Google Search (via the Gemini API) and returns the results. This tool is useful for finding information on the internet based on a query.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		webSearchTool := tools.NewWebSearchTool(SettingsService, nil, nil)
 		result, err := webSearchTool.Execute(context.Background(), map[string]any{

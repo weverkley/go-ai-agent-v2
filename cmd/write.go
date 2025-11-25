@@ -23,7 +23,7 @@ func init() {
 var writeCmd = &cobra.Command{
 	Use:   "write",
 	Short: "Write content to a file",
-	Long:  `Write content to a specified file.`, 
+	Long:  `Write content to a specified file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		toolRegistryVal, found := Cfg.Get("toolRegistry")
 		if !found || toolRegistryVal == nil {

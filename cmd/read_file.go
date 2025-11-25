@@ -6,13 +6,14 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
 var (
 	readFileAbsolutePath string
-	readFileOffset int
-	readFileLimit int
+	readFileOffset       int
+	readFileLimit        int
 )
 
 func init() {

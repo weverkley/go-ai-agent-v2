@@ -17,18 +17,23 @@ type GetCurrentBranchTool struct {
 // NewGetCurrentBranchTool creates a new GetCurrentBranchTool.
 func NewGetCurrentBranchTool(gitService services.GitService) *GetCurrentBranchTool {
 	return &GetCurrentBranchTool{
-	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-		types.GET_CURRENT_BRANCH_TOOL_NAME,
-		"Get Current Branch",
-		"Retrieves the name of the current Git branch.",
-		types.KindOther,
-		(&types.JsonSchemaObject{
-			Type:       "object",
-		}).SetProperties(map[string]*types.JsonSchemaProperty{}),
-		false, // isOutputMarkdown
-		false, // canUpdateOutput
-		nil,   // MessageBus
-	),
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.GET_CURRENT_BRANCH_TOOL_NAME,
+			"Get Current Branch",
+			"Retrieves the name of the current Git branch.",
+			types.KindOther,
+			(&types.JsonSchemaObject{
+				Type: "object",
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"dir": {
+					Type:        "string",
+					Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
+				},
+			}).SetRequired([]string{"dir"}),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 		gitService: gitService,
 	}
 }

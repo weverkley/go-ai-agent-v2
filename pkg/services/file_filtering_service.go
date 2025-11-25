@@ -15,12 +15,12 @@ import (
 
 // FileFilteringService implements the FileService interface for filtering files based on ignore patterns.
 type FileFilteringService struct {
-	projectRoot string
-	gitIgnorePatterns []glob.Glob
-	goaiagentIgnorePatterns []glob.Glob
-	gitIgnoreStringPatterns []string // New field
+	projectRoot                   string
+	gitIgnorePatterns             []glob.Glob
+	goaiagentIgnorePatterns       []glob.Glob
+	gitIgnoreStringPatterns       []string // New field
 	goaiagentIgnoreStringPatterns []string // New field
-	mu sync.RWMutex
+	mu                            sync.RWMutex
 }
 
 // NewFileFilteringService creates a new instance of FileFilteringService.

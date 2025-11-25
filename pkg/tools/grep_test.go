@@ -27,11 +27,11 @@ func TestGrepTool_Execute(t *testing.T) {
 	os.WriteFile(filepath.Join(tempDir, "ignored.log"), []byte("log entry\n"), 0644)
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing pattern argument",
@@ -49,32 +49,32 @@ func TestGrepTool_Execute(t *testing.T) {
 			expectedError: "invalid regex pattern: error parsing regexp: missing closing ]: `[`",
 		},
 		{
-			name: "successful grep - single file",
-			args: map[string]any{"pattern": "Hello", "path": tempDir},
+			name:                  "successful grep - single file",
+			args:                  map[string]any{"pattern": "Hello", "path": tempDir},
 			expectedLLMContent:    fmt.Sprintf("Found 1 matches for pattern \"Hello\" in path \"%s\":\n---\nFile: %s\nL3: fmt.Println(\"Hello, World!\")\n---\n\n", tempDir, filepath.Join(tempDir, "main.go")),
 			expectedReturnDisplay: fmt.Sprintf("Found 1 matches for pattern \"Hello\" in path \"%s\":\n---\nFile: %s\nL3: fmt.Println(\"Hello, World!\")\n---\n\n", tempDir, filepath.Join(tempDir, "main.go")),
 		},
 		{
-			name: "successful grep - multiple files",
-			args: map[string]any{"pattern": "test", "path": tempDir},
+			name:                  "successful grep - multiple files",
+			args:                  map[string]any{"pattern": "test", "path": tempDir},
 			expectedLLMContent:    fmt.Sprintf("Found 3 matches for pattern \"test\" in path \"%s\":\n---\nFile: %s\nL2: This is a test project.\n---\n\n\nFile: %s\nL1: This is a test file.\nL2: It contains the word test.\n---\n\n", tempDir, filepath.Join(tempDir, "README.md"), filepath.Join(tempDir, "test.txt")),
 			expectedReturnDisplay: fmt.Sprintf("Found 3 matches for pattern \"test\" in path \"%s\":\n---\nFile: %s\nL2: This is a test project.\n---\n\n\nFile: %s\nL1: This is a test file.\nL2: It contains the word test.\n---\n\n", tempDir, filepath.Join(tempDir, "README.md"), filepath.Join(tempDir, "test.txt")),
 		},
 		{
-			name: "no matches found",
-			args: map[string]any{"pattern": "NonExistent", "path": tempDir},
+			name:                  "no matches found",
+			args:                  map[string]any{"pattern": "NonExistent", "path": tempDir},
 			expectedLLMContent:    fmt.Sprintf("No matches found for pattern \"NonExistent\" in path \"%s\"", tempDir),
 			expectedReturnDisplay: fmt.Sprintf("No matches found for pattern \"NonExistent\" in path \"%s\"", tempDir),
 		},
 		{
-			name: "filter by include glob",
-			args: map[string]any{"pattern": "package", "path": tempDir, "include": "*.go"},
+			name:                  "filter by include glob",
+			args:                  map[string]any{"pattern": "package", "path": tempDir, "include": "*.go"},
 			expectedLLMContent:    fmt.Sprintf("Found 2 matches for pattern \"package\" in path \"%s\":\n---\nFile: %s\nL1: package main\n---\n\n\nFile: %s\nL1: package utils\n---\n\n", tempDir, filepath.Join(tempDir, "main.go"), filepath.Join(tempDir, "src", "utils.go")),
 			expectedReturnDisplay: fmt.Sprintf("Found 2 matches for pattern \"package\" in path \"%s\":\n---\nFile: %s\nL1: package main\n---\n\n\nFile: %s\nL1: package utils\n---\n\n", tempDir, filepath.Join(tempDir, "main.go"), filepath.Join(tempDir, "src", "utils.go")),
 		},
 		{
-			name: "filter by include glob - no match",
-			args: map[string]any{"pattern": "package", "path": tempDir, "include": "*.md"},
+			name:                  "filter by include glob - no match",
+			args:                  map[string]any{"pattern": "package", "path": tempDir, "include": "*.md"},
 			expectedLLMContent:    fmt.Sprintf("No matches found for pattern \"package\" in path \"%s\"", tempDir),
 			expectedReturnDisplay: fmt.Sprintf("No matches found for pattern \"package\" in path \"%s\"", tempDir),
 		},

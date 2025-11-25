@@ -21,14 +21,14 @@ var grepCodeCmd = &cobra.Command{
 	Long:  `This command uses grep to search for a code pattern and then uses AI to summarize the findings.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		runGrepCodeCmd(cmd, args, SettingsService, ShellService)
+		runGrepCodeCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
 	},
 }
 
 // runGrepCodeCmd contains the logic for the grep-code command, accepting necessary services.
-func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
+func runGrepCodeCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService, workspaceService *services.WorkspaceService) {
 	// Initialize the ToolRegistry
-	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
+	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService, workspaceService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {

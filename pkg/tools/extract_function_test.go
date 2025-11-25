@@ -86,8 +86,6 @@ func (m *MockFileSystemService) Rename(oldpath, newpath string) error {
 
 // var MockExtractFunction func(filePath string, startLine, endLine int, newFunctionName, receiver string) (*agents.ExtractedFunction, error)
 
-
-
 // func init() {
 
 // 	// Set default implementation to the actual function
@@ -96,15 +94,11 @@ func (m *MockFileSystemService) Rename(oldpath, newpath string) error {
 
 // }
 
-
-
 func TestExtractFunctionTool_Execute(t *testing.T) {
 
 	mockFSS := new(MockFileSystemService)
 
 	tool := NewExtractFunctionTool(mockFSS)
-
-
 
 	// originalExtractFunction := agents.ExtractFunction
 
@@ -114,46 +108,40 @@ func TestExtractFunctionTool_Execute(t *testing.T) {
 
 	// })
 
-
-
 	tests := []struct {
+		name string
 
-		name          string
+		args map[string]any
 
-		args          map[string]any
-
-		setupMock     func()
+		setupMock func()
 
 		expectedLLMContent string
 
 		expectedReturnDisplay string
 
 		expectedError string
-
 	}{
 
 		{
 
-			name:          "missing filePath argument",
+			name: "missing filePath argument",
 
-			args:          map[string]any{"startLine": float64(1), "endLine": float64(5), "newFunctionName": "NewFunc"},
+			args: map[string]any{"startLine": float64(1), "endLine": float64(5), "newFunctionName": "NewFunc"},
 
-			setupMock:     func() {},
+			setupMock: func() {},
 
 			expectedError: "missing or invalid 'filePath' argument",
-
 		},
 
 		{
 
-			name:          "invalid startLine argument",
+			name: "invalid startLine argument",
 
-			args:          map[string]any{"filePath": "/tmp/file.go", "startLine": "invalid", "endLine": float64(5), "newFunctionName": "NewFunc"},
+			args: map[string]any{"filePath": "/tmp/file.go", "startLine": "invalid", "endLine": float64(5), "newFunctionName": "NewFunc"},
 
-			setupMock:     func() {},
+			setupMock: func() {},
 
 			expectedError: "missing or invalid 'startLine' argument",
-
 		},
 
 		// {

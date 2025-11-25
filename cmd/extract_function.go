@@ -47,9 +47,9 @@ Optionally, a receiver can be specified to create a method instead of a standalo
 		}
 
 		toolArgs := map[string]any{
-			"filePath":          filePath,
-			"startLine":         float64(startLine),
-			"endLine":           float64(endLine),
+			"filePath":        filePath,
+			"startLine":       float64(startLine),
+			"endLine":         float64(endLine),
 			"newFunctionName": newFunctionName,
 		}
 		if receiver != "" {

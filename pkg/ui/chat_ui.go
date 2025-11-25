@@ -4,6 +4,9 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+
+	// New import for core package
+	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/pathutils"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
@@ -22,154 +25,305 @@ import (
 )
 
 type ChatModel struct {
+
 	viewport     viewport.Model
+
 	textarea     textarea.Model
+
 	spinner      spinner.Model
+
 	messages     []Message
+
 	executorType string
+
 	config       types.Config
+
 	// Services
+
 	chatService      *services.ChatService
+
 	sessionService   *services.SessionService
+
 	shellService     services.ShellExecutionService
+
 	gitService       services.GitService
+
 	workspaceService *services.WorkspaceService
+
 	// UI state
-	streamCh        <-chan interface{}
-	isStreaming     bool
-	cancelCtx       context.Context
-	cancelFunc      context.CancelFunc
-	status          string
-	err             error
-	commandExecutor func(args []string) (string, error)
-	activeToolCalls map[string]*ToolCallStatus
+
+	streamCh                 <-chan interface{}
+
+	isStreaming              bool
+
+	cancelCtx                context.Context
+
+	cancelFunc               context.CancelFunc
+
+	status                   string
+
+	err                      error
+
+	commandExecutor          func(args []string) (string, error)
+
+	activeToolCalls          map[string]*ToolCallStatus
+
 	// Styles
+
 	senderStyle              lipgloss.Style
+
 	botStyle                 lipgloss.Style
+
 	toolStyle                lipgloss.Style
+
 	errorStyle               lipgloss.Style
+
 	statusStyle              lipgloss.Style
+
 	footerStyle              lipgloss.Style
+
 	suggestionStyle          lipgloss.Style
+
 	pathStyle                lipgloss.Style
+
 	branchStyle              lipgloss.Style
+
 	modelStyle               lipgloss.Style
+
 	logFile                  *os.File
+
 	logWriter                *bufio.Writer
+
 	toolConfirmationRequest  *types.ToolConfirmationRequestEvent
+
 	awaitingToolConfirmation bool
+
 	commandHistory           []string
+
 	historyIndex             int
+
 	// Session stats
+
 	startTime      time.Time
+
 	toolCallCount  int
+
 	toolErrorCount int
+
 	contextFile    string
+
 	sessionID      string
-	todosSummary    string
+
+	todosSummary   string
+
 }
 
+
+
 func NewChatModel(
+
 	chatService *services.ChatService,
+
 	sessionService *services.SessionService,
+
 	executorType string,
+
 	config types.Config,
+
 	commandExecutor func(args []string) (string, error),
+
 	shellService services.ShellExecutionService,
+
 	gitService services.GitService,
+
 	workspaceService *services.WorkspaceService,
+
 	sessionID string,
+
 ) *ChatModel {
+
 	ta := textarea.New()
+
 	ta.Placeholder = "Send a message or type a command (e.g. /clear)..."
+
 	ta.Focus()
+
 	ta.Prompt = "❯ "
+
 	ta.CharLimit = 0
+
 	ta.SetWidth(80)
+
 	ta.SetHeight(1)
+
 	ta.ShowLineNumbers = false
+
 	ta.FocusedStyle.CursorLine = lipgloss.NewStyle()
+
 	vp := viewport.New(80, 20)
+
 	vp.Style = lipgloss.NewStyle().
+
 		BorderStyle(lipgloss.HiddenBorder())
+
 	s := spinner.New()
+
 	s.Spinner = spinner.Meter
+
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+
+	
+
+	// ... (logging initialization)
+
 	var logDirPath string
+
 	telemetrySettingsVal, ok := config.Get("telemetry")
+
 	if ok {
+
 		if telemetrySettings, ok := telemetrySettingsVal.(*types.TelemetrySettings); ok && telemetrySettings.Enabled && telemetrySettings.OutDir != "" {
+
 			expandedPath, err := pathutils.ExpandPath(telemetrySettings.OutDir)
+
 			if err != nil {
+
 				telemetry.LogErrorf("Error expanding telemetry OutDir path '%s': %v", telemetrySettings.OutDir, err)
+
 			} else {
+
 				logDirPath = expandedPath
+
 			}
+
 		}
+
 	}
+
 	if logDirPath == "" {
+
 		expandedPath, err := pathutils.ExpandPath("~/.goaiagent/tmp")
+
 		if err != nil {
+
 			telemetry.LogErrorf("Error expanding default log directory path: %v", err)
+
 			logDirPath = ".goaiagent/tmp"
+
 		} else {
+
 			logDirPath = expandedPath
+
 		}
+
 	}
+
 	logFilePath := filepath.Join(logDirPath, "chat-ui.log")
+
 	if err := os.MkdirAll(logDirPath, 0755); err != nil {
+
 		telemetry.LogErrorf("Error creating log directory: %v", err)
+
 	}
+
 	logFile, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
 	if err != nil {
+
 		telemetry.LogErrorf("Error opening chat log file: %v", err)
+
 	}
+
 	logWriter := bufio.NewWriter(logFile)
+
 	model := &ChatModel{
+
 		viewport:                 vp,
+
 		textarea:                 ta,
+
 		spinner:                  s,
+
 		messages:                 createInitialMessages(),
+
 		chatService:              chatService,
+
 		sessionService:           sessionService,
+
 		executorType:             executorType,
+
 		config:                   config,
+
 		shellService:             shellService,
+
 		gitService:               gitService,
+
 		workspaceService:         workspaceService,
+
 		isStreaming:              false,
+
 		status:                   "Ready",
+
 		commandExecutor:          commandExecutor,
+
 		activeToolCalls:          make(map[string]*ToolCallStatus),
+
 		senderStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("5")),
+
 		botStyle:                 lipgloss.NewStyle().Foreground(lipgloss.Color("6")),
+
 		toolStyle:                lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Italic(true),
+
 		errorStyle:               lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true),
+
 		statusStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+
 		footerStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("240")),
+
 		suggestionStyle:          lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Italic(true),
+
 		pathStyle:                lipgloss.NewStyle().Foreground(lipgloss.Color("12")),
+
 		branchStyle:              lipgloss.NewStyle().Foreground(lipgloss.Color("10")),
+
 		modelStyle:               lipgloss.NewStyle().Foreground(lipgloss.Color("13")),
+
 		logFile:                  logFile,
+
 		logWriter:                logWriter,
+
 		toolConfirmationRequest:  nil,
+
 		awaitingToolConfirmation: false,
+
 		commandHistory:           []string{},
+
 		historyIndex:             0,
-		// Session stats
-		startTime:      time.Now(),
-		toolCallCount:  0,
-		toolErrorCount: 0,
-		contextFile:    "", // Initializing as empty string
-		sessionID:      sessionID,
-		todosSummary:   "", // Initialize as empty
+
+		startTime:                time.Now(),
+
+		toolCallCount:            0,
+
+		toolErrorCount:           0,
+
+		contextFile:              "", 
+
+		sessionID:                sessionID,
+
+		todosSummary:             "",
+
 	}
+
 	if _, err := os.Stat("GOAIAGENT.md"); err == nil {
+
 		model.contextFile = "GOAIAGENT.md"
+
 	}
+
 	model.updateViewport()
+
 	return model
+
 }
 
 func (m *ChatModel) Close() error {
@@ -185,6 +339,13 @@ func (m *ChatModel) Close() error {
 func (m *ChatModel) GetStats() (int, int, time.Duration) {
 	return m.toolCallCount, m.toolErrorCount, time.Since(m.startTime)
 }
+
+// SetChatService updates the ChatModel's chatService and executorType.
+func (m *ChatModel) SetChatService(newSvc *services.ChatService, newExecutorType string) {
+	m.chatService = newSvc
+	m.executorType = newExecutorType
+}
+
 func (m *ChatModel) Init() tea.Cmd {
 	return tea.Batch(
 		textarea.Blink,
@@ -377,6 +538,11 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			errmsg := ErrorMessage{Err: event.Err} // Corrected errmsg to errMsg
 			m.messages = append(m.messages, errmsg)
 			m.logUIMessage(errmsg) // Log error message
+		case types.ModelSwitchEvent:
+			m.executorType = event.NewModel
+			botMsg := BotMessage{Content: fmt.Sprintf("Automatically switched from **%s** to **%s** due to: %s", event.OldModel, event.NewModel, event.Reason)}
+			m.messages = append(m.messages, botMsg)
+			m.logUIMessage(botMsg)
 		}
 		m.updateViewport()
 		return m, waitForEvent(m.streamCh) // Continue waiting for events
@@ -431,12 +597,21 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, tea.Quit
 			case "settings":
 				if len(msg.args) > 1 && (msg.args[1] == "set" || msg.args[1] == "reset") {
-					suggestionMsg := SuggestionMessage{Content: "Configuration changed. Please restart the chat for the changes to take effect."}
-					m.messages = append(m.messages, suggestionMsg)
-					m.logUIMessage(suggestionMsg)
+					// Trigger hot-reload of chat service
+					m.status = "Settings changed, reinitializing chat service..."
+					return m, ReinitializeChatCmd(m.chatService, m.sessionService, m.config)
 				}
 			}
 		}
+		m.updateViewport()
+		return m, nil
+	case chatServiceReloadedMsg:
+		m.SetChatService(msg.newService, msg.newExecutorType)
+		m.messages = m.repopulateMessagesFromHistory(m.chatService.GetHistory()) // Repopulate messages from the new service's history
+		m.status = fmt.Sprintf("Switched to executor: %s", msg.newExecutorType)
+		botMsg := BotMessage{Content: fmt.Sprintf("Switched to executor: %s", msg.newExecutorType)}
+		m.messages = append(m.messages, botMsg)
+		m.logUIMessage(botMsg)
 		m.updateViewport()
 		return m, nil
 	}
@@ -474,15 +649,18 @@ func (m *ChatModel) renderFooter() string {
 		var finalRender string
 		if m.awaitingToolConfirmation && m.toolConfirmationRequest != nil {
 			options := "(y: allow once, a: allow always, n: cancel, m: modify)"
-			
+
 			messageStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Width(m.viewport.Width - lipgloss.Width(m.spinner.View()) - 1)
-			
+
 			var finalRender string
 			if m.toolConfirmationRequest.Type == "edit" && m.toolConfirmationRequest.FileDiff != "" {
 				// For edits, show message, options, and then the diff on subsequent lines.
 				messageLine := messageStyle.Render(m.toolConfirmationRequest.Message)
 				optionsLine := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Render(options)
-				finalRender = lipgloss.JoinVertical(lipgloss.Left, messageLine, optionsLine, m.toolConfirmationRequest.FileDiff)
+				// Explicitly style the diff to ensure it's monospaced and readable
+				diffStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("248"))
+				styledDiff := diffStyle.Render(m.toolConfirmationRequest.FileDiff)
+				finalRender = lipgloss.JoinVertical(lipgloss.Left, messageLine, optionsLine, styledDiff)
 			} else {
 				// For other confirmations, show message and options.
 				fullMessage := fmt.Sprintf("%s %s", m.toolConfirmationRequest.Message, options)
@@ -567,12 +745,24 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 			return m, nil
 		case "help":
 			helpText := `
-Available Commands:
-  /clear                  - Clears the current chat session history.
-  /sessions list          - Lists all saved chat sessions.
-  /sessions resume <id>   - Resumes a specific chat session by its ID or number.
-  /quit                   - Exits the application.
-  /help                   - Shows this help message.
+**Available Commands**
+
+**Session Management**
+* ` + "`/clear`" + ` - Clears the current chat session history.
+* ` + "`/sessions list`" + ` - Lists all saved chat sessions.
+* ` + "`/sessions resume <id>`" + ` - Resumes a session by its ID or list number.
+
+**Application**
+* ` + "`/help`" + ` - Shows this help message.
+* ` + "`/quit` or `/exit`" + ` - Exits the application.
+
+**Settings**
+* ` + "`/settings list`" + ` - Shows current settings.
+* ` + "`/settings set <key> <value>`" + ` - Changes a setting (e.g., ` + "`/settings set executor qwen`" + `).
+* ` + "`/settings get <key>`" + ` - Retrieves the value of a setting.
+* ` + "`/settings reset`" + ` - Resets all settings to their default values.
+
+*Most other commands from ` + "`main-agent --help`" + ` can also be run with a ` + "`/`" + ` prefix.*
 `
 			m.messages = append(m.messages, BotMessage{Content: helpText})
 			m.updateViewport()
@@ -607,7 +797,7 @@ Available Commands:
 					return m, nil
 				}
 				sessionID := args[2]
-				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService())
+				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.config, nil)
 				if err != nil {
 					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
 					m.updateViewport()
@@ -743,5 +933,54 @@ func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 			return streamErrorMsg{err}
 		}
 		return streamChannelMsg{ch: stream}
+	}
+}
+
+// ReinitializeChatCmd creates a new chat service based on current settings and transfers state.
+func ReinitializeChatCmd(oldChatService *services.ChatService, sessionService *services.SessionService, config types.Config) tea.Cmd {
+	return func() tea.Msg {
+		// 1. Capture the current state from the old chat service
+		chatState := oldChatService.GetState()
+
+		// 2. Read the latest executor and model settings
+		settingsService := oldChatService.GetSettingsService()
+		executorTypeVal, _ := settingsService.Get("executor")
+		executorType, ok := executorTypeVal.(string)
+		if !ok {
+			executorType = "gemini" // Fallback
+		}
+
+		modelVal, _ := settingsService.Get("model")
+		model, ok := modelVal.(string)
+		if !ok {
+			model = "gemini-pro" // Fallback
+		}
+		appConfig := config.WithModel(model)
+
+		// 3. Create a new Executor instance
+		executorFactory, err := core.NewExecutorFactory(executorType, appConfig)
+		if err != nil {
+			return streamErrorMsg{fmt.Errorf("error creating new executor factory: %w", err)}
+		}
+		newExecutor, err := executorFactory.NewExecutor(appConfig, types.GenerateContentConfig{}, chatState.History) // Pass history for context
+		if err != nil {
+			return streamErrorMsg{fmt.Errorf("error creating new executor: %w", err)}
+		}
+
+		// 4. Create a new ChatService instance, passing the captured state
+		newChatService, err := services.NewChatService(
+			newExecutor,
+			oldChatService.GetToolRegistry(),
+			sessionService,
+			chatState.SessionID,
+			settingsService,
+			appConfig, // Pass the appConfig
+			chatState, // Pass the captured state
+		)
+		if err != nil {
+			return streamErrorMsg{fmt.Errorf("error creating new chat service: %w", err)}
+		}
+
+		return chatServiceReloadedMsg{newService: newChatService, newExecutorType: executorType}
 	}
 }

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
+
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +19,7 @@ func init() {
 var readCmd = &cobra.Command{
 	Use:   "read",
 	Short: "Read content from a file",
-	Long:  `Read the content of a specified file.`, 
+	Long:  `Read the content of a specified file.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fsService := services.NewFileSystemService()
 		content, err := fsService.ReadFile(readFilePath)

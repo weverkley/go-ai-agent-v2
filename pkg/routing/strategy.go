@@ -2,8 +2,9 @@ package routing
 
 import (
 	"context"
-	"fmt" // Added
-	"go-ai-agent-v2/go-cli/pkg/types" // Add this line
+	"fmt"
+	"go-ai-agent-v2/go-cli/pkg/telemetry" // Re-add telemetry import
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"strings"
 )
 
@@ -43,11 +44,15 @@ func (s *DefaultStrategy) Name() string {
 func (s *DefaultStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	modelVal, ok := cfg.Get("model")
 	if !ok || modelVal == nil {
-		return nil, fmt.Errorf("model not found in config")
+		err := fmt.Errorf("model not found in config")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	model, ok := modelVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("model in config is not a string")
+		err := fmt.Errorf("model in config is not a string")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	return &RoutingDecision{
 		Model: model,
@@ -72,7 +77,9 @@ func (s *OverrideStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 	}
 	model, ok := modelVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("model in config is not a string")
+		err := fmt.Errorf("model in config is not a string")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	if model == "auto" {
 		return nil, nil // Pass to the next strategy
@@ -95,25 +102,32 @@ func (s *FallbackStrategy) Name() string {
 }
 
 func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
+	telemetry.LogDebugf("FallbackStrategy.Route called")
 	if !ctx.IsFallback {
 		return nil, nil // Not a fallback scenario, pass to the next strategy.
 	}
 
 	currentModelVal, ok := cfg.Get("model")
 	if !ok || currentModelVal == nil {
-		return nil, fmt.Errorf("current model not found in config for fallback strategy")
+		err := fmt.Errorf("current model not found in config for fallback strategy")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 	currentModel, ok := currentModelVal.(string)
 	if !ok {
-		return nil, fmt.Errorf("current model in config is not a string for fallback strategy")
+		err := fmt.Errorf("current model in config is not a string for fallback strategy")
+		telemetry.LogErrorf(err.Error())
+		return nil, err
 	}
 
 	suggester, ok := modelSuggesters[ctx.ExecutorType]
+	telemetry.LogDebugf("FallbackStrategy: ctx.ExecutorType=%s, suggester found=%t", ctx.ExecutorType, ok)
 	if !ok {
 		return nil, nil // No suggester for this executor type.
 	}
 
 	suggestedModel, ok := suggester(currentModel)
+	telemetry.LogDebugf("FallbackStrategy: currentModel=%s, suggestedModel=%s, suggestion made=%t", currentModel, suggestedModel, ok)
 	if !ok {
 		return nil, nil // No suggestion available.
 	}
@@ -129,25 +143,28 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 
 var modelSuggesters = map[string]func(string) (string, bool){
 	"gemini": func(currentModel string) (string, bool) {
-		parts := strings.Split(currentModel, "/")
-		modelName := parts[len(parts)-1]
-
+		telemetry.LogDebugf("Gemini Suggester: currentModel=%s", currentModel)
 		switch {
-		case strings.Contains(modelName, "pro"):
-			return "gemini-1.5-flash", true
-		case strings.Contains(modelName, "flash"):
-			return "gemini-1.5-flash-latest", true
+		case strings.Contains(currentModel, "pro"):
+			return "gemini-flash-latest", true
+		case strings.Contains(currentModel, "flash"):
+			return "gemini-flash-lite-latest", true
 		default:
+			telemetry.LogDebugf("Gemini Suggester: No suggestion found for modelName=%s", currentModel)
 			return "", false
 		}
 	},
 	"qwen": func(currentModel string) (string, bool) {
+		telemetry.LogDebugf("Qwen Suggester: currentModel=%s", currentModel)
 		switch {
 		case strings.Contains(currentModel, "max"):
 			return "qwen-plus", true
 		case strings.Contains(currentModel, "plus"):
 			return "qwen-turbo", true
+		case strings.Contains(currentModel, "turbo"):
+			return "qwen-flash", true
 		default:
+			telemetry.LogDebugf("Qwen Suggester: No suggestion found for modelName=%s", currentModel)
 			return "", false
 		}
 	},
@@ -163,9 +180,36 @@ func (s *ClassifierStrategy) Name() string {
 func (s *ClassifierStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	// Simplified heuristic: if the request contains "code", use a more powerful model.
 	if strings.Contains(strings.ToLower(ctx.Request), "code") {
+		currentModelVal, ok := cfg.Get("model")
+		if !ok || currentModelVal == nil {
+			err := fmt.Errorf("current model not found in config for ClassifierStrategy")
+			telemetry.LogErrorf(err.Error())
+			return nil, err
+		}
+		currentModel, ok := currentModelVal.(string)
+		if !ok {
+			err := fmt.Errorf("current model in config is not a string for ClassifierStrategy")
+			telemetry.LogErrorf(err.Error())
+			return nil, err
+		}
+
+		var modelSuggestion string = ""
+
+		switch {
+		case strings.Contains(currentModel, "gemini"):
+			telemetry.LogDebugf("ClassifierStrategy: Request contains 'code', suggesting 'gemini-pro-latest'")
+			modelSuggestion = "gemini-pro-latest"
+		case strings.Contains(currentModel, "qwen"):
+			telemetry.LogDebugf("ClassifierStrategy: Request contains 'code', suggesting 'qwen-plus'")
+			modelSuggestion = "qwen-plus"
+		default:
+			telemetry.LogDebugf("ClassifierStrategy: Request contains 'code', but no specific executor handling implemented")
+			modelSuggestion = currentModel // No change
+		}
+
 		// This could be made more generic, e.g., by getting the "powerful" model from config.
 		return &RoutingDecision{
-			Model: "gemini-1.5-pro",
+			Model: modelSuggestion,
 			Metadata: map[string]interface{}{
 				"source":    s.Name(),
 				"reasoning": "Request contains 'code', suggesting a more powerful model.",
@@ -175,4 +219,3 @@ func (s *ClassifierStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Rout
 
 	return nil, nil // Pass to the next strategy.
 }
-

@@ -20,8 +20,8 @@ type ReadFileTool struct {
 func NewReadFileTool() *ReadFileTool {
 	return &ReadFileTool{
 		types.NewBaseDeclarativeTool(
-			"read_file",
-			"read_file",
+			types.READ_FILE_TOOL_NAME,
+			types.READ_FILE_TOOL_DISPLAY_NAME,
 			"Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
 			types.KindOther, // Assuming KindOther for now
 			&types.JsonSchemaObject{
@@ -29,7 +29,7 @@ func NewReadFileTool() *ReadFileTool {
 				Properties: map[string]*types.JsonSchemaProperty{
 					"absolute_path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt').",
 					},
 					"offset": &types.JsonSchemaProperty{
 						Type:        "number",
@@ -95,41 +95,39 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 		}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
 	}
 
-		// Handle different file types
+	// Handle different file types
 
-		ext := strings.ToLower(filepath.Ext(absolutePath))
+	ext := strings.ToLower(filepath.Ext(absolutePath))
 
-		switch ext {
+	switch ext {
 
-				case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
+	case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
 
-					output := fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath)
+		output := fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath)
 
-					return types.ToolResult{
+		return types.ToolResult{
 
-						LLMContent:    output,
+			LLMContent: output,
 
-						ReturnDisplay: output,
+			ReturnDisplay: output,
+		}, nil
 
-					}, nil
+	case ".pdf":
 
-		case ".pdf":
+		output := fmt.Sprintf("PDF file: %s (binary file, consider using a specialized PDF tool for content extraction)", absolutePath)
 
-			output := fmt.Sprintf("PDF file: %s (binary file, consider using a specialized PDF tool for content extraction)", absolutePath)
+		return types.ToolResult{
 
-			return types.ToolResult{
+			LLMContent: output,
 
-				LLMContent:    output,
+			ReturnDisplay: output,
+		}, nil
 
-				ReturnDisplay: output,
+	default:
 
-			}, nil
+		// Assume text file and proceed with existing text reading logic.
 
-		default:
-
-			// Assume text file and proceed with existing text reading logic.
-
-		}
+	}
 
 	file, err := os.Open(absolutePath)
 	if err != nil {

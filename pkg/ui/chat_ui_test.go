@@ -12,7 +12,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/charmbracelet/bubbletea"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -38,7 +38,6 @@ func (m *MockShellExecutionService) KillAllProcesses() {
 }
 
 // MockSettingsService is a mock implementation of types.SettingsServiceIface
-
 
 // --- Helper for creating a test model ---
 func setupTestSessionService(t *testing.T) (*services.SessionService, func()) {
@@ -74,7 +73,7 @@ func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.
 
 	sessionID := "test-session"
-	chatService, err := services.NewChatService(executor, types.NewToolRegistry(), sessionService, sessionID, mockSettingsService)
+	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, sessionID, mockSettingsService, appConfig, nil)
 	assert.NoError(t, err)
 
 	model := NewChatModel(chatService, sessionService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)
@@ -230,7 +229,7 @@ func TestUpdate_ToolConfirmationFlow(t *testing.T) {
 		// Setup
 		executor := &core.MockExecutor{}
 		model := newTestModel(t, executor)
-		model.isStreaming = true // We must be streaming to receive a confirmation request
+		model.isStreaming = true        // We must be streaming to receive a confirmation request
 		model.streamCh = make(chan any) // Ensure streamCh is not nil
 
 		// 1. Simulate the service sending a ToolConfirmationRequestEvent
@@ -295,7 +294,7 @@ func TestUpdate_ToolConfirmationFlow(t *testing.T) {
 		confirmationEvent := types.ToolConfirmationRequestEvent{ToolCallID: "confirm-esc", ToolName: "test-tool", Message: "..."}
 		newModel, _ := model.Update(streamEventMsg{event: confirmationEvent})
 		chatModel, _ := newModel.(*ChatModel)
-		
+
 		newModel, _ = chatModel.Update(tea.KeyMsg{Type: tea.KeyEsc})
 		chatModel, _ = newModel.(*ChatModel)
 

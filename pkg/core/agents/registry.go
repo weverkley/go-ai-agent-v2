@@ -64,6 +64,33 @@ func (ar *AgentRegistry) loadBuiltInAgents() {
 
 		ar.registerAgent(agentDef)
 	}
+
+	testWriterSettingsVal, found := ar.config.Get("testWriterSettings")
+	var testWriterSettings *types.TestWriterSettings
+	if found && testWriterSettingsVal != nil {
+		if tws, ok := testWriterSettingsVal.(*types.TestWriterSettings); ok {
+			testWriterSettings = tws
+		}
+	}
+
+	if testWriterSettings != nil && testWriterSettings.Enabled {
+		agentDef := TestWriterAgent
+
+		if testWriterSettings.Model != "" {
+			agentDef.ModelConfig.Model = testWriterSettings.Model
+		}
+		if testWriterSettings.ThinkingBudget != nil {
+			agentDef.ModelConfig.ThinkingBudget = *testWriterSettings.ThinkingBudget
+		}
+		if testWriterSettings.MaxTimeMinutes != nil {
+			agentDef.RunConfig.MaxTimeMinutes = *testWriterSettings.MaxTimeMinutes
+		}
+		if testWriterSettings.MaxNumTurns != nil {
+			agentDef.RunConfig.MaxTurns = *testWriterSettings.MaxNumTurns
+		}
+
+		ar.registerAgent(agentDef)
+	}
 }
 
 // registerAgent registers an agent definition.

@@ -15,9 +15,9 @@ import (
 
 // tavilySearchResult represents a single search result from Tavily.
 type tavilySearchResult struct {
-	Title    string `json:"title"`
-	URL      string `json:"url"`
-	Content  string `json:"content"`
+	Title      string `json:"title"`
+	URL        string `json:"url"`
+	Content    string `json:"content"`
 	RawContent string `json:"raw_content"`
 }
 
@@ -30,8 +30,8 @@ type tavilyResponse struct {
 // WebSearchTool represents the web-search tool.
 type WebSearchTool struct {
 	*types.BaseDeclarativeTool
-	settingsService types.SettingsServiceIface
-	httpClient      *http.Client // For Tavily API
+	settingsService                  types.SettingsServiceIface
+	httpClient                       *http.Client                                                            // For Tavily API
 	googleCustomSearchServiceFactory func(ctx context.Context, apiKey string) (*customsearch.Service, error) // For Google Custom Search
 }
 
@@ -51,25 +51,25 @@ func NewWebSearchTool(
 	}
 
 	return &WebSearchTool{
-	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-		types.WEB_SEARCH_TOOL_NAME,
-		"Web Search",
-		"Performs a web search using Google Search (via the Gemini API) and returns the results.",
-		types.KindOther,
-		(&types.JsonSchemaObject{
-			Type: "object",
-		}).SetProperties(map[string]*types.JsonSchemaProperty{
-			"query": &types.JsonSchemaProperty{
-				Type:        "string",
-				Description: "The search query to find information on the web.",
-			},
-		}).SetRequired([]string{"query"}),
-		false, // isOutputMarkdown
-		false, // canUpdateOutput
-		nil,   // MessageBus
-	),
-		settingsService: settingsService,
-		httpClient:      httpClient,
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.WEB_SEARCH_TOOL_NAME,
+			types.WEB_SEARCH_TOOL_DISPLAY_NAME,
+			"Performs a web search using Google Search (via the Gemini API) and returns the results.",
+			types.KindOther,
+			(&types.JsonSchemaObject{
+				Type: "object",
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"query": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "The search query to find information on the web.",
+				},
+			}).SetRequired([]string{"query"}),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
+		settingsService:                  settingsService,
+		httpClient:                       httpClient,
 		googleCustomSearchServiceFactory: googleCustomSearchServiceFactory,
 	}
 }
@@ -87,12 +87,12 @@ func (t *WebSearchTool) searchWithTavily(ctx context.Context, query string, apiK
 
 	// Request body
 	requestBody, err := json.Marshal(map[string]interface{}{
-		"q":       query,
-		"api_key": apiKey,
-		"search_depth": "basic", // or "advanced"
-		"include_answer": false,
+		"q":                   query,
+		"api_key":             apiKey,
+		"search_depth":        "basic", // or "advanced"
+		"include_answer":      false,
 		"include_raw_content": false,
-		"max_results": 5,
+		"max_results":         5,
 	})
 	if err != nil {
 		return "", &types.ToolError{

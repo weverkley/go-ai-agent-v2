@@ -28,14 +28,14 @@ var findDocsCmd = &cobra.Command{
 	This command uses AI to search for documentation files related to your question and provides direct links to them on GitHub.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		runFindDocsCmd(cmd, args, SettingsService, ShellService)
+		runFindDocsCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
 	},
 }
 
 // runFindDocsCmd handles the find-docs command logic.
-func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
+func runFindDocsCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService, workspaceService *services.WorkspaceService) {
 	// Initialize the ToolRegistry
-	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService)
+	toolRegistry := tools.RegisterAllTools(FSService, shellService, settingsService, workspaceService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {

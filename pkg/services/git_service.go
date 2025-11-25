@@ -3,9 +3,11 @@ package services
 import (
 	"fmt"
 	"strings"
+	"time" // New import
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
+	"github.com/go-git/go-git/v5/plumbing/object" // New import
 )
 
 // GitService interface defines the methods for interacting with Git repositories.
@@ -16,6 +18,8 @@ type GitService interface {
 	Pull(dir string, ref string) error
 	Clone(url string, directory string, ref string) error
 	DeleteBranch(dir string, branchName string) error
+	StageFiles(dir string, files []string) error
+	Commit(dir, message string) error
 }
 
 // gitService implements the GitService interface.
@@ -145,5 +149,68 @@ func (s *gitService) DeleteBranch(dir string, branchName string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete branch %s: %w", branchName, err)
 	}
+	return nil
+}
+
+// StageFiles stages the specified files. If files is empty, it stages all changes.
+func (s *gitService) StageFiles(dir string, files []string) error {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree for %s: %w", dir, err)
+	}
+
+	if len(files) == 0 {
+		// Stage all changes
+		_, err = w.Add(".")
+		if err != nil {
+			return fmt.Errorf("failed to add all files: %w", err)
+		}
+	} else {
+		// Stage specific files
+		for _, file := range files {
+			_, err = w.Add(file)
+			if err != nil {
+				return fmt.Errorf("failed to add file %s: %w", file, err)
+			}
+		}
+	}
+	return nil
+}
+
+// Commit creates a new commit with the given message.
+func (s *gitService) Commit(dir, message string) error {
+	repo, err := git.PlainOpen(dir)
+	if err != nil {
+		return fmt.Errorf("failed to open git repository at %s: %w", dir, err)
+	}
+
+	w, err := repo.Worktree()
+	if err != nil {
+		return fmt.Errorf("failed to get worktree for %s: %w", dir, err)
+	}
+
+	// This is a simplified approach, typically you'd configure the author/committer
+	// from git config or environment variables. For now, a placeholder.
+	commit, err := w.Commit(message, &git.CommitOptions{
+		Author: &object.Signature{
+			Name:  "AI Agent",
+			Email: "ai-agent@example.com",
+			When:  time.Now(),
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create commit: %w", err)
+	}
+
+	_, err = repo.CommitObject(commit)
+	if err != nil {
+		return fmt.Errorf("failed to get commit object: %w", err)
+	}
+
 	return nil
 }

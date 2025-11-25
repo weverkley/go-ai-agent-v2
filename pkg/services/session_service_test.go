@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -147,4 +148,3 @@ func TestGenerateSessionID(t *testing.T) {
 	_, err := time.Parse("20060102-150405", sessionID)
 	assert.NoError(t, err, "session ID should be in the expected time format")
 }
-

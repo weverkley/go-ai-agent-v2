@@ -21,7 +21,7 @@ func TestGlobTool_Execute(t *testing.T) {
 	// Create some dummy files and directories
 	os.MkdirAll(filepath.Join(tempDir, "src"), 0755)
 	os.MkdirAll(filepath.Join(tempDir, "docs"), 0755)
-	os.MkdirAll(filepath.Join(tempDir, ".git"), 0755) // Simulate a git repo
+	os.MkdirAll(filepath.Join(tempDir, ".git"), 0755)         // Simulate a git repo
 	os.MkdirAll(filepath.Join(tempDir, "node_modules"), 0755) // Simulate node_modules
 
 	os.WriteFile(filepath.Join(tempDir, "main.go"), []byte("package main"), 0644)
@@ -35,24 +35,24 @@ func TestGlobTool_Execute(t *testing.T) {
 	os.WriteFile(filepath.Join(tempDir, ".gitignore"), []byte("*.log\nnode_modules/"), 0644)
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func(*MockFileSystemService)
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func(*MockFileSystemService)
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
-			name:          "missing pattern argument",
-			args:          map[string]any{},
+			name: "missing pattern argument",
+			args: map[string]any{},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Maybe()
 			},
 			expectedError: "invalid or missing 'pattern' argument",
 		},
 		{
-			name:          "empty pattern argument",
-			args:          map[string]any{"pattern": ""},
+			name: "empty pattern argument",
+			args: map[string]any{"pattern": ""},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Maybe()
 			},
@@ -146,7 +146,7 @@ func TestGlobTool_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockFSS := new(MockFileSystemService) // Create a new mock for each subtest
-			tool := NewGlobTool(mockFSS)           // Pass the new mock to the tool
+			tool := NewGlobTool(mockFSS)          // Pass the new mock to the tool
 
 			tt.setupMock(mockFSS) // Pass the mock to the setup function
 

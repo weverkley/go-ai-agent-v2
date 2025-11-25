@@ -17,24 +17,24 @@ type GetRemoteURLTool struct {
 // NewGetRemoteURLTool creates a new GetRemoteURLTool.
 func NewGetRemoteURLTool(gitService services.GitService) *GetRemoteURLTool {
 	return &GetRemoteURLTool{
-		        BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-		            "get_remote_url",
-		            "Get Git Remote URL",
-		            "Returns the URL of the 'origin' remote for the given Git repository.",
-		            types.KindOther,
-		            &types.JsonSchemaObject{
-		                Type: "object",
-		                		            Properties: map[string]*types.JsonSchemaProperty{
-		                		                "dir": &types.JsonSchemaProperty{
-		                		                    Type:        "string",
-		                		                    Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
-		                		                },
-		                		            },		                Required: []string{"dir"},
-		            },
-		            false,
-		            false,
-		            nil,
-		        ),		gitService: gitService,
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			"get_remote_url",
+			"Get Git Remote URL",
+			"Returns the URL of the 'origin' remote for the given Git repository.",
+			types.KindOther,
+			&types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]*types.JsonSchemaProperty{
+					"dir": &types.JsonSchemaProperty{
+						Type:        "string",
+						Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
+					},
+				}, Required: []string{"dir"},
+			},
+			false,
+			false,
+			nil,
+		), gitService: gitService,
 	}
 }
 

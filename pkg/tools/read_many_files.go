@@ -23,8 +23,8 @@ type ReadManyFilesTool struct {
 func NewReadManyFilesTool(fs services.FileSystemService) *ReadManyFilesTool {
 	return &ReadManyFilesTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"read_many_files",
-			"read_many_files",
+			types.READ_MANY_FILES_TOOL_NAME,
+			types.READ_MANY_FILES_TOOL_DISPLAY_NAME,
 			"Reads content from multiple files specified by paths or glob patterns (e.g., `src/**/*.ts`, `**/*.md`), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
 			types.KindOther, // Assuming KindOther for now
 			&types.JsonSchemaObject{

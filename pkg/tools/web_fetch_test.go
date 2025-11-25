@@ -17,12 +17,12 @@ func TestWebFetchTool_Execute(t *testing.T) {
 	tool := NewWebFetchTool()
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupServer   func() *httptest.Server
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupServer           func() *httptest.Server
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing prompt argument",
@@ -37,9 +37,9 @@ func TestWebFetchTool_Execute(t *testing.T) {
 			expectedError: "invalid or missing 'prompt' argument",
 		},
 		{
-			name:          "no URLs found in prompt",
-			args:          map[string]any{"prompt": "This is a test prompt with no URLs."},
-			setupServer:   func() *httptest.Server { return nil },
+			name:                  "no URLs found in prompt",
+			args:                  map[string]any{"prompt": "This is a test prompt with no URLs."},
+			setupServer:           func() *httptest.Server { return nil },
 			expectedLLMContent:    "No URLs found in the prompt.",
 			expectedReturnDisplay: "No URLs found in the prompt.",
 		},

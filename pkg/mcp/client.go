@@ -70,7 +70,7 @@ func (c *McpClient) GetTools() ([]types.Tool, error) {
 			fmt.Sprintf("Dummy tool from MCP server %s", c.name),
 			types.KindOther,
 			&types.JsonSchemaObject{
-				Type: "object",
+				Type:       "object",
 				Properties: map[string]*types.JsonSchemaProperty{},
 			},
 			false,
@@ -81,4 +81,3 @@ func (c *McpClient) GetTools() ([]types.Tool, error) {
 	}
 	return tools, nil
 }
-

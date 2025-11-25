@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"path/filepath" // Added import
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -11,17 +12,37 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+// MockWorkspaceService implements types.WorkspaceServiceIface for testing
+type MockWorkspaceService struct {
+	mock.Mock
+}
+
+func (m *MockWorkspaceService) GetProjectRoot() string {
+	args := m.Called()
+	return args.String(0)
+}
+
 func TestWriteFileTool_Execute(t *testing.T) {
-	mockFSS := new(MockFileSystemService) // Reusing MockFileSystemService from extract_function_test.go
-	tool := NewWriteFileTool(mockFSS)
+	mockFSS := new(MockFileSystemService)
+	mockWSS := new(MockWorkspaceService) // Using the new mock
+
+	tempProjectRoot := t.TempDir()
+	mockWSS.On("GetProjectRoot").Return(tempProjectRoot).Maybe() // Use .Maybe() if not always called
+
+	tool := NewWriteFileTool(mockFSS, mockWSS) // Pass the mock
+
+	// Helper to resolve paths in test expectations
+	resolvePath := func(relativePath string) string {
+		return filepath.Join(tempProjectRoot, relativePath)
+	}
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func()
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func()
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing file_path argument",
@@ -37,32 +58,33 @@ func TestWriteFileTool_Execute(t *testing.T) {
 		},
 		{
 			name:          "missing content argument",
-			args:          map[string]any{"file_path": "/tmp/file.txt"},
+			args:          map[string]any{"file_path": "test.txt"},
 			setupMock:     func() {},
 			expectedError: "missing or invalid 'content' argument",
 		},
 		{
 			name: "write file fails",
-			args: map[string]any{"file_path": "/tmp/file.txt", "content": "test content"},
+			args: map[string]any{"file_path": "test.txt", "content": "test content"},
 			setupMock: func() {
-				mockFSS.On("WriteFile", "/tmp/file.txt", "test content").Return(fmt.Errorf("write error")).Once()
+				mockFSS.On("WriteFile", resolvePath("test.txt"), "test content").Return(fmt.Errorf("write error")).Once()
 			},
-			expectedError: "failed to write to file /tmp/file.txt: write error",
+			expectedError: fmt.Sprintf("failed to write to file %s: write error", resolvePath("test.txt")),
 		},
 		{
 			name: "successful write file",
-			args: map[string]any{"file_path": "/tmp/file.txt", "content": "test content"},
+			args: map[string]any{"file_path": "test.txt", "content": "test content"},
 			setupMock: func() {
-				mockFSS.On("WriteFile", "/tmp/file.txt", "test content").Return(nil).Once()
+				mockFSS.On("WriteFile", resolvePath("test.txt"), "test content").Return(nil).Once()
 			},
-			expectedLLMContent:    "Successfully wrote to file: /tmp/file.txt",
-			expectedReturnDisplay: "Successfully wrote to file: /tmp/file.txt",
+			expectedLLMContent:    fmt.Sprintf("Successfully wrote to file: %s", resolvePath("test.txt")),
+			expectedReturnDisplay: fmt.Sprintf("Successfully wrote to file: %s", resolvePath("test.txt")),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockFSS.Calls = []mock.Call{} // Reset calls for each test
+			mockWSS.Calls = []mock.Call{} // Reset calls for each test
 			tt.setupMock()
 
 			result, err := tool.Execute(context.Background(), tt.args)
@@ -77,6 +99,7 @@ func TestWriteFileTool_Execute(t *testing.T) {
 				assert.Equal(t, tt.expectedReturnDisplay, result.ReturnDisplay)
 			}
 			mockFSS.AssertExpectations(t)
+			mockWSS.AssertExpectations(t) // Assert expectations for mockWSS
 		})
 	}
 }

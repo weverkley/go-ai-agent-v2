@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,6 +19,12 @@ type commandFinishedMsg struct {
 	output string
 	err    error
 	args   []string // Keep track of the command that was run
+}
+
+// chatServiceReloadedMsg is sent when the chat service is reinitialized after a settings change.
+type chatServiceReloadedMsg struct {
+	newService      *services.ChatService
+	newExecutorType string
 }
 
 // executeCommandCmd runs the commandExecutor in a goroutine and returns a

@@ -14,12 +14,12 @@ import (
 
 func TestWriteTodosTool_Execute(t *testing.T) {
 	tests := []struct {
-		name                string
-		args                map[string]any
-		setupMock           func(mockService *services.MockSettingsService, tempDir string)
-		expectedLLMContent  string
+		name                  string
+		args                  map[string]any
+		setupMock             func(mockService *services.MockSettingsService, tempDir string)
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError       string
+		expectedError         string
 	}{
 		{
 			name:          "missing todos argument",

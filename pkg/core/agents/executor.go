@@ -37,13 +37,13 @@ func (ae *AgentExecutor) Run(inputs AgentInputs, ctx context.Context) (OutputObj
 
 	chat, err := ae.createChatObject(inputs)
 	if err != nil {
-		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+		ae.emitActivity(types.ActivityTypeError, map[string]interface{}{"error": err.Error()})
 		return OutputObject{}, err
 	}
 
 	toolsList, err := ae.prepareToolsList()
 	if err != nil {
-		ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+		ae.emitActivity(types.ActivityTypeError, map[string]interface{}{"error": err.Error()})
 		return OutputObject{}, err
 	}
 
@@ -70,7 +70,7 @@ MainLoop:
 
 		functionCalls, _, err := ae.callModel(chat, currentMessage, toolsList, ctx, promptId)
 		if err != nil {
-			ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+			ae.emitActivity(types.ActivityTypeError, map[string]interface{}{"error": err.Error()})
 			return OutputObject{}, err
 		}
 
@@ -82,16 +82,16 @@ MainLoop:
 		if len(functionCalls) == 0 {
 			terminateReason = types.AgentTerminateModeError
 			finalResult = fmt.Sprintf("Agent stopped calling tools but did not call '%s' to finalize the session.", types.TASK_COMPLETE_TOOL_NAME)
-			ae.emitActivity("ERROR", map[string]interface{}{
+			ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
 				"error":   finalResult,
-				"context": "protocol_violation",
+				"context": types.ActivityTypeProtocolViolation,
 			})
 			break
 		}
 
 		nextMessage, submittedOutput, taskCompleted, err := ae.processFunctionCalls(functionCalls, ctx, promptId)
 		if err != nil {
-			ae.emitActivity("ERROR", map[string]interface{}{"error": err.Error()})
+			ae.emitActivity(types.ActivityTypeError, map[string]interface{}{"error": err.Error()})
 			// In the JS version, some errors might not terminate the loop.
 			// For now, we terminate on any error from processFunctionCalls.
 			return OutputObject{}, err
@@ -168,10 +168,10 @@ func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, er
 	// Determine executor type from model name.
 	var executorType string
 	if strings.HasPrefix(modelConfig.Model, "qwen") {
-		executorType = "qwen"
+		executorType = types.ExecutorTypeQwen
 	} else {
-		// Default to goaiagent for gemini or other models
-		executorType = "goaiagent"
+		// Default to gemini
+		executorType = types.ExecutorTypeGemini
 	}
 
 	factory, err := core.NewExecutorFactory(executorType, ae.RuntimeContext)
@@ -340,7 +340,7 @@ func (ae *AgentExecutor) callModel(
 				if part.Thought != "" {
 					thoughtResult := utils.ParseThought(part.Thought)
 					if thoughtResult.Subject != "" {
-						ae.emitActivity("THOUGHT_CHUNK", map[string]interface{}{"text": thoughtResult.Subject})
+						ae.emitActivity(types.ActivityTypeThoughtChunk, map[string]interface{}{"text": thoughtResult.Subject})
 					}
 				}
 
@@ -385,7 +385,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 		callId := fmt.Sprintf("%s-%d", promptId, i)
 		args := functionCall.Args
 
-		ae.emitActivity("TOOL_CALL_START", map[string]interface{}{
+		ae.emitActivity(types.ActivityTypeToolCallStart, map[string]interface{}{
 			"name": functionCall.Name,
 			"args": args,
 		})
@@ -397,8 +397,8 @@ func (ae *AgentExecutor) processFunctionCalls(
 					Name:     types.TASK_COMPLETE_TOOL_NAME,
 					Response: map[string]interface{}{"error": errorMsg},
 				}})
-				ae.emitActivity("ERROR", map[string]interface{}{
-					"context": "protocol_violation",
+				ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
+					"context": types.ActivityTypeProtocolViolation,
 					"name":    functionCall.Name,
 					"error":   errorMsg,
 				})
@@ -421,7 +421,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 						Name:     types.TASK_COMPLETE_TOOL_NAME,
 						Response: map[string]interface{}{"result": "Output submitted and task completed."},
 					}})
-					ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
+					ae.emitActivity(types.ActivityTypeToolCallEnd, map[string]interface{}{
 						"name":   functionCall.Name,
 						"output": "Output submitted and task completed.",
 					})
@@ -432,8 +432,8 @@ func (ae *AgentExecutor) processFunctionCalls(
 						Name:     types.TASK_COMPLETE_TOOL_NAME,
 						Response: map[string]interface{}{"error": errorMsg},
 					}})
-					ae.emitActivity("ERROR", map[string]interface{}{
-						"context": "tool_call",
+					ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
+						"context": types.ActivityTypeToolCall,
 						"name":    functionCall.Name,
 						"error":   errorMsg,
 					})
@@ -444,7 +444,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 					Name:     types.TASK_COMPLETE_TOOL_NAME,
 					Response: map[string]interface{}{"status": "Task marked complete."},
 				}})
-				ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
+				ae.emitActivity(types.ActivityTypeToolCallEnd, map[string]interface{}{
 					"name":   functionCall.Name,
 					"output": "Task marked complete.",
 				})
@@ -458,8 +458,8 @@ func (ae *AgentExecutor) processFunctionCalls(
 				Name:     functionCall.Name,
 				Response: map[string]interface{}{"error": errorMsg},
 			}})
-			ae.emitActivity("ERROR", map[string]interface{}{
-				"context": "tool_call_unauthorized",
+			ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
+				"context": types.ActivityTypeToolCallUnauthorized,
 				"name":    functionCall.Name,
 				"callId":  callId,
 				"error":   errorMsg,
@@ -484,15 +484,14 @@ func (ae *AgentExecutor) processFunctionCalls(
 			}
 
 			if result.Error != nil {
-				ae.emitActivity("ERROR", map[string]interface{}{
-					"context": "tool_call",
+				ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
+					"context": types.ActivityTypeToolCall,
 					"name":    fc.Name,
 					"error":   result.Error.Message,
 				})
 			} else {
-				ae.emitActivity("TOOL_CALL_END", map[string]interface{}{
-					"name":   fc.Name,
-					"output": result.ReturnDisplay,
+				ae.emitActivity(types.ActivityTypeToolCallEnd, map[string]interface{}{
+					"name": fc.Name, "output": result.ReturnDisplay,
 				})
 			}
 
@@ -588,14 +587,21 @@ func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Conf
 // validateTools validates that all tools in a registry are safe for non-interactive use.
 func validateTools(toolRegistry *types.ToolRegistry, agentName string) error {
 	allowlist := map[string]bool{
-		types.LS_TOOL_NAME:              true,
-		types.READ_FILE_TOOL_NAME:       true,
-		types.GREP_TOOL_NAME:            true,
-		types.GLOB_TOOL_NAME:            true,
-		types.READ_MANY_FILES_TOOL_NAME: true,
-		types.MEMORY_TOOL_NAME:          true,
-		types.WEB_SEARCH_TOOL_NAME:      true,
-		types.WEB_FETCH_TOOL_NAME:       true,
+		types.LS_TOOL_NAME:               true,
+		types.READ_FILE_TOOL_NAME:        true,
+		types.GREP_TOOL_NAME:             true,
+		types.GLOB_TOOL_NAME:             true,
+		types.READ_MANY_FILES_TOOL_NAME:  true,
+		types.MEMORY_TOOL_NAME:           true,
+		types.WEB_SEARCH_TOOL_NAME:       true,
+		types.WEB_FETCH_TOOL_NAME:        true,
+		types.RUN_TESTS_TOOL_NAME:        true,
+		types.FIND_REFERENCES_TOOL_NAME:  true,
+		types.RENAME_SYMBOL_TOOL_NAME:    true,
+		types.GIT_COMMIT_TOOL_NAME:       true,
+		types.WRITE_FILE_TOOL_NAME:       true,
+		types.SMART_EDIT_TOOL_NAME:       true,
+		types.EXTRACT_FUNCTION_TOOL_NAME: true,
 	}
 
 	for _, tool := range toolRegistry.GetAllTools() {

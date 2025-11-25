@@ -6,7 +6,6 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
 	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/core"
 
 	"go-ai-agent-v2/go-cli/pkg/extension"
 
@@ -22,23 +21,22 @@ import (
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "go-cli",
-	Short: "A Go-based CLI for Gemini",
-	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
+	Use:   "go-ai-agent-v2/go-cli",
+	Short: "A Go-based CLI for multimodal AI interactions",
+	Long:  `A Go-based CLI for multimodal AI interactions, managing extensions and expose MCP servers.`,
 }
 
 var Cfg *config.Config
 var executorType string
-var executor core.Executor                      // Declare package-level executor
 var chatService *services.ChatService           // Declare package-level chatService
 var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
 var MemoryService *services.MemoryService       // Declare package-level memoryService
-var SettingsService types.SettingsServiceIface // Declare package-level settingsService as interface
-var SessionService *services.SessionService // Declare package-level sessionService
+var SettingsService types.SettingsServiceIface  // Declare package-level settingsService as interface
+var SessionService *services.SessionService     // Declare package-level sessionService
 
-var FSService services.FileSystemService // Declare package-level FileSystemService
-var ShellService services.ShellExecutionService   // Declare package-level ShellExecutionService
+var FSService services.FileSystemService             // Declare package-level FileSystemService
+var ShellService services.ShellExecutionService      // Declare package-level ShellExecutionService
 var extensionsCliCommand *commands.ExtensionsCommand // Declare package-level extensionsCliCommand
 
 func Execute() {
@@ -47,7 +45,6 @@ func Execute() {
 		os.Exit(1)
 	}
 }
-
 
 func initServices(projectRoot string) (
 	*services.WorkspaceService,
@@ -76,8 +73,8 @@ func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.Tel
 	return settingsService.GetTelemetrySettings()
 }
 
-func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface) *types.ToolRegistry {
-	return tools.RegisterAllTools(fsService, shellService, settingsService)
+func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
+	return tools.RegisterAllTools(fsService, shellService, settingsService, workspaceService)
 }
 
 func initConfig(
@@ -136,7 +133,7 @@ func registerCommands() {
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(smartEditCmd)
 	grepCodeCmd.Run = func(cmd *cobra.Command, args []string) {
-		runGrepCodeCmd(cmd, args, SettingsService, ShellService)
+		runGrepCodeCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
 	}
 	RootCmd.AddCommand(grepCodeCmd)
 	RootCmd.AddCommand(readManyFilesCmd)
@@ -185,7 +182,7 @@ func init() {
 		var fileFilteringService *services.FileFilteringService
 		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
-		toolRegistry := registerTools(FSService, ShellService, SettingsService)
+		toolRegistry := registerTools(FSService, ShellService, SettingsService, WorkspaceService)
 		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
 
 		// Initialize SessionService now that Cfg is available
@@ -195,37 +192,7 @@ func init() {
 			os.Exit(1)
 		}
 
-		// Get executor type from settings
-		executorTypeVal, _ := SettingsService.Get("executor")
-		executorType, ok := executorTypeVal.(string)
-		if !ok {
-			executorType = "gemini" // Fallback
-		}
-
-		// Allow tests to override the executor
-		if testExecutor := os.Getenv("GO_AI_AGENT_TEST_EXECUTOR"); testExecutor != "" {
-			executorType = testExecutor
-		}
-
-		// Get model from settings
-		modelVal, _ := SettingsService.Get("model")
-		model, ok := modelVal.(string)
-		if !ok {
-			model = config.DEFAULT_GEMINI_MODEL // Fallback
-		}
-		appConfig := Cfg.WithModel(model)
-
-		// Initialize the global executor
-		factory, err := core.NewExecutorFactory(executorType, appConfig)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor factory: %v\n", err)
-			os.Exit(1)
-		}
-		executor, err = factory.NewExecutor(appConfig, types.GenerateContentConfig{}, []*types.Content{})
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error creating executor: %v\n", err)
-			os.Exit(1)
-		}
+		// Initialize the global executor (removed as part of dynamic executor refactor)
 
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)

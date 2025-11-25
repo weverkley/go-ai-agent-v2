@@ -22,17 +22,17 @@ var codeGuideCmd = &cobra.Command{
 This command acts as a specialized AI prompt to help new engineers understand the Go AI Agent codebase.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		runCodeGuideCmd(cmd, args, SettingsService, ShellService)
+		runCodeGuideCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
 	},
 }
 
 // runCodeGuideCmd handles the code-guide command logic.
-func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService) {
+func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService types.SettingsServiceIface, shellService services.ShellExecutionService, workspaceService *services.WorkspaceService) {
 	// Initialize FileSystemService and GitService
 	fsService := services.NewFileSystemService()
 
 	// Register tools
-	toolRegistry := tools.RegisterAllTools(fsService, shellService, settingsService)
+	toolRegistry := tools.RegisterAllTools(fsService, shellService, settingsService, workspaceService)
 
 	modelVal, ok := settingsService.Get("model")
 	if !ok {
@@ -101,4 +101,3 @@ func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService types.Se
 func init() {
 	codeGuideCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }
-

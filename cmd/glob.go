@@ -7,14 +7,15 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
 var (
-	globPattern string
-	globPath string
-	globCaseSensitive bool
-	globRespectGitIgnore bool
+	globPattern                string
+	globPath                   string
+	globCaseSensitive          bool
+	globRespectGitIgnore       bool
 	globRespectGoaiagentIgnore bool
 )
 
@@ -35,10 +36,10 @@ var globCmd = &cobra.Command{
 		fileSystemService := services.NewFileSystemService()
 		globTool := tools.NewGlobTool(fileSystemService)
 		result, err := globTool.Execute(context.Background(), map[string]any{
-			"pattern":               globPattern,
-			"path":                  globPath,
-			"case_sensitive":        globCaseSensitive,
-			"respect_git_ignore":    globRespectGitIgnore,
+			"pattern":                  globPattern,
+			"path":                     globPath,
+			"case_sensitive":           globCaseSensitive,
+			"respect_git_ignore":       globRespectGitIgnore,
 			"respect_goaiagent_ignore": globRespectGoaiagentIgnore,
 		})
 		if err != nil {

@@ -17,23 +17,23 @@ type LsTool struct {
 // NewLsTool creates a new instance of LsTool.
 func NewLsTool() *LsTool {
 	return &LsTool{
-				BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-					types.LS_TOOL_NAME,
-					"List Directory Contents",
-					"Lists the contents of a directory.",
-					types.KindOther,
-					(&types.JsonSchemaObject{
-						Type: "object",
-					}).SetProperties(map[string]*types.JsonSchemaProperty{
-						"path": &types.JsonSchemaProperty{
-							Type:        "string",
-							Description: "The path to the directory to list.",
-						},
-					}),
-					false, // isOutputMarkdown
-					false, // canUpdateOutput
-					nil,   // MessageBus
-				),	}
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.LS_TOOL_NAME,
+			"List Directory Contents",
+			"Lists the contents of a directory.",
+			types.KindOther,
+			(&types.JsonSchemaObject{
+				Type: "object",
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"path": &types.JsonSchemaProperty{
+					Type:        "string",
+					Description: "The path to the directory to list.",
+				},
+			}).SetRequired([]string{"path"}),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		)}
 }
 
 // Execute runs the tool with the given arguments.

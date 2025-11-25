@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"path/filepath" // Add this import
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -14,10 +15,11 @@ const WRITE_FILE_TOOL_NAME = "write_file"
 type WriteFileTool struct {
 	*types.BaseDeclarativeTool
 	fileSystemService services.FileSystemService
+	workspaceService  types.WorkspaceServiceIface // Change to interface
 }
 
 // NewWriteFileTool creates a new WriteFileTool.
-func NewWriteFileTool(fileSystemService services.FileSystemService) *WriteFileTool {
+func NewWriteFileTool(fileSystemService services.FileSystemService, workspaceService types.WorkspaceServiceIface) *WriteFileTool {
 	return &WriteFileTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			WRITE_FILE_TOOL_NAME,
@@ -29,7 +31,7 @@ func NewWriteFileTool(fileSystemService services.FileSystemService) *WriteFileTo
 				Properties: map[string]*types.JsonSchemaProperty{
 					"file_path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The absolute path to the file to write to (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
+						Description: "The path to the file to write to, relative to the project root (e.g., 'hello.html', 'src/main.js').",
 					},
 					"content": &types.JsonSchemaProperty{
 						Type:        "string",
@@ -43,6 +45,7 @@ func NewWriteFileTool(fileSystemService services.FileSystemService) *WriteFileTo
 			nil,   // MessageBus
 		),
 		fileSystemService: fileSystemService,
+		workspaceService:  workspaceService, // Initialize new field
 	}
 }
 
@@ -68,17 +71,20 @@ func (t *WriteFileTool) Execute(ctx context.Context, args map[string]any) (types
 		}, fmt.Errorf("missing or invalid 'content' argument")
 	}
 
-	err := t.fileSystemService.WriteFile(filePath, content)
+	projectRoot := t.workspaceService.GetProjectRoot()
+	resolvedPath := filepath.Join(projectRoot, filePath)
+
+	err := t.fileSystemService.WriteFile(resolvedPath, content)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
-				Message: fmt.Sprintf("Failed to write to file %s: %v", filePath, err),
+				Message: fmt.Sprintf("Failed to write to file %s: %v", resolvedPath, err),
 				Type:    types.ToolErrorTypeExecutionFailed,
 			},
-		}, fmt.Errorf("failed to write to file %s: %w", filePath, err)
+		}, fmt.Errorf("failed to write to file %s: %w", resolvedPath, err)
 	}
 
-	output := fmt.Sprintf("Successfully wrote to file: %s", filePath)
+	output := fmt.Sprintf("Successfully wrote to file: %s", resolvedPath)
 	return types.ToolResult{
 		LLMContent:    output,
 		ReturnDisplay: output,

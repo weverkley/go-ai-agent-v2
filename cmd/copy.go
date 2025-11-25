@@ -16,40 +16,42 @@ var copyCmd = &cobra.Command{
 	Long:  `The copy command copies the last AI generated output or code snippet to the system clipboard.`, //nolint:staticcheck
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		history, err := executor.GetHistory()
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error getting chat history: %v\n", err)
-			os.Exit(1)
-		}
+		fmt.Fprintf(os.Stderr, "Error: Copy command is not yet functional after refactoring.\n")
+		os.Exit(1)
+		// history, err := executor.GetHistory()
+		// if err != nil {
+		// 	fmt.Fprintf(os.Stderr, "Error getting chat history: %v\n", err)
+		// 	os.Exit(1)
+		// }
 
-		var lastAiMessage string
-		for i := len(history) - 1; i >= 0; i-- {
-			item := history[i]
-			if item.Role == "model" {
-				for _, part := range item.Parts {
-					if part.Text != "" { // Directly access the Text field
-						lastAiMessage = part.Text
-						break
-					}
-				}
-			}
-			if lastAiMessage != "" {
-				break
-			}
-		}
+		// var lastAiMessage string
+		// for i := len(history) - 1; i >= 0; i-- {
+		// 	item := history[i]
+		// 	if item.Role == "model" {
+		// 		for _, part := range item.Parts {
+		// 			if part.Text != "" { // Directly access the Text field
+		// 				lastAiMessage = part.Text
+		// 				break
+		// 			}
+		// 		}
+		// 	}
+		// 	if lastAiMessage != "" {
+		// 		break
+		// 	}
+		// }
 
-		if lastAiMessage == "" {
-			fmt.Println("No AI output found in history to copy.")
-			return
-		}
+		// if lastAiMessage == "" {
+		// 	fmt.Println("No AI output found in history to copy.")
+		// 	return
+		// }
 
-		err = copyToClipboard(lastAiMessage)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to copy to clipboard: %v\n", err)
-			os.Exit(1)
-		}
+		// err = copyToClipboard(lastAiMessage)
+		// if err != nil {
+		// 	fmt.Fprintf(os.Stderr, "Failed to copy to clipboard: %v\n", err)
+		// 	os.Exit(1)
+		// }
 
-		fmt.Println("Last AI output copied to the clipboard.")
+		// fmt.Println("Last AI output copied to the clipboard.")
 	},
 }
 

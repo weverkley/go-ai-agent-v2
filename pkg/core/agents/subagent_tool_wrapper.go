@@ -34,16 +34,16 @@ func NewSubagentToolWrapper(
 		definition.Description,
 		types.KindOther, // Assuming KindOther for now
 		parameterSchema,
-		false, // isOutputMarkdown
-		false, // canUpdateOutput
-		messageBus,   // MessageBus
+		false,      // isOutputMarkdown
+		false,      // canUpdateOutput
+		messageBus, // MessageBus
 	)
 
 	return &SubagentToolWrapper{
-		BaseDeclarativeTool: baseTool,
-		definition:          definition,
-		config:              cfg,
-	},
+			BaseDeclarativeTool: baseTool,
+			definition:          definition,
+			config:              cfg,
+		},
 		nil
 }
 
