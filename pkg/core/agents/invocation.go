@@ -67,7 +67,7 @@ func (si *SubagentInvocation) Execute(
 			return
 		}
 
-		if activity.Type == "THOUGHT_CHUNK" {
+		if activity.Type == types.ActivityTypeThoughtChunk {
 			if text, ok := activity.Data["text"].(string); ok {
 				updateOutput(fmt.Sprintf("🤖💭 %s", text))
 			}

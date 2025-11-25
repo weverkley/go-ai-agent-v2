@@ -53,7 +53,7 @@ func NewWebSearchTool(
 	return &WebSearchTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			types.WEB_SEARCH_TOOL_NAME,
-			"Web Search",
+			types.WEB_SEARCH_TOOL_DISPLAY_NAME,
 			"Performs a web search using Google Search (via the Gemini API) and returns the results.",
 			types.KindOther,
 			(&types.JsonSchemaObject{

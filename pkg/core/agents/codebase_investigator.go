@@ -57,7 +57,7 @@ func init() {
 
 // CodebaseInvestigatorAgent defines the Codebase Investigator subagent.
 var CodebaseInvestigatorAgent = AgentDefinition{
-	Name:        "codebase_investigator",
+	Name:        types.CODEBASE_INVESTIGATOR_TOOL_NAME,
 	DisplayName: "Codebase Investigator Agent",
 	Description: codebaseInvestigatorPrompts["Description"],
 	InputConfig: InputConfig{

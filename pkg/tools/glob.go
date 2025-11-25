@@ -25,8 +25,8 @@ type GlobTool struct {
 func NewGlobTool(fileSystemService services.FileSystemService) *GlobTool {
 	return &GlobTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"glob",
-			"glob",
+			types.GLOB_TOOL_NAME,
+			types.GLOB_TOOL_DISPLAY_NAME,
 			"Efficiently finds files matching specific glob patterns.",
 			types.KindOther, // Assuming KindOther for now
 			&types.JsonSchemaObject{

@@ -19,8 +19,8 @@ type SmartEditTool struct {
 func NewSmartEditTool(fileSystemService services.FileSystemService) *SmartEditTool {
 	return &SmartEditTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-			"smart_edit",
-			"smart_edit",
+			types.SMART_EDIT_TOOL_NAME,
+			types.SMART_EDIT_TOOL_DISPLAY_NAME,
 			"Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the read_file tool to examine the file's current content before attempting a text replacement.",
 			types.KindOther, // Assuming KindOther for now
 			&types.JsonSchemaObject{

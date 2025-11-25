@@ -19,30 +19,50 @@ const (
 
 // Tool names
 const (
-	LS_TOOL_NAME                 = "ls"
-	READ_FILE_TOOL_NAME          = "read_file"
-	GLOB_TOOL_NAME               = "glob"
-	GREP_TOOL_NAME               = "grep"
-	SMART_EDIT_TOOL_NAME         = "smart_edit"
-	WEB_FETCH_TOOL_NAME          = "web_fetch"
-	WEB_SEARCH_TOOL_NAME         = "web_search"
-	MEMORY_TOOL_NAME             = "memory"
-	WRITE_TODOS_TOOL_NAME        = "write_todos"
-	LIST_DIRECTORY_TOOL_NAME     = "list_directory"
-	GET_CURRENT_BRANCH_TOOL_NAME = "get_current_branch"
-	GET_REMOTE_URL_TOOL_NAME     = "get_remote_url"
-	CHECKOUT_BRANCH_TOOL_NAME    = "checkout_branch"
-	PULL_TOOL_NAME               = "pull"
-	EXECUTE_COMMAND_TOOL_NAME    = "execute_command"
-	READ_MANY_FILES_TOOL_NAME    = "read_many_files"
-	FIND_UNUSED_CODE_TOOL_NAME   = "find_unused_code"
-	EXTRACT_FUNCTION_TOOL_NAME   = "extract_function"
-	WRITE_FILE_TOOL_NAME         = "write_file"
-	RUN_TESTS_TOOL_NAME          = "run_tests"
-	FIND_REFERENCES_TOOL_NAME    = "find_references"
-	RENAME_SYMBOL_TOOL_NAME      = "rename_symbol"
-	CODEBASE_INVESTIGATOR_TOOL_NAME = "codebase_investigator"
-	GIT_COMMIT_TOOL_NAME         = "git_commit"
+	LS_TOOL_NAME                      = "ls"
+	READ_FILE_TOOL_NAME               = "read_file"
+	READ_FILE_TOOL_DISPLAY_NAME       = "Read File"
+	GLOB_TOOL_NAME                    = "glob"
+	GLOB_TOOL_DISPLAY_NAME            = "Glob"
+	GREP_TOOL_NAME                    = "grep"
+	GREP_TOOL_DISPLAY_NAME            = "Grep"
+	SMART_EDIT_TOOL_NAME              = "smart_edit"
+	SMART_EDIT_TOOL_DISPLAY_NAME      = "Smart Edit"
+	WEB_FETCH_TOOL_NAME               = "web_fetch"
+	WEB_FETCH_TOOL_DISPLAY_NAME       = "Web Fetch"
+	WEB_SEARCH_TOOL_NAME              = "web_search"
+	WEB_SEARCH_TOOL_DISPLAY_NAME      = "Web Search"
+	MEMORY_TOOL_NAME                  = "memory"
+	MEMORY_TOOL_DISPLAY_NAME          = "Memory"
+	WRITE_TODOS_TOOL_NAME             = "write_todos"
+	LIST_DIRECTORY_TOOL_NAME          = "list_directory"
+	GET_CURRENT_BRANCH_TOOL_NAME      = "get_current_branch"
+	GET_REMOTE_URL_TOOL_NAME          = "get_remote_url"
+	CHECKOUT_BRANCH_TOOL_NAME         = "checkout_branch"
+	PULL_TOOL_NAME                    = "pull"
+	EXECUTE_COMMAND_TOOL_NAME         = "execute_command"
+	READ_MANY_FILES_TOOL_NAME         = "read_many_files"
+	READ_MANY_FILES_TOOL_DISPLAY_NAME = "Read Many Files"
+	FIND_UNUSED_CODE_TOOL_NAME        = "find_unused_code"
+	EXTRACT_FUNCTION_TOOL_NAME        = "extract_function"
+	WRITE_FILE_TOOL_NAME              = "write_file"
+	RUN_TESTS_TOOL_NAME               = "run_tests"
+	FIND_REFERENCES_TOOL_NAME         = "find_references"
+	RENAME_SYMBOL_TOOL_NAME           = "rename_symbol"
+	CODEBASE_INVESTIGATOR_TOOL_NAME   = "codebase_investigator"
+	GIT_COMMIT_TOOL_NAME              = "git_commit"
+
+	// Agent names
+	TEST_WRITER_AGENT_NAME         = "test_writer"
+	TEST_WRITER_AGENT_DISPLAY_NAME = "Test Writer Agent"
+	REFACTOR_AGENT_NAME            = "refactor_agent"
+	REFACTOR_AGENT_DISPLAY_NAME    = "Refactor Agent"
+)
+
+// Executor Types
+const (
+	ExecutorTypeQwen   = "qwen"
+	ExecutorTypeGemini = "goaiagent"
 )
 
 // MCPServerStatus represents the connection status of an MCP server.
@@ -700,6 +720,16 @@ type ToolCallEndEvent struct {
 	Result     string
 	Err        error
 }
+
+const (
+	ActivityTypeThoughtChunk         = "THOUGHT_CHUNK"
+	ActivityTypeError                = "ERROR"
+	ActivityTypeToolCallStart        = "TOOL_CALL_START"
+	ActivityTypeToolCallEnd          = "TOOL_CALL_END"
+	ActivityTypeProtocolViolation    = "protocol_violation"
+	ActivityTypeToolCallUnauthorized = "tool_call_unauthorized"
+	ActivityTypeToolCall             = "tool_call"
+)
 
 type FinalResponseEvent struct {
 	Content string

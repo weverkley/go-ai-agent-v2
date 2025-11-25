@@ -12,8 +12,8 @@ import (
 
 // TestWriterAgent defines the Test Writer subagent.
 var TestWriterAgent = AgentDefinition{
-	Name:        "test_writer",
-	DisplayName: "Test Writer Agent",
+	Name:        types.TEST_WRITER_AGENT_NAME,
+	DisplayName: types.TEST_WRITER_AGENT_DISPLAY_NAME,
 	Description: "", // Will be populated in init()
 	InputConfig: InputConfig{
 		Inputs: map[string]InputParameter{

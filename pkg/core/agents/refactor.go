@@ -12,8 +12,8 @@ import (
 
 // RefactorAgent defines the Refactor subagent.
 var RefactorAgent = AgentDefinition{
-	Name:        "refactor_agent",
-	DisplayName: "Refactor Agent",
+	Name:        types.REFACTOR_AGENT_NAME,
+	DisplayName: types.REFACTOR_AGENT_DISPLAY_NAME,
 	Description: "", // Will be populated in init()
 	InputConfig: InputConfig{
 		Inputs: map[string]InputParameter{

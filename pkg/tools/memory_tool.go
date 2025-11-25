@@ -23,8 +23,8 @@ type MemoryTool struct {
 func NewMemoryTool() *MemoryTool {
 	return &MemoryTool{
 		types.NewBaseDeclarativeTool(
-			"save_memory",
-			"save_memory",
+			types.MEMORY_TOOL_NAME,
+			types.MEMORY_TOOL_DISPLAY_NAME,
 			"Saves a specific piece of information or fact to your long-term memory.",
 			types.KindOther, // Assuming KindOther for now
 			&types.JsonSchemaObject{

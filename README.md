@@ -102,3 +102,5 @@ To handle API limits gracefully, the application uses a routing service.
 ## TODO
 - Validate fallback strategy for models in the current executor (e.g. `gemini` executor) will fallback in its models (e.g. `gemini-prod` to `gemini-flash-latest`).
 - Validate switching between executors.
+- Loop detection tool.
+- Integrate agents.
