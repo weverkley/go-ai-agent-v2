@@ -24,7 +24,7 @@ type Message interface {
 
 func createInitialMessages() []Message {
 	ascii := figlet4go.NewAsciiRender()
-	renderStr, _ := ascii.Render("GO AI AGENT")
+	renderStr, _ := ascii.Render("GAIA")
 	return []Message{
 		SystemMessage{Content: renderStr},
 		SuggestionMessage{Content: tipsMessage},
@@ -36,15 +36,22 @@ type UserMessage struct {
 }
 
 func (msg UserMessage) Render(m *ChatModel) string {
-	return m.senderStyle.Render("You: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
+	return m.senderStyle.Render("User: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
 }
 
 type BotMessage struct {
 	Content string
 }
 
-func (msg BotMessage) Render(m *ChatModel) string {
-	return m.botStyle.Render("Bot: ") + lipgloss.NewStyle().Width(m.viewport.Width-10).Render(msg.Content)
+func (m BotMessage) Render(model *ChatModel) string {
+	botHeader := model.botStyle.Render("Bot:")
+	
+	// Use the new safe formatter
+	formattedContent := FormatMessage(m.Content)
+	
+	botContent := lipgloss.NewStyle().Padding(0, 2).Render(formattedContent)
+	
+	return lipgloss.JoinVertical(lipgloss.Left, botHeader, botContent)
 }
 
 type SystemMessage struct {

@@ -19,24 +19,24 @@ type FindUnusedCodeTool struct {
 // NewFindUnusedCodeTool creates a new FindUnusedCodeTool.
 func NewFindUnusedCodeTool() *FindUnusedCodeTool {
 	return &FindUnusedCodeTool{
-			BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-				types.FIND_UNUSED_CODE_TOOL_NAME,
-				"Find Unused Code",
-				"Finds unused code in the specified directory.",
-				types.KindOther,
-				&types.JsonSchemaObject{
-					Type: "object",
-									Properties: map[string]*types.JsonSchemaProperty{
-										"dir_path": &types.JsonSchemaProperty{
-											Type:        "string",
-											Description: "The path to the directory to search for unused code.",
-										},
-									},					Required: []string{"dir_path"},
-				},
-				false, // isOutputMarkdown
-				false, // canUpdateOutput
-				nil,   // MessageBus
-			),	}
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.FIND_UNUSED_CODE_TOOL_NAME,
+			"Find Unused Code",
+			"Finds unused code in the specified directory.",
+			types.KindOther,
+			&types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]*types.JsonSchemaProperty{
+					"dir_path": &types.JsonSchemaProperty{
+						Type:        "string",
+						Description: "The path to the directory to search for unused code.",
+					},
+				}, Required: []string{"dir_path"},
+			},
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		)}
 }
 
 // Execute implements the Tool interface.
@@ -88,4 +88,3 @@ func (t *FindUnusedCodeTool) Execute(ctx context.Context, args map[string]any) (
 		ReturnDisplay: output,
 	}, nil
 }
-

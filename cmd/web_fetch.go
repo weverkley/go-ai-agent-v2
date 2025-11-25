@@ -7,12 +7,13 @@ import (
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
 var (
-	webFetchUrls []string
-	webFetchSummarize bool
+	webFetchUrls             []string
+	webFetchSummarize        bool
 	webFetchExtractKeyPoints bool
 )
 
@@ -26,7 +27,7 @@ func init() {
 var webFetchCmd = &cobra.Command{
 	Use:   "web-fetch",
 	Short: "Fetches content from URL(s)",
-	Long:  `Fetches content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt.`, 
+	Long:  `Fetches content from URL(s), including local and private network addresses (e.g., localhost), embedded in a prompt.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var promptBuilder strings.Builder
 		promptBuilder.WriteString("Fetch content from:")

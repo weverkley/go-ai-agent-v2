@@ -130,7 +130,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 					var apiErr *googleapi.Error
 					if errors.As(streamErr, &apiErr) && apiErr.Code == 429 {
 						telemetry.LogDebugf("Gemini Quota Exceeded error detected: %v", streamErr)
-						
+
 						router := routing.NewModelRouterService(cs.appConfig)
 						routingCtx := &routing.RoutingContext{
 							Request:      userInput,
@@ -304,7 +304,7 @@ func executeTool(ctx context.Context, fc *types.FunctionCall, toolRegistry types
 func generateDiff(oldContent, newContent string) string {
 	oldLines := strings.Split(oldContent, "\n")
 	newLines := strings.Split(newContent, "\n")
-	maxLength := 20 
+	maxLength := 20
 	if len(oldLines) > maxLength || len(newLines) > maxLength {
 		return "Diff too large to display."
 	}
@@ -320,7 +320,6 @@ func generateDiff(oldContent, newContent string) string {
 	}
 	return diff.String()
 }
-
 
 func (cs *ChatService) GetHistory() []*types.Content {
 	return cs.history

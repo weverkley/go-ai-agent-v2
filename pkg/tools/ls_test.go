@@ -24,11 +24,11 @@ func TestLsTool_Execute(t *testing.T) {
 	os.WriteFile(filepath.Join(tempDir, "file2.go"), []byte("content2"), 0644)
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing path argument",
@@ -41,17 +41,17 @@ func TestLsTool_Execute(t *testing.T) {
 			expectedError: "path argument is required and must be a string",
 		},
 		{
-			name: "successful list directory",
-			args: map[string]any{"path": tempDir},
+			name:                  "successful list directory",
+			args:                  map[string]any{"path": tempDir},
 			expectedLLMContent:    "file1.txt\nfile2.go\nsubdir1",
 			expectedReturnDisplay: "file1.txt\nfile2.go\nsubdir1",
 		},
 		{
-			name: "directory not found",
-			args: map[string]any{"path": "/nonexistent/dir"},
-					expectedError: "failed to read directory /nonexistent/dir: open /nonexistent/dir: no such file or directory",
-				},
-				}
+			name:          "directory not found",
+			args:          map[string]any{"path": "/nonexistent/dir"},
+			expectedError: "failed to read directory /nonexistent/dir: open /nonexistent/dir: no such file or directory",
+		},
+	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			args := tt.args

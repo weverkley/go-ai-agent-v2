@@ -18,33 +18,33 @@ type ExecuteCommandTool struct {
 // NewExecuteCommandTool creates a new ExecuteCommandTool.
 func NewExecuteCommandTool(shellService services.ShellExecutionService) *ExecuteCommandTool {
 	return &ExecuteCommandTool{
-	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-		types.EXECUTE_COMMAND_TOOL_NAME,
-		"Execute Command",
-		"Executes a shell command and returns its output.",
-		types.KindOther,
-		&types.JsonSchemaObject{
-			Type: "object",
-			Properties: map[string]*types.JsonSchemaProperty{
-				"command": {
-					Type:        "string",
-					Description: "The shell command to execute.",
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.EXECUTE_COMMAND_TOOL_NAME,
+			"Execute Command",
+			"Executes a shell command and returns its output.",
+			types.KindOther,
+			&types.JsonSchemaObject{
+				Type: "object",
+				Properties: map[string]*types.JsonSchemaProperty{
+					"command": {
+						Type:        "string",
+						Description: "The shell command to execute.",
+					},
+					"dir": {
+						Type:        "string",
+						Description: "Optional: The directory to execute the command in. Defaults to the current working directory.",
+					},
+					"background": {
+						Type:        "boolean",
+						Description: "Optional: Whether to execute the command in the background. Defaults to false.",
+					},
 				},
-				"dir": {
-					Type:        "string",
-					Description: "Optional: The directory to execute the command in. Defaults to the current working directory.",
-				},
-				"background": {
-					Type:        "boolean",
-					Description: "Optional: Whether to execute the command in the background. Defaults to false.",
-				},
+				Required: []string{"command"},
 			},
-			Required: []string{"command"},
-		},
-		false, // isOutputMarkdown
-		false, // canUpdateOutput
-		nil,   // MessageBus
-	),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 		shellService: shellService,
 	}
 }
@@ -88,7 +88,7 @@ func (t *ExecuteCommandTool) Execute(ctx context.Context, args map[string]any) (
 	}
 
 	stdout, stderr, err := t.shellService.ExecuteCommand(ctx, command, dir)
-	
+
 	output := strings.Builder{}
 	if stdout != "" {
 		output.WriteString("Stdout:\n")

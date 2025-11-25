@@ -226,4 +226,3 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		ReturnDisplay: resultMessage,
 	}, nil
 }
-

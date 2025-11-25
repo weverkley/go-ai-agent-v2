@@ -7,16 +7,17 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
 var (
-	readManyFilesPaths []string
-	readManyFilesInclude []string
-	readManyFilesExclude []string
-	readManyFilesRecursive bool
-	readManyFilesUseDefaultExcludes bool
-	readManyFilesRespectGitIgnore bool
+	readManyFilesPaths                  []string
+	readManyFilesInclude                []string
+	readManyFilesExclude                []string
+	readManyFilesRecursive              bool
+	readManyFilesUseDefaultExcludes     bool
+	readManyFilesRespectGitIgnore       bool
 	readManyFilesRespectGoaiagentIgnore bool
 )
 
@@ -47,13 +48,13 @@ var readManyFilesCmd = &cobra.Command{
 		fileSystemService := services.NewFileSystemService()
 		readManyFilesTool := tools.NewReadManyFilesTool(fileSystemService)
 		result, err := readManyFilesTool.Execute(context.Background(), map[string]any{
-			"paths":                stringSliceToAnySlice(readManyFilesPaths),
-			"include":              stringSliceToAnySlice(readManyFilesInclude),
-			"exclude":              stringSliceToAnySlice(readManyFilesExclude),
-			"recursive":            readManyFilesRecursive,
-			"useDefaultExcludes":   readManyFilesUseDefaultExcludes,
-			"respectGitIgnore":     readManyFilesRespectGitIgnore,
-			"respectGoaiagentIgnore":  readManyFilesRespectGoaiagentIgnore,
+			"paths":                  stringSliceToAnySlice(readManyFilesPaths),
+			"include":                stringSliceToAnySlice(readManyFilesInclude),
+			"exclude":                stringSliceToAnySlice(readManyFilesExclude),
+			"recursive":              readManyFilesRecursive,
+			"useDefaultExcludes":     readManyFilesUseDefaultExcludes,
+			"respectGitIgnore":       readManyFilesRespectGitIgnore,
+			"respectGoaiagentIgnore": readManyFilesRespectGoaiagentIgnore,
 		})
 		if err != nil {
 			fmt.Printf("Error executing read-many-files command: %v\n", err)

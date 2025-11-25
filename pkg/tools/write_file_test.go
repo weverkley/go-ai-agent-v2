@@ -37,29 +37,29 @@ func TestWriteFileTool_Execute(t *testing.T) {
 	}
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func()
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func()
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
-			name: "missing file_path argument",
-			args: map[string]any{"content": "test content"},
-			setupMock: func() {},
+			name:          "missing file_path argument",
+			args:          map[string]any{"content": "test content"},
+			setupMock:     func() {},
 			expectedError: "missing or invalid 'file_path' argument",
 		},
 		{
-			name: "empty file_path argument",
-			args: map[string]any{"file_path": "", "content": "test content"},
-			setupMock: func() {},
+			name:          "empty file_path argument",
+			args:          map[string]any{"file_path": "", "content": "test content"},
+			setupMock:     func() {},
 			expectedError: "missing or invalid 'file_path' argument",
 		},
 		{
-			name: "missing content argument",
-			args: map[string]any{"file_path": "test.txt"},
-			setupMock: func() {},
+			name:          "missing content argument",
+			args:          map[string]any{"file_path": "test.txt"},
+			setupMock:     func() {},
 			expectedError: "missing or invalid 'content' argument",
 		},
 		{

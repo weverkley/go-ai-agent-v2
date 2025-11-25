@@ -87,7 +87,7 @@ func (si *SubagentInvocation) Execute(
 		si.Definition,
 		si.Config,
 		toolRegistry, // Pass the main tool registry for subagent to discover tools
-		"",                          // parentPromptId - SubagentInvocation is top-level for its own execution
+		"",           // parentPromptId - SubagentInvocation is top-level for its own execution
 		onActivity,
 	)
 	if err != nil {

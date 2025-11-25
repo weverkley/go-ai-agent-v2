@@ -162,13 +162,13 @@ func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Git() {
 
 	tempPath := filepath.Join(s.tempDir, ".goaiagent", "temp_extensions", filepath.Base(source))
 	s.mockFs.On("PathExists", extensionPath).Return(false, nil).Maybe()
-	s.mockGit.On("Clone", source, tempPath, ref).Return(nil).Maybe() // Clone to tempPath
+	s.mockGit.On("Clone", source, tempPath, ref).Return(nil).Maybe()                                                 // Clone to tempPath
 	s.mockFs.On("ReadFile", filepath.Join(tempPath, "goaiagent-extension.json")).Return(manifestContent, nil).Once() // Mock ReadFile for manifest
-	
+
 	// Mock PathExists and ReadFile for settings.json when SaveExtensionStatus is called
 	settingsPath := filepath.Join(s.tempDir, ".goaiagent", "settings.json")
 	s.mockFs.On("PathExists", settingsPath).Return(true, nil).Maybe() // After initial creation, it exists
-	s.mockFs.On("ReadFile", settingsPath).Return("{}", nil).Maybe() // It reads the (empty) settings
+	s.mockFs.On("ReadFile", settingsPath).Return("{}", nil).Maybe()   // It reads the (empty) settings
 
 	s.mockFs.On("Rename", tempPath, extensionPath).Return(nil).Once()
 	s.mockFs.On("RemoveAll", tempPath).Return(nil).Once()
@@ -196,14 +196,14 @@ func (s *ManagerTestSuite) TestInstallOrUpdateExtension_Local() {
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
 	s.mockFs.On("ReadFile", filepath.Join(source, "goaiagent-extension.json")).Return(manifestContent, nil).Once() // Read manifest from source
-	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once()                                             // Symlink from source to final path
-	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe() // Already Maybe
-	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // Already Maybe
+	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once()                                               // Symlink from source to final path
+	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe()                                      // Already Maybe
+	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe()                                     // Already Maybe
 
 	// Mock PathExists and ReadFile for settings.json when SaveExtensionStatus is called
 	settingsPath := filepath.Join(s.tempDir, ".goaiagent", "settings.json")
 	s.mockFs.On("PathExists", settingsPath).Return(true, nil).Maybe() // After initial creation, it exists
-	s.mockFs.On("ReadFile", settingsPath).Return("{}", nil).Maybe() // It reads the (empty) settings
+	s.mockFs.On("ReadFile", settingsPath).Return("{}", nil).Maybe()   // It reads the (empty) settings
 
 	metadata := ExtensionInstallMetadata{
 		Source: source,
@@ -233,7 +233,6 @@ func (s *ManagerTestSuite) TestUninstallExtension() {
 	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe()
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-
 	err := s.manager.UninstallExtension(extName, false)
 	s.NoError(err)
 
@@ -254,7 +253,6 @@ func (s *ManagerTestSuite) TestUpdateExtension() {
 	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe()
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe()
 
-
 	err := s.manager.UpdateExtension(extName)
 	s.NoError(err)
 }
@@ -267,15 +265,14 @@ func (s *ManagerTestSuite) TestLinkExtension() {
 	manifestContent := fmt.Sprintf(`{"name": "%s"}`, extName)
 
 	s.mockFs.On("ReadFile", filepath.Join(source, "goaiagent-extension.json")).Return(manifestContent, nil).Once()
-	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once() // Symlink from source to final path
-	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe() // Already Maybe
+	s.mockFs.On("Symlink", source, extensionPath).Return(nil).Once()           // Symlink from source to final path
+	s.mockFs.On("MkdirAll", mock.Anything, mock.Anything).Return(nil).Maybe()  // Already Maybe
 	s.mockFs.On("WriteFile", mock.Anything, mock.Anything).Return(nil).Maybe() // Already Maybe
 
 	// Mock PathExists and ReadFile for settings.json when SaveExtensionStatus is called
 	settingsPath := filepath.Join(s.tempDir, ".goaiagent", "settings.json")
 	s.mockFs.On("PathExists", settingsPath).Return(true, nil).Maybe() // After initial creation, it exists
-	s.mockFs.On("ReadFile", settingsPath).Return("{}", nil).Maybe() // It reads the (empty) settings
-
+	s.mockFs.On("ReadFile", settingsPath).Return("{}", nil).Maybe()   // It reads the (empty) settings
 
 	err := s.manager.LinkExtension(source)
 	s.NoError(err)

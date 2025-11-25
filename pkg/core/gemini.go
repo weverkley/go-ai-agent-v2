@@ -121,7 +121,7 @@ func buildGeminiTools(toolRegistry types.ToolRegistryInterface, logger telemetry
 		logger.LogWarnf("buildGeminiTools: No tools found in registry.")
 		return nil
 	}
-	
+
 	// ... (rest of function is unchanged)
 	var convertObject func(obj *types.JsonSchemaObject) *genai.Schema
 	var convertProperty func(prop *types.JsonSchemaProperty) *genai.Schema
@@ -217,7 +217,7 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 		}
 
 		cs := model.StartChat()
-		
+
 		if len(history) > 1 {
 			historyToSet := history[:len(history)-1]
 			gc.logger.LogDebugf("GeminiExecutor: Setting chat history with %d previous messages.", len(historyToSet))
@@ -225,7 +225,7 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 		} else {
 			gc.logger.LogDebugf("GeminiExecutor: No previous history to set.")
 		}
-		
+
 		var lastParts []genai.Part
 		if len(history) > 0 {
 			lastContent := history[len(history)-1]
@@ -238,7 +238,7 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 			return
 		}
 		gc.logger.LogDebugf("GeminiExecutor: Sending last message with %d parts.", len(lastParts))
-		
+
 		iter := cs.SendMessageStream(ctx, lastParts...)
 		gc.logger.LogDebugf("GeminiExecutor: SendMessageStream called. Waiting for response...")
 
@@ -254,7 +254,7 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 				return
 			}
 			gc.logger.LogDebugf("GeminiExecutor: Received a response chunk from Gemini stream.")
-			
+
 			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
 				for _, part := range resp.Candidates[0].Content.Parts {
 					eventChan <- fromGenaiPart(part, gc.logger)

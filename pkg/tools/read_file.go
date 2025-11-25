@@ -95,41 +95,39 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 		}, fmt.Errorf("path is a directory, not a file: %s", absolutePath)
 	}
 
-		// Handle different file types
+	// Handle different file types
 
-		ext := strings.ToLower(filepath.Ext(absolutePath))
+	ext := strings.ToLower(filepath.Ext(absolutePath))
 
-		switch ext {
+	switch ext {
 
-				case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
+	case ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp":
 
-					output := fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath)
+		output := fmt.Sprintf("Content of %s (binary file, not displayed)", absolutePath)
 
-					return types.ToolResult{
+		return types.ToolResult{
 
-						LLMContent:    output,
+			LLMContent: output,
 
-						ReturnDisplay: output,
+			ReturnDisplay: output,
+		}, nil
 
-					}, nil
+	case ".pdf":
 
-		case ".pdf":
+		output := fmt.Sprintf("PDF file: %s (binary file, consider using a specialized PDF tool for content extraction)", absolutePath)
 
-			output := fmt.Sprintf("PDF file: %s (binary file, consider using a specialized PDF tool for content extraction)", absolutePath)
+		return types.ToolResult{
 
-			return types.ToolResult{
+			LLMContent: output,
 
-				LLMContent:    output,
+			ReturnDisplay: output,
+		}, nil
 
-				ReturnDisplay: output,
+	default:
 
-			}, nil
+		// Assume text file and proceed with existing text reading logic.
 
-		default:
-
-			// Assume text file and proceed with existing text reading logic.
-
-		}
+	}
 
 	file, err := os.Open(absolutePath)
 	if err != nil {

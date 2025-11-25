@@ -15,12 +15,12 @@ func TestMemoryTool_Execute(t *testing.T) {
 	tool := NewMemoryTool()
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func(tempDir string)
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func(tempDir string)
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing fact argument",

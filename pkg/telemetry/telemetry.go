@@ -27,13 +27,12 @@ type TelemetryLogger interface {
 type noopTelemetryLogger struct{}
 
 func (l *noopTelemetryLogger) LogAgentStart(event types.AgentStartEvent)    {}
-func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent)   {}
-func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{})  {}
-func (l *noopTelemetryLogger) LogWarnf(format string, args ...interface{})   {}
-func (l *noopTelemetryLogger) LogInfof(format string, args ...interface{})   {}
-func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{})  {}
-func (l *noopTelemetryLogger) LogPrompt(prompt string) {} // New method
-
+func (l *noopTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent)  {}
+func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{}) {}
+func (l *noopTelemetryLogger) LogWarnf(format string, args ...interface{})  {}
+func (l *noopTelemetryLogger) LogInfof(format string, args ...interface{})  {}
+func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{}) {}
+func (l *noopTelemetryLogger) LogPrompt(prompt string)                      {} // New method
 
 // fileTelemetryLogger logs telemetry events to a specified file.
 type fileTelemetryLogger struct {
@@ -60,8 +59,8 @@ func (l *fileTelemetryLogger) LogAgentStart(event types.AgentStartEvent) {
 	defer l.mu.Unlock()
 
 	logEntry := map[string]interface{}{
-		"type":    "AgentStart",
-		"agentID": event.AgentID,
+		"type":      "AgentStart",
+		"agentID":   event.AgentID,
 		"agentName": event.AgentName,
 	}
 	data, err := json.Marshal(logEntry)
@@ -81,11 +80,11 @@ func (l *fileTelemetryLogger) LogAgentFinish(event types.AgentFinishEvent) {
 	defer l.mu.Unlock()
 
 	logEntry := map[string]interface{}{
-		"type":          "AgentFinish",
-		"agentID":       event.AgentID,
-		"agentName":     event.AgentName,
-		"durationMs":    event.DurationMs,
-		"turnCounter":   event.TurnCounter,
+		"type":            "AgentFinish",
+		"agentID":         event.AgentID,
+		"agentName":       event.AgentName,
+		"durationMs":      event.DurationMs,
+		"turnCounter":     event.TurnCounter,
 		"terminateReason": event.TerminateReason,
 	}
 	data, err := json.Marshal(logEntry)
@@ -123,8 +122,8 @@ func (l *fileTelemetryLogger) LogErrorf(format string, args ...interface{}) {
 	defer l.mu.Unlock()
 
 	logEntry := map[string]interface{}{
-		"type":    "Error",
-		"message": fmt.Sprintf(format, args...),
+		"type":      "Error",
+		"message":   fmt.Sprintf(format, args...),
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	data, err := json.Marshal(logEntry)
@@ -143,8 +142,8 @@ func (l *fileTelemetryLogger) LogWarnf(format string, args ...interface{}) {
 	defer l.mu.Unlock()
 
 	logEntry := map[string]interface{}{
-		"type":    "Warn",
-		"message": fmt.Sprintf(format, args...),
+		"type":      "Warn",
+		"message":   fmt.Sprintf(format, args...),
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	data, err := json.Marshal(logEntry)
@@ -163,8 +162,8 @@ func (l *fileTelemetryLogger) LogInfof(format string, args ...interface{}) {
 	defer l.mu.Unlock()
 
 	logEntry := map[string]interface{}{
-		"type":    "Info",
-		"message": fmt.Sprintf(format, args...),
+		"type":      "Info",
+		"message":   fmt.Sprintf(format, args...),
 		"timestamp": time.Now().Format(time.RFC3339),
 	}
 	data, err := json.Marshal(logEntry)

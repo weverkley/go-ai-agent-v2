@@ -38,64 +38,53 @@ type Settings struct {
 	Tavily               *types.TavilySettings             `json:"tavily,omitempty"`
 }
 
+func newDefaultSettings(workspaceDir string) *Settings {
+	telemetryOutDir := filepath.Join(workspaceDir, ".goaiagent", "tmp")
+	return &Settings{
+		ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
+		McpServers:           make(map[string]types.MCPServerConfig),
+		DebugMode:            false,
+		UserMemory:           "",
+		ApprovalMode:         types.ApprovalModeDefault,
+		DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME},
+		ShowMemoryUsage:      false,
+		Model:                "gemini-1.5-flash-latest",
+		Executor:             "gemini",
+		Proxy:                "",
+		EnabledExtensions:    make(map[types.SettingScope][]string),
+		ToolDiscoveryCommand: "",
+		ToolCallCommand:      "",
+		Telemetry: &types.TelemetrySettings{
+			Enabled:  true,
+			OutDir:   telemetryOutDir,
+			LogLevel: "info",
+		},
+		GoogleCustomSearch: &types.GoogleCustomSearchSettings{
+			ApiKey: "your-google-api-key",
+			CxId:   "your-google-cx-id",
+		},
+		WebSearchProvider: types.WebSearchProviderGoogleCustomSearch,
+		Tavily: &types.TavilySettings{
+			ApiKey: "your-tavily-api-key",
+		},
+	}
+}
+
 // LoadSettings loads the application settings from various sources.
 func LoadSettings(workspaceDir string) *Settings {
 	settingsPath := getSettingsPath(workspaceDir)
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
-		return &Settings{
-			ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
-			McpServers:           make(map[string]types.MCPServerConfig),
-			DebugMode:            false,
-			UserMemory:           "",
-			ApprovalMode:         types.ApprovalModeDefault,
-			DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME}, // Default dangerous tools
-			ShowMemoryUsage:      false,
-			TelemetryEnabled:     false,
-			Model:                "gemini-pro", // Default model
-			Executor:             "gemini",     // Default executor
-			Proxy:                "",
-			EnabledExtensions:    make(map[types.SettingScope][]string),
-			ToolDiscoveryCommand: "",
-			ToolCallCommand:      "",
-			Telemetry: &types.TelemetrySettings{
-				Enabled: false,
-			},
-			GoogleCustomSearch: &types.GoogleCustomSearchSettings{},
-			WebSearchProvider:  types.WebSearchProviderGoogleCustomSearch, // Default to Google Custom Search
-			Tavily:             &types.TavilySettings{},
-		}
+		return newDefaultSettings(workspaceDir)
 	}
 
 	var settings Settings
 	if err := json.Unmarshal(data, &settings); err != nil {
 		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
-		// Return default settings on parsing error
-		return &Settings{
-			ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
-			McpServers:           make(map[string]types.MCPServerConfig),
-			DebugMode:            false,
-			UserMemory:           "",
-			ApprovalMode:         types.ApprovalModeDefault,
-			DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME}, // Default dangerous tools
-			ShowMemoryUsage:      false,
-			TelemetryEnabled:     false,
-			Model:                "gemini-pro", // Default model
-			Executor:             "gemini",     // Default executor
-			Proxy:                "",
-			EnabledExtensions:    make(map[types.SettingScope][]string),
-			ToolDiscoveryCommand: "",
-			ToolCallCommand:      "",
-			Telemetry: &types.TelemetrySettings{
-				Enabled: false,
-			},
-			GoogleCustomSearch: &types.GoogleCustomSearchSettings{},
-			WebSearchProvider:  types.WebSearchProviderGoogleCustomSearch, // Default to Google Custom Search
-			Tavily:             &types.TavilySettings{},
-		}
+		return newDefaultSettings(workspaceDir)
 	}
 
-	// Apply defaults if not set in the loaded settings
+	// Apply defaults if not set in the loaded settings to ensure backward compatibility
 	if len(settings.ExtensionPaths) == 0 {
 		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")}
 	}
@@ -106,7 +95,7 @@ func LoadSettings(workspaceDir string) *Settings {
 		settings.ApprovalMode = types.ApprovalModeDefault
 	}
 	if settings.Model == "" {
-		settings.Model = "gemini-pro"
+		settings.Model = "gemini-1.5-flash-latest"
 	}
 	if settings.Executor == "" {
 		settings.Executor = "gemini"
@@ -114,15 +103,11 @@ func LoadSettings(workspaceDir string) *Settings {
 	if settings.EnabledExtensions == nil {
 		settings.EnabledExtensions = make(map[types.SettingScope][]string)
 	}
-	if settings.ToolDiscoveryCommand == "" {
-		settings.ToolDiscoveryCommand = ""
-	}
-	if settings.ToolCallCommand == "" {
-		settings.ToolCallCommand = ""
-	}
 	if settings.Telemetry == nil {
 		settings.Telemetry = &types.TelemetrySettings{
-			Enabled: false,
+			Enabled:  true,
+			OutDir:   filepath.Join(workspaceDir, ".goaiagent", "tmp"),
+			LogLevel: "info",
 		}
 	}
 	if settings.GoogleCustomSearch == nil {
@@ -134,7 +119,6 @@ func LoadSettings(workspaceDir string) *Settings {
 	if settings.Tavily == nil {
 		settings.Tavily = &types.TavilySettings{}
 	}
-	// IMPORTANT: Apply default dangerous tools if not specified in the settings file
 	if settings.DangerousTools == nil {
 		settings.DangerousTools = []string{
 			types.EXECUTE_COMMAND_TOOL_NAME,

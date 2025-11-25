@@ -13,22 +13,22 @@ import (
 
 // McpCommand provides functionalities for managing MCP servers.
 type McpCommand struct {
-	workspaceDir string
-	settingsService *services.SettingsService
-	mcpManager   *mcp.McpClientManager
+	workspaceDir     string
+	settingsService  *services.SettingsService
+	mcpManager       *mcp.McpClientManager
 	extensionManager *extension.Manager
-	toolRegistry *types.ToolRegistry
+	toolRegistry     *types.ToolRegistry
 }
 
 // NewMcpCommand creates a new instance of McpCommand.
 func NewMcpCommand(toolRegistry *types.ToolRegistry, settingsService *services.SettingsService, extensionManager *extension.Manager) *McpCommand {
 	workspaceDir, _ := os.Getwd()
 	return &McpCommand{
-		workspaceDir: workspaceDir,
-		settingsService: settingsService,
-		mcpManager:   mcp.NewMcpClientManager(toolRegistry),
+		workspaceDir:     workspaceDir,
+		settingsService:  settingsService,
+		mcpManager:       mcp.NewMcpClientManager(toolRegistry),
 		extensionManager: extensionManager,
-		toolRegistry: toolRegistry,
+		toolRegistry:     toolRegistry,
 	}
 }
 

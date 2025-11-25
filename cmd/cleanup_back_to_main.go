@@ -6,13 +6,14 @@ import (
 	"path/filepath"
 
 	"go-ai-agent-v2/go-cli/pkg/services"
+
 	"github.com/spf13/cobra"
 )
 
 var cleanupBackToMainCmd = &cobra.Command{
 	Use:   "cleanup-back-to-main",
 	Short: "Go back to main and clean up the branch.",
-	Long:  `This command automates the process of going back to the main branch, pulling the latest changes, and deleting the feature branch.`, 
+	Long:  `This command automates the process of going back to the main branch, pulling the latest changes, and deleting the feature branch.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		gitService := services.NewGitService()
 		workspaceDir, err := os.Getwd()

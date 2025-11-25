@@ -11,19 +11,19 @@ import (
 
 // ListDirectoryTool implements the Tool interface for listing directory contents.
 type ListDirectoryTool struct {
-	*types.BaseDeclarativeTool // Embed BaseDeclarativeTool directly
-	fileSystemService services.FileSystemService // Use the interface
+	*types.BaseDeclarativeTool                            // Embed BaseDeclarativeTool directly
+	fileSystemService          services.FileSystemService // Use the interface
 }
 
 // NewListDirectoryTool creates a new ListDirectoryTool.
 func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 	return &ListDirectoryTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-		types.LIST_DIRECTORY_TOOL_NAME,
-		"List Directory",
-		"Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.",
-		types.KindOther,
-					&types.JsonSchemaObject{
+			types.LIST_DIRECTORY_TOOL_NAME,
+			"List Directory",
+			"Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.",
+			types.KindOther,
+			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{
 					"path": &types.JsonSchemaProperty{
@@ -52,10 +52,10 @@ func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 				},
 				Required: []string{"path"},
 			},
-		false, // isOutputMarkdown
-		false, // canUpdateOutput
-		nil,   // MessageBus
-	),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 		fileSystemService: fs,
 	}
 }
@@ -99,8 +99,8 @@ func (t *ListDirectoryTool) Execute(ctx context.Context, args map[string]any) (t
 	}
 
 	return types.ToolResult{
-		LLMContent:    strings.Join(files, "\n"),
-		ReturnDisplay: fmt.Sprintf("Listed directory %s: %d items", path, len(files)),
-	},
-	nil
+			LLMContent:    strings.Join(files, "\n"),
+			ReturnDisplay: fmt.Sprintf("Listed directory %s: %d items", path, len(files)),
+		},
+		nil
 }

@@ -17,31 +17,31 @@ type PullTool struct {
 // NewPullTool creates a new PullTool.
 func NewPullTool(gitService services.GitService) *PullTool {
 	return &PullTool{
-	BaseDeclarativeTool: types.NewBaseDeclarativeTool(
-		types.PULL_TOOL_NAME,
-		"Pull",
-		"Pulls changes from a remote Git repository.",
-		types.KindOther,
-		(&types.JsonSchemaObject{
-			Type: "object",
-		}).SetProperties(map[string]*types.JsonSchemaProperty{
-			"dir": {
-				Type:        "string",
-				Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
-			},
-			"remote_name": {
-				Type:        "string",
-				Description: "Optional: The name of the Git remote (e.g., 'origin'). Defaults to 'origin'.",
-			},
-			"branch_name": {
-				Type:        "string",
-				Description: "Optional: The name of the branch to pull. Defaults to the current branch of the remote.",
-			},
-		}).SetRequired([]string{"dir"}),
-		false, // isOutputMarkdown
-		false, // canUpdateOutput
-		nil,   // MessageBus
-	),
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
+			types.PULL_TOOL_NAME,
+			"Pull",
+			"Pulls changes from a remote Git repository.",
+			types.KindOther,
+			(&types.JsonSchemaObject{
+				Type: "object",
+			}).SetProperties(map[string]*types.JsonSchemaProperty{
+				"dir": {
+					Type:        "string",
+					Description: "The absolute path to the Git repository (e.g., '/home/user/project').",
+				},
+				"remote_name": {
+					Type:        "string",
+					Description: "Optional: The name of the Git remote (e.g., 'origin'). Defaults to 'origin'.",
+				},
+				"branch_name": {
+					Type:        "string",
+					Description: "Optional: The name of the branch to pull. Defaults to the current branch of the remote.",
+				},
+			}).SetRequired([]string{"dir"}),
+			false, // isOutputMarkdown
+			false, // canUpdateOutput
+			nil,   // MessageBus
+		),
 		gitService: gitService,
 	}
 }

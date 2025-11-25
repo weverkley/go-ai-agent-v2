@@ -36,10 +36,10 @@ func (sjf *StreamJsonFormatter) ConvertToStreamStats(
 	durationMs int,
 ) types.StreamStats {
 	return types.StreamStats{
-		TotalTokens: metrics.TotalTokens,
-		InputTokens: metrics.InputTokens,
+		TotalTokens:  metrics.TotalTokens,
+		InputTokens:  metrics.InputTokens,
 		OutputTokens: metrics.OutputTokens,
-		DurationMs:  durationMs,
-		ToolCalls:   0, // Placeholder for now, needs to be tracked separately
+		DurationMs:   durationMs,
+		ToolCalls:    0, // Placeholder for now, needs to be tracked separately
 	}
 }

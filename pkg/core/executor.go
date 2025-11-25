@@ -17,6 +17,6 @@ type Executor interface {
 	SetHistory(history []*types.Content) error
 	CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error)
 	StreamContent(ctx context.Context, contents ...*types.Content) (<-chan any, error)
-	SetUserConfirmationChannel(chan bool) // New method for user confirmation
+	SetUserConfirmationChannel(chan bool)                          // New method for user confirmation
 	SetToolConfirmationChannel(chan types.ToolConfirmationOutcome) // New method for rich tool confirmation
 }

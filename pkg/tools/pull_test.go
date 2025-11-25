@@ -16,23 +16,23 @@ func TestPullTool_Execute(t *testing.T) {
 	tool := NewPullTool(mockGitService)
 
 	tests := []struct {
-		name string
-		args map[string]any
-		setupMock func()
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func()
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
-			name: "missing dir argument",
-			args: map[string]any{},
-			setupMock: func() {},
+			name:          "missing dir argument",
+			args:          map[string]any{},
+			setupMock:     func() {},
 			expectedError: "missing or invalid 'dir' argument",
 		},
 		{
-			name: "empty dir argument",
-			args: map[string]any{"dir": ""},
-			setupMock: func() {},
+			name:          "empty dir argument",
+			args:          map[string]any{"dir": ""},
+			setupMock:     func() {},
 			expectedError: "missing or invalid 'dir' argument",
 		},
 		{

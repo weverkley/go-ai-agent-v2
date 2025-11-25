@@ -20,14 +20,10 @@ const (
 	SettingScopeWorkspace SettingScope = "workspace"
 )
 
-
-
 // GetWorkspaceContext returns the workspace context.
 func (c *Config) GetWorkspaceContext() types.WorkspaceContext {
 	return c.WorkspaceContext
 }
-
-
 
 // OutputSettings represents the output settings.
 type OutputSettings struct {
@@ -36,57 +32,57 @@ type OutputSettings struct {
 
 // ConfigParameters represents the parameters for creating a new Config.
 type ConfigParameters struct {
-	SessionID      string
-	EmbeddingModel string
-	TargetDir      string
-	DebugMode      bool
-	ModelName          string
-	McpServers     map[string]types.MCPServerConfig
-	ApprovalMode   types.ApprovalMode // Use ApprovalMode from types package
-	Telemetry      *types.TelemetrySettings
-	Output         *OutputSettings
+	SessionID            string
+	EmbeddingModel       string
+	TargetDir            string
+	DebugMode            bool
+	ModelName            string
+	McpServers           map[string]types.MCPServerConfig
+	ApprovalMode         types.ApprovalMode // Use ApprovalMode from types package
+	Telemetry            *types.TelemetrySettings
+	Output               *OutputSettings
 	CodebaseInvestigator *types.CodebaseInvestigatorSettings
-	ToolRegistry types.ToolRegistryInterface
+	ToolRegistry         types.ToolRegistryInterface
 	ToolDiscoveryCommand string
 	ToolCallCommand      string
 }
 
 // Config represents the application's configuration.
 type Config struct {
-	sessionID      string
-	embeddingModel string
-	targetDir      string
-	debugMode      bool
-	modelName          string
-	mcpServers     map[string]types.MCPServerConfig
-	approvalMode   types.ApprovalMode // Use ApprovalMode from types package
-	Telemetry      *types.TelemetrySettings
-	output         *OutputSettings
+	sessionID                    string
+	embeddingModel               string
+	targetDir                    string
+	debugMode                    bool
+	modelName                    string
+	mcpServers                   map[string]types.MCPServerConfig
+	approvalMode                 types.ApprovalMode // Use ApprovalMode from types package
+	Telemetry                    *types.TelemetrySettings
+	output                       *OutputSettings
 	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
-	toolRegistry types.ToolRegistryInterface // Changed to interface
-	toolDiscoveryCommand string
-	toolCallCommand      string
-	telemetryLogger telemetry.TelemetryLogger
-	FileFilteringService types.FileFilteringService // Exported FileFilteringService field
-	WorkspaceContext types.WorkspaceContext // Exported workspaceContext field
+	toolRegistry                 types.ToolRegistryInterface // Changed to interface
+	toolDiscoveryCommand         string
+	toolCallCommand              string
+	telemetryLogger              telemetry.TelemetryLogger
+	FileFilteringService         types.FileFilteringService // Exported FileFilteringService field
+	WorkspaceContext             types.WorkspaceContext     // Exported workspaceContext field
 }
 
 // NewConfig creates a new Config instance from ConfigParameters.
 func NewConfig(params *ConfigParameters) *Config {
 	return &Config{
-		sessionID:      params.SessionID,
-		embeddingModel: params.EmbeddingModel,
-		targetDir:      params.TargetDir,
-		debugMode:      params.DebugMode,
-		modelName:          params.ModelName,
-		mcpServers:     params.McpServers,
-		approvalMode:   params.ApprovalMode,
-		Telemetry:      params.Telemetry,
-		output:         params.Output,
+		sessionID:                    params.SessionID,
+		embeddingModel:               params.EmbeddingModel,
+		targetDir:                    params.TargetDir,
+		debugMode:                    params.DebugMode,
+		modelName:                    params.ModelName,
+		mcpServers:                   params.McpServers,
+		approvalMode:                 params.ApprovalMode,
+		Telemetry:                    params.Telemetry,
+		output:                       params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
-		toolRegistry:   params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
-		toolDiscoveryCommand: params.ToolDiscoveryCommand,
-		toolCallCommand:      params.ToolCallCommand,
+		toolRegistry:                 params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
+		toolDiscoveryCommand:         params.ToolDiscoveryCommand,
+		toolCallCommand:              params.ToolCallCommand,
 		// telemetryLogger and fileFilteringService will be set separately
 	}
 }
@@ -149,7 +145,7 @@ var (
 		"dist":         true,
 	}
 	DEFAULT_FILE_FILTERING_OPTIONS = types.FileFilteringOptions{
-		RespectGitIgnore:  boolPtr(true),
+		RespectGitIgnore:       boolPtr(true),
 		RespectGoaiagentIgnore: boolPtr(true),
 	}
 )
@@ -197,9 +193,9 @@ func (c *Config) _getFolderStructure(directory string, options *types.FolderStru
 	}
 
 	mergedOptions := types.FolderStructureOptions{
-		MaxItems:           intPtr(MAX_ITEMS),
-		IgnoredFolders:     &[]string{}, // Will be merged with DEFAULT_IGNORED_FOLDERS
-		FileIncludePattern: nil,
+		MaxItems:             intPtr(MAX_ITEMS),
+		IgnoredFolders:       &[]string{}, // Will be merged with DEFAULT_IGNORED_FOLDERS
+		FileIncludePattern:   nil,
 		FileFilteringOptions: &DEFAULT_FILE_FILTERING_OPTIONS,
 	}
 
@@ -232,7 +228,6 @@ func (c *Config) _getFolderStructure(directory string, options *types.FolderStru
 	for k := range defaultIgnoredMap {
 		*mergedOptions.IgnoredFolders = append(*mergedOptions.IgnoredFolders, k)
 	}
-
 
 	structureRoot, err := c.readFullStructure(resolvedPath, &mergedOptions, fileFilteringService)
 	if err != nil {
@@ -300,7 +295,7 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 				// debugLogger.Warn(fmt.Sprintf("Warning: Could not read directory %s: %v", currentPath, err))
 				// If root directory itself not found
 				if currentPath == rootPath && os.IsNotExist(err) {
-					return nil, nil 
+					return nil, nil
 				}
 				continue
 			}
@@ -322,7 +317,6 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 					break
 				}
 				fileName := entry.Name()
-				
 
 				isIgnored := false
 				if fileFilteringService != nil {
@@ -378,13 +372,13 @@ func (c *Config) readFullStructure(rootPath string, options *types.FolderStructu
 
 				if isIgnored {
 					ignoredSubFolder := types.FullFolderInfo{
-						Name:        subFolderName,
-						Path:        subFolderPath,
-						IsIgnored:   true,
-						Files:       []string{},
-						SubFolders:  []types.FullFolderInfo{},
+						Name:          subFolderName,
+						Path:          subFolderPath,
+						IsIgnored:     true,
+						Files:         []string{},
+						SubFolders:    []types.FullFolderInfo{},
 						TotalChildren: 0,
-						TotalFiles:  0,
+						TotalFiles:    0,
 					}
 					subFoldersInCurrentDir = append(subFoldersInCurrentDir, ignoredSubFolder)
 					currentItemCount++

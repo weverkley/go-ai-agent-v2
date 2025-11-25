@@ -101,4 +101,3 @@ func runCodeGuideCmd(cmd *cobra.Command, args []string, settingsService types.Se
 func init() {
 	codeGuideCmd.Flags().StringVarP(&executorType, "executor", "e", "gemini", "The type of AI executor to use (e.g., 'gemini', 'mock')")
 }
-

@@ -61,7 +61,7 @@ func (m *mockableMcpClient) Name() string {
 
 // McpClientManager manages the lifecycle of multiple MCP clients and local servers.
 type McpClientManager struct {
-	mu             sync.RWMutex // Mutex to protect concurrent access
+	mu             sync.RWMutex                  // Mutex to protect concurrent access
 	clients        map[string]McpClientInterface // Change type to interface
 	toolRegistry   types.ToolRegistryInterface
 	runningServers map[string]*exec.Cmd // Map to store running local server processes
@@ -70,8 +70,8 @@ type McpClientManager struct {
 // NewMcpClientManager creates a new instance of McpClientManager.
 func NewMcpClientManager(toolRegistry types.ToolRegistryInterface) *McpClientManager {
 	return &McpClientManager{
-		clients: make(map[string]McpClientInterface), // Change type to interface
-		toolRegistry: toolRegistry,
+		clients:        make(map[string]McpClientInterface), // Change type to interface
+		toolRegistry:   toolRegistry,
 		runningServers: make(map[string]*exec.Cmd),
 	}
 }
@@ -136,9 +136,9 @@ func (m *McpClientManager) DiscoverAllMcpTools(cliConfig types.Config) error {
 	for name, serverConfig := range mcpServers {
 		telemetry.LogDebugf("Connecting to MCP server: %s (URL: %s)", name, serverConfig.Url)
 		client := NewMcpClientFactory(name, "v1.0", serverConfig) // Use the mockable NewMcpClientFactory function
-		
+
 		// Simulate connection
-		if err := client.Connect(5*time.Second); err != nil {
+		if err := client.Connect(5 * time.Second); err != nil {
 			telemetry.LogErrorf("Error connecting to MCP server %s: %v", name, err)
 			continue
 		}

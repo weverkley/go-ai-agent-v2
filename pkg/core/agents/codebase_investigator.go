@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath" // Added
-	"runtime" // Added
+	"runtime"       // Added
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
@@ -40,6 +40,7 @@ func loadPromptsFromFile(filePath string) (map[string]string, error) {
 }
 
 var prompts map[string]string
+
 func init() {
 	var err error
 	_, filename, _, ok := runtime.Caller(0)
@@ -63,8 +64,8 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 		Inputs: map[string]InputParameter{
 			"objective": {
 				Description: prompts["Objective Description"],
-				Type:     "string",
-				Required: true,
+				Type:        "string",
+				Required:    true,
 			},
 		},
 	},
@@ -85,9 +86,9 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 	},
 
 	ModelConfig: ModelConfig{
-		Model:        config.DEFAULT_GEMINI_MODEL, // Assuming DEFAULT_GEMINI_MODEL is defined in config
-		Temperature:  0.1,
-		TopP:         0.95,
+		Model:          config.DEFAULT_GEMINI_MODEL, // Assuming DEFAULT_GEMINI_MODEL is defined in config
+		Temperature:    0.1,
+		TopP:           0.95,
 		ThinkingBudget: -1,
 	},
 
@@ -102,7 +103,7 @@ var CodebaseInvestigatorAgent = AgentDefinition{
 	},
 
 	PromptConfig: PromptConfig{
-		Query: prompts["Query"],
+		Query:        prompts["Query"],
 		SystemPrompt: prompts["System Prompt"],
 	},
 }

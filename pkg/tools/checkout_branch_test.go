@@ -48,12 +48,12 @@ func (m *MockGitService) Clone(url string, directory string, ref string) error {
 
 func TestCheckoutBranchTool_Execute(t *testing.T) {
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func(mockGitService *MockGitService)
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func(mockGitService *MockGitService)
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing dir argument",

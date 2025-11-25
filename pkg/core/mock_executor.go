@@ -9,19 +9,19 @@ import (
 
 // MockExecutor is a mock implementation of the Executor interface for testing.
 type MockExecutor struct {
-	GenerateContentFunc        func(contents ...*types.Content) (*types.GenerateContentResponse, error)
+	GenerateContentFunc          func(contents ...*types.Content) (*types.GenerateContentResponse, error)
 	GenerateContentWithToolsFunc func(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error)
-	ExecuteToolFunc            func(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error)
-	SendMessageStreamFunc      func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
-	ListModelsFunc             func() ([]string, error)
-	GetHistoryFunc             func() ([]*types.Content, error)
-	SetHistoryFunc             func(history []*types.Content) error
-	CompressChatFunc           func(promptId string, force bool) (*types.ChatCompressionResult, error)
-	StreamContentFunc          func(ctx context.Context, contents ...*types.Content) (<-chan any, error)
-	toolRegistry               types.ToolRegistryInterface
-	UserConfirmationChan       chan bool                            // Expose for testing
-	ToolConfirmationChan       chan types.ToolConfirmationOutcome // New channel for rich confirmation
-	MockStep                   int                                  // State for the realistic mock flow
+	ExecuteToolFunc              func(ctx context.Context, fc *types.FunctionCall) (types.ToolResult, error)
+	SendMessageStreamFunc        func(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error)
+	ListModelsFunc               func() ([]string, error)
+	GetHistoryFunc               func() ([]*types.Content, error)
+	SetHistoryFunc               func(history []*types.Content) error
+	CompressChatFunc             func(promptId string, force bool) (*types.ChatCompressionResult, error)
+	StreamContentFunc            func(ctx context.Context, contents ...*types.Content) (<-chan any, error)
+	toolRegistry                 types.ToolRegistryInterface
+	UserConfirmationChan         chan bool                          // Expose for testing
+	ToolConfirmationChan         chan types.ToolConfirmationOutcome // New channel for rich confirmation
+	MockStep                     int                                // State for the realistic mock flow
 }
 
 const (
@@ -276,7 +276,6 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 	return mock
 }
 
-
 // GenerateContent mocks the GenerateContent method.
 func (m *MockExecutor) GenerateContent(contents ...*types.Content) (*types.GenerateContentResponse, error) {
 	if m.GenerateContentFunc != nil {
@@ -337,12 +336,12 @@ func (m *MockExecutor) SetHistory(history []*types.Content) error {
 
 // CompressChat mocks the CompressChat method.
 func (m *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-		if m.CompressChatFunc != nil {
-			return m.CompressChatFunc(promptId, force)
-		}
-		return nil, fmt.Errorf("CompressChat not implemented in mock")
+	if m.CompressChatFunc != nil {
+		return m.CompressChatFunc(promptId, force)
 	}
-	
+	return nil, fmt.Errorf("CompressChat not implemented in mock")
+}
+
 // StreamContent mocks the StreamContent method.
 func (m *MockExecutor) StreamContent(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 	if m.StreamContentFunc != nil {

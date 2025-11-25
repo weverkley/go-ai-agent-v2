@@ -207,13 +207,13 @@ func TestMcpClientManager_DiscoverAllMcpTools(t *testing.T) {
 					// Simulate returning some tools
 					if name == "server1" {
 						return []types.Tool{
-															&MockTool{name: "toolA"},
-															&MockTool{name: "toolB"},							}, nil
+							&MockTool{name: "toolA"},
+							&MockTool{name: "toolB"}}, nil
 					}
-				if name == "server2" {
+					if name == "server2" {
 						return []types.Tool{
-								&MockTool{name: "toolC"},
-							}, nil
+							&MockTool{name: "toolC"},
+						}, nil
 					}
 					return []types.Tool{}, nil
 				},
@@ -333,7 +333,7 @@ func TestMcpClientManager_Stop(t *testing.T) {
 
 		// Add a client that returns an error on Close
 		mockClient := &MockMcpClient{
-			name: "error-client",
+			name:      "error-client",
 			CloseFunc: func() error { return errors.New("mock close error") },
 		}
 		manager.AddClient("error-client", mockClient)
@@ -379,7 +379,7 @@ func TestMcpClientManager_ListServers(t *testing.T) {
 		serverConfig1.Command = dummyExecutablePath
 		serverConfig1.Cwd = tempDir
 		mcpServers["server1"] = serverConfig1 // Update config with command
-		
+
 		err = manager.StartServer("server1", serverConfig1)
 		assert.NoError(t, err)
 		time.Sleep(100 * time.Millisecond) // Give it time to start
@@ -442,9 +442,9 @@ func findServerStatus(statuses []types.MCPServerStatus, name string) *types.MCPS
 
 // MockTool implements types.Tool for testing purposes.
 type MockTool struct {
-	name string
+	name        string
 	description string
-	parameters *types.JsonSchemaObject
+	parameters  *types.JsonSchemaObject
 }
 
 func (m *MockTool) Name() string {

@@ -35,12 +35,12 @@ func TestExecuteCommandTool_Execute(t *testing.T) {
 	tool := NewExecuteCommandTool(mockShellService)
 
 	tests := []struct {
-		name          string
-		args          map[string]any
-		setupMock     func()
-		expectedLLMContent string
+		name                  string
+		args                  map[string]any
+		setupMock             func()
+		expectedLLMContent    string
 		expectedReturnDisplay string
-		expectedError string
+		expectedError         string
 	}{
 		{
 			name:          "missing command argument",

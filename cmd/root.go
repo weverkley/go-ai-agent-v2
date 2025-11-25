@@ -21,9 +21,9 @@ import (
 )
 
 var RootCmd = &cobra.Command{
-	Use:   "go-cli",
-	Short: "A Go-based CLI for Gemini",
-	Long:  `A Go-based CLI for interacting with the Gemini API and managing extensions.`,
+	Use:   "go-ai-agent-v2/go-cli",
+	Short: "A Go-based CLI for multimodal AI interactions",
+	Long:  `A Go-based CLI for multimodal AI interactions, managing extensions and expose MCP servers.`,
 }
 
 var Cfg *config.Config
@@ -32,11 +32,11 @@ var chatService *services.ChatService           // Declare package-level chatSer
 var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
 var MemoryService *services.MemoryService       // Declare package-level memoryService
-var SettingsService types.SettingsServiceIface // Declare package-level settingsService as interface
-var SessionService *services.SessionService // Declare package-level sessionService
+var SettingsService types.SettingsServiceIface  // Declare package-level settingsService as interface
+var SessionService *services.SessionService     // Declare package-level sessionService
 
-var FSService services.FileSystemService // Declare package-level FileSystemService
-var ShellService services.ShellExecutionService   // Declare package-level ShellExecutionService
+var FSService services.FileSystemService             // Declare package-level FileSystemService
+var ShellService services.ShellExecutionService      // Declare package-level ShellExecutionService
 var extensionsCliCommand *commands.ExtensionsCommand // Declare package-level extensionsCliCommand
 
 func Execute() {
@@ -45,7 +45,6 @@ func Execute() {
 		os.Exit(1)
 	}
 }
-
 
 func initServices(projectRoot string) (
 	*services.WorkspaceService,

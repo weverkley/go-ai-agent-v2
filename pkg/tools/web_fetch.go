@@ -123,4 +123,3 @@ func (t *WebFetchTool) Execute(ctx context.Context, args map[string]any) (types.
 		Error:         toolError,
 	}, returnErr
 }
-

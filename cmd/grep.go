@@ -6,12 +6,13 @@ import (
 	"os"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
+
 	"github.com/spf13/cobra"
 )
 
 var (
 	grepPattern string
-	grepPath string
+	grepPath    string
 	grepInclude string
 )
 

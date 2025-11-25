@@ -23,7 +23,7 @@ type commandFinishedMsg struct {
 
 // chatServiceReloadedMsg is sent when the chat service is reinitialized after a settings change.
 type chatServiceReloadedMsg struct {
-	newService    *services.ChatService
+	newService      *services.ChatService
 	newExecutorType string
 }
 

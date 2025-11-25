@@ -7,9 +7,10 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go-ai-agent-v2/go-cli/pkg/config" // New import
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
-	"go-ai-agent-v2/go-cli/pkg/config" // New import
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -67,7 +68,6 @@ func (t *MockUserConfirmTool) Execute(ctx context.Context, args map[string]any) 
 	return types.ToolResult{}, fmt.Errorf("user_confirm Execute should not be called directly")
 }
 
-
 // setupTestChatService creates a temporary directory and a ChatService instance for testing.
 func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *SessionService, types.ToolRegistryInterface, *MockSettingsService, types.Config, string, func()) {
 	projectRoot, err := os.MkdirTemp("", "chat_service_test_*")
@@ -84,11 +84,10 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 	mockSettingsService.On("Get", mock.Anything).Return(nil, false).Maybe()
 	mockSettingsService.On("GetWorkspaceDir").Return(projectRoot).Maybe()
 
-
 	toolRegistry := types.NewToolRegistry()
 	toolRegistry.Register(&MockWriteFileTool{})
 	toolRegistry.Register(&MockUserConfirmTool{})
-	
+
 	mockExecutor := &core.MockExecutor{}
 
 	appConfig := config.NewConfig(&config.ConfigParameters{}) // Create a simple mock config
@@ -142,7 +141,7 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 	t.Run("User cancels tool execution", func(t *testing.T) {
 		chatService, mockExecutor, _, _, mockSettingsService, _, _, cleanup := setupTestChatService(t)
 		defer cleanup()
-		
+
 		mockExecutor.StreamContentFunc = func(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
 			eventChan := make(chan any)
 			go func() {
@@ -210,7 +209,7 @@ func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 				chatService.GetToolConfirmationChannel() <- types.ToolConfirmationOutcomeProceedOnce
 			}
 		}
-		
+
 		history := chatService.GetHistory()
 		assert.Len(t, history, 4)
 		assert.Equal(t, "continue", history[2].Parts[0].FunctionResponse.Response["result"].(map[string]interface{})["result"])

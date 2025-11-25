@@ -20,7 +20,7 @@ var prReviewCmd = &cobra.Command{
 	Use:   "pr-review [pr_identifier]",
 	Short: "Review a specific pull request",
 	Long: `This command uses AI to conduct a comprehensive review of a pull request.
-It evaluates code quality, adherence to standards, and readiness for merging, providing detailed feedback or approval messages.`, 
+It evaluates code quality, adherence to standards, and readiness for merging, providing detailed feedback or approval messages.`,
 	Args: cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		runPrReviewCmd(cmd, args, SettingsService, ShellService, WorkspaceService)

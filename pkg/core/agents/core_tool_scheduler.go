@@ -24,10 +24,10 @@ type CoreToolScheduler struct {
 	config *config.Config
 
 	outputUpdateHandler    func(toolCallID string, outputChunk string)
-	onAllToolCallsComplete     func(completedToolCalls []CompletedToolCall)
-	onToolCallsUpdate          func(toolCalls []ToolCall)
-	getPreferredEditor         func() types.EditorType
-	onEditorClose              func()
+	onAllToolCallsComplete func(completedToolCalls []CompletedToolCall)
+	onToolCallsUpdate      func(toolCalls []ToolCall)
+	getPreferredEditor     func() types.EditorType
+	onEditorClose          func()
 }
 
 // NewCoreToolScheduler creates a new CoreToolScheduler instance.
@@ -90,7 +90,7 @@ func (s *CoreToolScheduler) Schedule(
 			BaseToolCall: BaseToolCall{
 				Request:    request,
 				Tool:       toolInstance, // Populate with actual tool instance
-				Invocation: nil, // Simplified
+				Invocation: nil,          // Simplified
 				StartTime:  &startTime,
 				Outcome:    types.ToolConfirmationOutcomeProceedAlways,
 			},
@@ -117,7 +117,7 @@ func (s *CoreToolScheduler) Schedule(
 			BaseToolCall: BaseToolCall{
 				Request:    request,
 				Tool:       toolInstance, // Populate with actual tool instance
-				Invocation: nil, // Simplified
+				Invocation: nil,          // Simplified
 				StartTime:  &startTime,
 				Outcome:    types.ToolConfirmationOutcomeProceedAlways,
 			},
