@@ -56,8 +56,8 @@ To handle API limits gracefully, the application uses a routing service.
 -   The `routing.ModelRouterService` contains a set of strategies.
 -   The primary strategy is to handle `googleapi: Error 429` (Quota Exceeded) errors from the Gemini executor.
 -   When this specific error is detected in the `ChatService`, it consults the router.
--   The router suggests a fallback model (e.g., from the `qwen` family).
--   The `ChatService` then automatically creates a new `QwenChat` executor, swaps it for the current one, and re-tries the user's request, providing a seamless fallback experience.
+-   The router suggests a fallback model (e.g., from the `gemini` family).
+-   The `ChatService` then automatically creates a new `GeminiChat` executor, swaps it for the current one, and re-tries the user's request, providing a seamless fallback experience.
 
 ---
 
@@ -98,3 +98,7 @@ To handle API limits gracefully, the application uses a routing service.
     -   **`ui/`**: The Bubble Tea interactive chat interface.
     -   **`routing/`**: Logic for dynamically routing requests to different models.
     -   **`types/`**: Centralized data structures and interfaces.
+
+## TODO
+- Validate fallback strategy for models in the current executor (e.g. `gemini` executor) will fallback in its models (e.g. `gemini-prod` to `gemini-flash-latest`).
+- Validate switching between executors.
