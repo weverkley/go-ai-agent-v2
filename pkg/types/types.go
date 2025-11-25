@@ -488,6 +488,11 @@ type WorkspaceContext interface {
 	GetDirectories() []string
 }
 
+// WorkspaceServiceIface defines the interface for workspace-related operations used by tools.
+type WorkspaceServiceIface interface {
+	GetProjectRoot() string
+}
+
 // Config defines the interface for application configuration.
 type Config interface {
 	Get(key string) (interface{}, bool)
