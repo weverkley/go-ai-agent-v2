@@ -100,22 +100,26 @@ func fromOpenAIMessage(msg openai.ChatCompletionMessage) (*types.Content, error)
 }
 
 // toOpenAITools converts generic []*types.ToolDefinition to []openai.Tool.
-func toOpenAITools(tools []*types.ToolDefinition) []openai.Tool {
-	if tools == nil {
+func toOpenAITools(toolRegistry types.ToolRegistryInterface, logger telemetry.TelemetryLogger) []openai.Tool {
+	if toolRegistry == nil {
 		return nil
 	}
-	openaiTools := make([]openai.Tool, 0)
-	for _, tool := range tools {
-		for _, decl := range tool.FunctionDeclarations {
-			openaiTools = append(openaiTools, openai.Tool{
-				Type: openai.ToolTypeFunction,
-				Function: &openai.FunctionDefinition{
-					Name:        decl.Name,
-					Description: decl.Description,
-					Parameters:  decl.Parameters,
-				},
-			})
-		}
+
+	allTools := toolRegistry.GetAllTools()
+	if allTools == nil {
+		return nil
+	}
+
+	openaiTools := make([]openai.Tool, 0, len(allTools)) // Pre-allocate capacity
+	for _, t := range allTools {
+		openaiTools = append(openaiTools, openai.Tool{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        t.Name(),
+				Description: t.Description(),
+				Parameters:  t.Parameters(),
+			},
+		})
 	}
 	return openaiTools
 }
@@ -202,20 +206,7 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 
 		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
-			allTools := qc.toolRegistry.GetAllTools()
-			toolDefinitions := make([]*types.ToolDefinition, len(allTools))
-			for i, t := range allTools {
-				toolDefinitions[i] = &types.ToolDefinition{
-					FunctionDeclarations: []*types.FunctionDeclaration{
-						{
-							Name:        t.Name(),
-							Description: t.Description(),
-							Parameters:  t.Parameters(),
-						},
-					},
-				}
-			}
-			openaiTools = toOpenAITools(toolDefinitions)
+			openaiTools = toOpenAITools(qc.toolRegistry, qc.logger)
 		}
 
 		req := openai.ChatCompletionRequest{
@@ -345,20 +336,7 @@ func (qc *QwenChat) GenerateContent(contents ...*types.Content) (*types.Generate
 	}
 
 	if qc.toolRegistry != nil {
-		allTools := qc.toolRegistry.GetAllTools()
-		toolDefinitions := make([]*types.ToolDefinition, len(allTools))
-		for i, t := range allTools {
-			toolDefinitions[i] = &types.ToolDefinition{
-				FunctionDeclarations: []*types.FunctionDeclaration{
-					{
-						Name:        t.Name(),
-						Description: t.Description(),
-						Parameters:  t.Parameters(),
-					},
-				},
-			}
-		}
-		req.Tools = toOpenAITools(toolDefinitions)
+		req.Tools = toOpenAITools(qc.toolRegistry, qc.logger)
 	}
 
 	ctx := context.Background()

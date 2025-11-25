@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -145,13 +146,66 @@ func fromGenaiContent(content *genai.Content) *types.Content {
 	return &types.Content{Role: content.Role, Parts: genericParts}
 }
 
-// toGenaiToolsFromToolInterface converts generic []types.Tool to []*genai.Tool.
-func toGenaiToolsFromToolInterface(tools []types.Tool) []*genai.Tool {
-	if tools == nil {
+// buildGeminiTools creates a slice of *genai.Tool from the tool registry.
+// It encapsulates all the schema conversion logic.
+func buildGeminiTools(toolRegistry types.ToolRegistryInterface, logger telemetry.TelemetryLogger) []*genai.Tool {
+	if toolRegistry == nil {
 		return nil
 	}
-	genaiTools := make([]*genai.Tool, len(tools))
-	for i, tool := range tools {
+
+	allTools := toolRegistry.GetAllTools()
+	if allTools == nil {
+		return nil
+	}
+
+	genaiTools := make([]*genai.Tool, len(allTools))
+
+	// Define the recursive schema conversion functions inside this scope
+	var toGenaiSchema func(schema *types.JsonSchemaObject) *genai.Schema
+	var toGenaiType func(t string) genai.Type
+
+	toGenaiType = func(t string) genai.Type {
+		switch t {
+		case "string":
+			return genai.TypeString
+		case "number":
+			return genai.TypeNumber
+		case "integer":
+			return genai.TypeInteger
+		case "boolean":
+			return genai.TypeBoolean
+		case "array":
+			return genai.TypeArray
+		case "object":
+			return genai.TypeObject
+		default:
+			logger.LogWarnf("buildGeminiTools: Unknown schema type '%s', defaulting to string.", t)
+			return genai.TypeString
+		}
+	}
+
+	toGenaiSchema = func(schema *types.JsonSchemaObject) *genai.Schema {
+		if schema == nil {
+			return nil
+		}
+		properties := make(map[string]*genai.Schema)
+		for k, v := range schema.Properties {
+			properties[k] = &genai.Schema{
+				Type:        toGenaiType(v.Type),
+				Description: v.Description,
+				Items:       toGenaiSchema(v.Items), // Recursive call
+				Enum:        v.Enum,
+			}
+		}
+		return &genai.Schema{
+			Type:       toGenaiType(schema.Type),
+			Properties: properties,
+			Required:   schema.Required,
+		}
+	}
+
+	// Now, build the tools
+	for i, tool := range allTools {
 		genaiTools[i] = &genai.Tool{
 			FunctionDeclarations: []*genai.FunctionDeclaration{
 				{
@@ -163,66 +217,6 @@ func toGenaiToolsFromToolInterface(tools []types.Tool) []*genai.Tool {
 		}
 	}
 	return genaiTools
-}
-
-// toGenaiTools converts generic []*types.ToolDefinition to []*genai.Tool.
-func toGenaiTools(tools []*types.ToolDefinition) []*genai.Tool {
-	if tools == nil {
-		return nil
-	}
-	genaiTools := make([]*genai.Tool, len(tools))
-	for i, tool := range tools {
-		genaiDeclarations := make([]*genai.FunctionDeclaration, len(tool.FunctionDeclarations))
-		for j, decl := range tool.FunctionDeclarations {
-			genaiDeclarations[j] = &genai.FunctionDeclaration{
-				Name:        decl.Name,
-				Description: decl.Description,
-				Parameters:  toGenaiSchema(decl.Parameters),
-			}
-		}
-		genaiTools[i] = &genai.Tool{FunctionDeclarations: genaiDeclarations}
-	}
-	return genaiTools
-}
-
-// toGenaiSchema converts a generic *types.JsonSchemaObject to *genai.Schema.
-func toGenaiSchema(schema *types.JsonSchemaObject) *genai.Schema {
-	if schema == nil {
-		return nil
-	}
-	properties := make(map[string]*genai.Schema)
-	for k, v := range schema.Properties {
-		properties[k] = &genai.Schema{
-			Type:        toGenaiType(v.Type),
-			Description: v.Description,
-			Items:       toGenaiSchema(v.Items),
-			Enum:        v.Enum,
-		}
-	}
-	return &genai.Schema{
-		Type:       toGenaiType(schema.Type),
-		Properties: properties,
-		Required:   schema.Required,
-	}
-}
-
-func toGenaiType(t string) genai.Type {
-	switch t {
-	case "string":
-		return genai.TypeString
-	case "number":
-		return genai.TypeNumber
-	case "integer":
-		return genai.TypeInteger
-	case "boolean":
-		return genai.TypeBoolean
-	case "array":
-		return genai.TypeArray
-	case "object":
-		return genai.TypeObject
-	default:
-		return genai.TypeString
-	}
 }
 
 // GenerateContent generates content using the Gemini API.
@@ -279,9 +273,6 @@ func (gc *GeminiChat) SendMessageStream(modelName string, messageParams types.Me
 
 	cs := gc.model.StartChat()
 	cs.History = genaiHistory
-
-	// Convert generic tools to genai tools
-	gc.model.Tools = toGenaiTools(messageParams.Tools)
 
 	// Convert generic parts to genai parts
 	genaiParts := make([]genai.Part, len(messageParams.Message))
@@ -497,7 +488,15 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 	go func() {
 		defer close(eventChan)
 
-		cs := gc.model.StartChat()
+		model := gc.client.GenerativeModel(gc.modelName)
+		model.SetTemperature(gc.generationConfig.Temperature)
+		model.SetTopP(gc.generationConfig.TopP)
+
+		if gc.toolRegistry != nil {
+			model.Tools = buildGeminiTools(gc.toolRegistry, gc.logger)
+		}
+
+		cs := model.StartChat()
 		cs.History = toGenaiContents(history[:len(history)-1])
 		lastMessage := history[len(history)-1]
 		genaiParts := toGenaiParts(lastMessage.Parts)
@@ -512,6 +511,22 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 		if promptBuilder.Len() > 0 {
 			gc.logger.LogPrompt(promptBuilder.String())
 		}
+
+		// Add this for detailed logging
+		historyJSON, err := json.MarshalIndent(cs.History, "", "  ")
+		if err != nil {
+			gc.logger.LogWarnf("Failed to marshal history for logging: %v", err)
+		} else {
+			gc.logger.LogDebugf("Gemini Request History:\n%s", string(historyJSON))
+		}
+
+		toolsJSON, err := json.MarshalIndent(model.Tools, "", "  ")
+		if err != nil {
+			gc.logger.LogWarnf("Failed to marshal tools for logging: %v", err)
+		} else {
+			gc.logger.LogDebugf("Gemini Request Tools:\n%s", string(toolsJSON))
+		}
+		// End of new logging code
 
 		iter := cs.SendMessageStream(ctx, genaiParts...)
 
@@ -561,22 +576,6 @@ func fromGenaiPart(part genai.Part) types.Part {
 
 // GenerateContentWithTools generates content using the Gemini API, including tools.
 func (gc *GeminiChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
-	// Convert []types.Tool to []*types.ToolDefinition
-	toolDefinitions := make([]*types.ToolDefinition, len(tools))
-	for i, tool := range tools {
-		toolDefinitions[i] = &types.ToolDefinition{
-			FunctionDeclarations: []*types.FunctionDeclaration{
-				{
-					Name:        tool.Name(),
-					Description: tool.Description(),
-					Parameters:  tool.Parameters(),
-				},
-			},
-		}
-	}
-
-	gc.model.Tools = toGenaiTools(toolDefinitions)
-
 	cs := gc.model.StartChat()
 
 	if len(history) == 0 {

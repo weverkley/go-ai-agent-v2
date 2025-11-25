@@ -144,31 +144,27 @@ func (s *FallbackStrategy) Route(ctx *RoutingContext, cfg types.Config) (*Routin
 var modelSuggesters = map[string]func(string) (string, bool){
 	"gemini": func(currentModel string) (string, bool) {
 		telemetry.LogDebugf("Gemini Suggester: currentModel=%s", currentModel)
-		parts := strings.Split(currentModel, "/")
-		modelName := parts[len(parts)-1]
-		telemetry.LogDebugf("Gemini Suggester: modelName=%s", modelName)
-
-		isPro := strings.Contains(modelName, "pro")
-		isFlash := strings.Contains(modelName, "flash")
-		telemetry.LogDebugf("Gemini Suggester: isPro=%t, isFlash=%t", isPro, isFlash)
-
 		switch {
-		case isPro:
-			return "gemini-flash", true
-		case isFlash:
-			return "gemini-flash-lite", true
+		case strings.Contains(currentModel, "pro"):
+			return "gemini-flash-latest", true
+		case strings.Contains(currentModel, "flash"):
+			return "gemini-flash-lite-latest", true
 		default:
-			telemetry.LogDebugf("Gemini Suggester: No suggestion found for modelName=%s", modelName)
+			telemetry.LogDebugf("Gemini Suggester: No suggestion found for modelName=%s", currentModel)
 			return "", false
 		}
 	},
 	"qwen": func(currentModel string) (string, bool) {
+		telemetry.LogDebugf("Qwen Suggester: currentModel=%s", currentModel)
 		switch {
 		case strings.Contains(currentModel, "max"):
 			return "qwen-plus", true
 		case strings.Contains(currentModel, "plus"):
 			return "qwen-turbo", true
+		case strings.Contains(currentModel, "turbo"):
+			return "qwen-flash", true
 		default:
+			telemetry.LogDebugf("Qwen Suggester: No suggestion found for modelName=%s", currentModel)
 			return "", false
 		}
 	},
@@ -184,9 +180,36 @@ func (s *ClassifierStrategy) Name() string {
 func (s *ClassifierStrategy) Route(ctx *RoutingContext, cfg types.Config) (*RoutingDecision, error) {
 	// Simplified heuristic: if the request contains "code", use a more powerful model.
 	if strings.Contains(strings.ToLower(ctx.Request), "code") {
+		currentModelVal, ok := cfg.Get("model")
+		if !ok || currentModelVal == nil {
+			err := fmt.Errorf("current model not found in config for ClassifierStrategy")
+			telemetry.LogErrorf(err.Error())
+			return nil, err
+		}
+		currentModel, ok := currentModelVal.(string)
+		if !ok {
+			err := fmt.Errorf("current model in config is not a string for ClassifierStrategy")
+			telemetry.LogErrorf(err.Error())
+			return nil, err
+		}
+
+		var modelSuggestion string = ""
+
+		switch {
+		case strings.Contains(currentModel, "gemini"):
+			telemetry.LogDebugf("ClassifierStrategy: Request contains 'code', suggesting 'gemini-pro-latest'")
+			modelSuggestion = "gemini-pro-latest"
+		case strings.Contains(currentModel, "qwen"):
+			telemetry.LogDebugf("ClassifierStrategy: Request contains 'code', suggesting 'qwen-plus'")
+			modelSuggestion = "qwen-plus"
+		default:
+			telemetry.LogDebugf("ClassifierStrategy: Request contains 'code', but no specific executor handling implemented")
+			modelSuggestion = currentModel // No change
+		}
+
 		// This could be made more generic, e.g., by getting the "powerful" model from config.
 		return &RoutingDecision{
-			Model: "gemini-1.5-pro",
+			Model: modelSuggestion,
 			Metadata: map[string]interface{}{
 				"source":    s.Name(),
 				"reasoning": "Request contains 'code', suggesting a more powerful model.",
