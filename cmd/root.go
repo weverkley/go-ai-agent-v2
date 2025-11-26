@@ -73,8 +73,8 @@ func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.Tel
 	return settingsService.GetTelemetrySettings()
 }
 
-func registerTools(fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
-	return tools.RegisterAllTools(fsService, shellService, settingsService, workspaceService)
+func registerTools(cfg types.Config, fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
+	return tools.RegisterAllTools(cfg, fsService, shellService, settingsService, workspaceService)
 }
 
 func initConfig(
@@ -132,9 +132,6 @@ func registerCommands() {
 	}
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(smartEditCmd)
-	grepCodeCmd.Run = func(cmd *cobra.Command, args []string) {
-		runGrepCodeCmd(cmd, args, SettingsService, ShellService, WorkspaceService)
-	}
 	RootCmd.AddCommand(grepCodeCmd)
 	RootCmd.AddCommand(readManyFilesCmd)
 	RootCmd.AddCommand(writeCmd)
@@ -182,8 +179,12 @@ func init() {
 		var fileFilteringService *services.FileFilteringService
 		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
-		toolRegistry := registerTools(FSService, ShellService, SettingsService, WorkspaceService)
-		Cfg = initConfig(toolRegistry, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
+
+		// Initialize Cfg before tool registry
+		Cfg = initConfig(nil, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
+
+		toolRegistry := registerTools(Cfg, FSService, ShellService, SettingsService, WorkspaceService)
+		Cfg.ToolRegistry = toolRegistry // Set the tool registry in the config
 
 		// Initialize SessionService now that Cfg is available
 		SessionService, err = services.NewSessionService(Cfg.GetGoaiagentDir())

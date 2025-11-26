@@ -59,7 +59,7 @@ type Config struct {
 	Telemetry                    *types.TelemetrySettings
 	output                       *OutputSettings
 	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
-	toolRegistry                 types.ToolRegistryInterface // Changed to interface
+	ToolRegistry                 types.ToolRegistryInterface // Changed to interface
 	toolDiscoveryCommand         string
 	toolCallCommand              string
 	telemetryLogger              telemetry.TelemetryLogger
@@ -80,7 +80,7 @@ func NewConfig(params *ConfigParameters) *Config {
 		Telemetry:                    params.Telemetry,
 		output:                       params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
-		toolRegistry:                 params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
+		ToolRegistry:                 params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
 		toolDiscoveryCommand:         params.ToolDiscoveryCommand,
 		toolCallCommand:              params.ToolCallCommand,
 		// telemetryLogger and fileFilteringService will be set separately
@@ -126,7 +126,7 @@ func (c *Config) Get(key string) (interface{}, bool) {
 		}
 		return false, true // Default to false if telemetry settings are nil
 	case "toolRegistry":
-		return c.toolRegistry, true
+		return c.ToolRegistry, true
 	// Add more cases for other settings as needed
 	default:
 		return nil, false

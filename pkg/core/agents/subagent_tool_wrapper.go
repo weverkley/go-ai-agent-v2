@@ -58,11 +58,11 @@ func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs) types.ToolI
 }
 
 // Execute is part of the types.Tool interface. It delegates to the invocation.
-func (stw *SubagentToolWrapper) Execute(args map[string]interface{}) (types.ToolResult, error) {
-	invoCation := stw.CreateInvocation(args)
+func (stw *SubagentToolWrapper) Execute(ctx context.Context, args map[string]interface{}) (types.ToolResult, error) {
+	invocation := stw.CreateInvocation(args)
 	// For now, we'll call execute with a dummy context and updateOutput.
 	// The actual execution will happen within the AgentExecutor.
-	result, err := invoCation.Execute(context.Background(), nil, nil, nil)
+	result, err := invocation.Execute(ctx, nil, nil, nil)
 	if err != nil {
 		return types.ToolResult{}, err
 	}

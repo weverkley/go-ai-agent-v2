@@ -1,6 +1,8 @@
 package tools
 
 import (
+	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -8,8 +10,11 @@ import (
 )
 
 // RegisterAllTools creates a new ToolRegistry and registers all the available tools.
-func RegisterAllTools(fs services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
+func RegisterAllTools(cfg types.Config, fs services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
 	registry := types.NewToolRegistry()
+
+	// Register standard tools
+	// ... (all existing tool registrations remain here)
 
 	// Web Searching tools
 	if err := registry.Register(NewWebFetchTool()); err != nil {
@@ -91,6 +96,20 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	}
 	if err := registry.Register(NewGitCommitTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering GitCommitTool: %v", err)
+	}
+
+	// Register agents as tools
+	agentRegistry := agents.NewAgentRegistry(cfg.(*config.Config))
+	agentRegistry.Initialize()
+	for _, agentDef := range agentRegistry.GetAllDefinitions() {
+		wrappedAgent, err := agents.NewSubagentToolWrapper(agentDef, cfg.(*config.Config), nil) // Assuming nil for messageBus for now
+		if err != nil {
+			telemetry.LogErrorf("Error wrapping agent %s: %v", agentDef.Name, err)
+			continue
+		}
+		if err := registry.Register(wrappedAgent); err != nil {
+			telemetry.LogErrorf("Error registering wrapped agent %s: %v", agentDef.Name, err)
+		}
 	}
 
 	return registry
