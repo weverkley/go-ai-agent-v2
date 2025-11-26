@@ -11,9 +11,12 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+
 func TestSmartEditTool_Execute(t *testing.T) {
 	mockFSS := new(MockFileSystemService) // Reusing MockFileSystemService from extract_function_test.go
-	tool := NewSmartEditTool(mockFSS)
+	mockWorkspace := new(MockWorkspaceService)
+	mockWorkspace.On("GetProjectRoot").Return("") // Project root is joined, can be empty for this test.
+	tool := NewSmartEditTool(mockFSS, mockWorkspace)
 
 	tests := []struct {
 		name                  string

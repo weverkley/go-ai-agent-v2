@@ -1,20 +1,29 @@
 package tools
 
 import (
+
 	"context"
+
 	"fmt"
+
 	"testing"
 
 
 
 	"github.com/stretchr/testify/assert"
+
 	"github.com/stretchr/testify/mock"
+
 )
+
+
 
 func TestRunTestsTool_Execute(t *testing.T) {
 	mockShellService := new(MockShellExecutionService)
 	mockFsService := new(MockFileSystemService)
-	tool := NewRunTestsTool(mockShellService, mockFsService)
+	mockWorkspace := new(MockWorkspaceService)
+	mockWorkspace.On("GetProjectRoot").Return("") // Project root is joined, can be empty for this test.
+	tool := NewRunTestsTool(mockShellService, mockFsService, mockWorkspace)
 
 	tests := []struct {
 		name          string

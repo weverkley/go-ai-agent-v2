@@ -463,6 +463,10 @@ func (m *MockTool) Parameters() *types.JsonSchemaObject {
 	return m.parameters
 }
 
+func (m *MockTool) Kind() types.Kind {
+	return types.KindOther
+}
+
 func (m *MockTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
 	return types.ToolResult{LLMContent: "mock result", ReturnDisplay: "mock result"}, nil
 }

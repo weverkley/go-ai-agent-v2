@@ -92,7 +92,7 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 
 	appConfig := config.NewConfig(&config.ConfigParameters{}) // Create a simple mock config
 
-	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService, appConfig, nil)
+	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService, appConfig, types.GenerateContentConfig{}, nil)
 	assert.NoError(t, err)
 
 	cleanup := func() {
@@ -212,7 +212,7 @@ func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 
 		history := chatService.GetHistory()
 		assert.Len(t, history, 4)
-		assert.Equal(t, "continue", history[2].Parts[0].FunctionResponse.Response["result"].(map[string]interface{})["result"])
+		assert.Equal(t, "continue", history[2].Parts[0].FunctionResponse.Response["result"])
 	})
 }
 

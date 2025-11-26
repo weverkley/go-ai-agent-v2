@@ -10,8 +10,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+
 func TestFindReferencesTool_Execute(t *testing.T) {
-	tool := NewFindReferencesTool()
+	mockWorkspace := new(MockWorkspaceService)
+	// For this test, the project root can be empty as it's not directly used in the logic being tested,
+	// but the dependency needs to be satisfied.
+	mockWorkspace.On("GetProjectRoot").Return("")
+
+	tool := NewFindReferencesTool(mockWorkspace)
 
 	// Save original function and restore after test
 	originalFindSymbolReferencesFunc := analysis.FindSymbolReferencesFunc

@@ -12,8 +12,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+
 func TestLsTool_Execute(t *testing.T) {
-	tool := NewLsTool()
+	mockWorkspace := new(MockWorkspaceService)
+	mockWorkspace.On("GetProjectRoot").Return("") // Not directly used in this test, but good practice to set up
+	tool := NewLsTool(mockWorkspace)
 
 	// Create a temporary directory for testing file system operations
 	tempDir := t.TempDir()

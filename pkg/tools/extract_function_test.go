@@ -2,85 +2,15 @@ package tools
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 
-	"github.com/gobwas/glob"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
 
-// MockFileSystemService is a mock implementation of services.FileSystemService
-type MockFileSystemService struct {
-	mock.Mock
-}
 
-func (m *MockFileSystemService) ListDirectory(dirPath string, ignorePatterns []string, respectGitIgnore, respectGeminiIgnore bool) ([]string, error) {
-	args := m.Called(dirPath, ignorePatterns, respectGitIgnore, respectGeminiIgnore)
-	return args.Get(0).([]string), args.Error(1)
-}
-
-func (m *MockFileSystemService) GetIgnorePatterns(searchDir string, respectGitIgnore, respectGoaiagentIgnore bool) ([]glob.Glob, error) {
-	args := m.Called(searchDir, respectGitIgnore, respectGoaiagentIgnore)
-	return args.Get(0).([]glob.Glob), args.Error(1)
-}
-
-func (m *MockFileSystemService) PathExists(path string) (bool, error) {
-	args := m.Called(path)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockFileSystemService) IsDirectory(path string) (bool, error) {
-	args := m.Called(path)
-	return args.Bool(0), args.Error(1)
-}
-
-func (m *MockFileSystemService) ReadFile(filePath string) (string, error) {
-	args := m.Called(filePath)
-	return args.String(0), args.Error(1)
-}
-
-func (m *MockFileSystemService) WriteFile(filePath string, content string) error {
-	args := m.Called(filePath, content)
-	return args.Error(0)
-}
-
-func (m *MockFileSystemService) CreateDirectory(path string) error {
-	args := m.Called(path)
-	return args.Error(0)
-}
-
-func (m *MockFileSystemService) CopyDirectory(src string, dst string) error {
-	args := m.Called(src, dst)
-	return args.Error(0)
-}
-
-func (m *MockFileSystemService) JoinPaths(elements ...string) string {
-	args := m.Called(elements)
-	return args.String(0)
-}
-
-func (m *MockFileSystemService) Symlink(oldname, newname string) error {
-	args := m.Called(oldname, newname)
-	return args.Error(0)
-}
-
-func (m *MockFileSystemService) RemoveAll(path string) error {
-	args := m.Called(path)
-	return args.Error(0)
-}
-
-func (m *MockFileSystemService) MkdirAll(path string, perm os.FileMode) error {
-	args := m.Called(path, perm)
-	return args.Error(0)
-}
-
-func (m *MockFileSystemService) Rename(oldpath, newpath string) error {
-	args := m.Called(oldpath, newpath)
-	return args.Error(0)
-}
 
 // MockExtractFunction is a mock for agents.ExtractFunction
 
@@ -97,8 +27,11 @@ func (m *MockFileSystemService) Rename(oldpath, newpath string) error {
 func TestExtractFunctionTool_Execute(t *testing.T) {
 
 	mockFSS := new(MockFileSystemService)
+	mockWorkspace := new(MockWorkspaceService)
+	// Setup mock expectation
+	mockWorkspace.On("GetProjectRoot").Return("/tmp")
 
-	tool := NewExtractFunctionTool(mockFSS)
+	tool := NewExtractFunctionTool(mockFSS, mockWorkspace)
 
 	// originalExtractFunction := agents.ExtractFunction
 

@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
+
 func TestGlobTool_Execute(t *testing.T) {
 	// Create a temporary directory for testing file system operations
 	tempDir := t.TempDir()
@@ -60,34 +61,34 @@ func TestGlobTool_Execute(t *testing.T) {
 		},
 		{
 			name: "successful glob - all go files",
-			args: map[string]any{"pattern": "**/*.go", "path": tempDir},
+			args: map[string]any{"pattern": "**/*.go", "path": "."},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("Found 2 file(s) matching \"**/*.go\" in path \"%s\":", tempDir),
-			expectedReturnDisplay: fmt.Sprintf("Found 2 file(s) matching \"**/*.go\" in path \"%s\":", tempDir),
+			expectedLLMContent:    "Found 2 file(s) matching \"**/*.go\" in path \".\":",
+			expectedReturnDisplay: "Found 2 file(s) matching \"**/*.go\" in path \".\":",
 		},
 		{
 			name: "successful glob - markdown files",
-			args: map[string]any{"pattern": "docs/*.md", "path": tempDir},
+			args: map[string]any{"pattern": "docs/*.md", "path": "."},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \"%s\":\n%s", tempDir, filepath.Join(tempDir, "docs", "README.md")),
-			expectedReturnDisplay: fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \"%s\":\n%s", tempDir, filepath.Join(tempDir, "docs", "README.md")),
+			expectedLLMContent:    fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \".\":\n%s", filepath.Join(tempDir, "docs", "README.md")),
+			expectedReturnDisplay: fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \".\":\n%s", filepath.Join(tempDir, "docs", "README.md")),
 		},
 		{
 			name: "no files found",
-			args: map[string]any{"pattern": "**/*.txt", "path": tempDir},
+			args: map[string]any{"pattern": "**/*.txt", "path": "."},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("No files found matching pattern \"**/*.txt\" in path \"%s\"", tempDir),
-			expectedReturnDisplay: fmt.Sprintf("No files found matching pattern \"**/*.txt\" in path \"%s\"", tempDir),
+			expectedLLMContent:    "No files found matching pattern \"**/*.txt\" in path \".\"",
+			expectedReturnDisplay: "No files found matching pattern \"**/*.txt\" in path \".\"",
 		},
 		{
 			name: "invalid glob pattern",
-			args: map[string]any{"pattern": "[", "path": tempDir},
+			args: map[string]any{"pattern": "[", "path": "."},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Maybe() // Maybe because it might not be called if pattern is invalid
 			},
@@ -95,47 +96,47 @@ func TestGlobTool_Execute(t *testing.T) {
 		},
 		{
 			name: "respect .gitignore",
-			args: map[string]any{"pattern": "**/*.log", "path": tempDir, "respect_git_ignore": true},
+			args: map[string]any{"pattern": "**/*.log", "path": ".", "respect_git_ignore": true},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				// Mock GetIgnorePatterns to return a glob for *.log and node_modules/
 				logGlob, _ := glob.Compile("*.log")
 				nodeModulesGlob, _ := glob.Compile("node_modules/")
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{logGlob, nodeModulesGlob}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("No files found matching pattern \"**/*.log\" in path \"%s\"", tempDir),
-			expectedReturnDisplay: fmt.Sprintf("No files found matching pattern \"**/*.log\" in path \"%s\"", tempDir),
+			expectedLLMContent:    "No files found matching pattern \"**/*.log\" in path \".\"",
+			expectedReturnDisplay: "No files found matching pattern \"**/*.log\" in path \".\"",
 		},
 		{
 			name: "do not respect .gitignore",
-			args: map[string]any{"pattern": "**/*.log", "path": tempDir, "respect_git_ignore": false},
+			args: map[string]any{"pattern": "**/*.log", "path": ".", "respect_git_ignore": false},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				// Mock GetIgnorePatterns to return an empty slice (no .gitignore respected)
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), false, true).Return([]glob.Glob{}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("Found 2 file(s) matching \"**/*.log\" in path \"%s\":\n%s\n%s", tempDir, filepath.Join(tempDir, "src", "test.log"), filepath.Join(tempDir, "test.log")),
-			expectedReturnDisplay: fmt.Sprintf("Found 2 file(s) matching \"**/*.log\" in path \"%s\":\n%s\n%s", tempDir, filepath.Join(tempDir, "src", "test.log"), filepath.Join(tempDir, "test.log")),
+			expectedLLMContent:    fmt.Sprintf("Found 2 file(s) matching \"**/*.log\" in path \".\":\n%s\n%s", filepath.Join(tempDir, "src", "test.log"), filepath.Join(tempDir, "test.log")),
+			expectedReturnDisplay: fmt.Sprintf("Found 2 file(s) matching \"**/*.log\" in path \".\":\n%s\n%s", filepath.Join(tempDir, "src", "test.log"), filepath.Join(tempDir, "test.log")),
 		},
 		{
 			name: "case insensitive glob",
-			args: map[string]any{"pattern": "docs/*.md", "path": tempDir, "case_sensitive": false},
+			args: map[string]any{"pattern": "docs/*.md", "path": "."},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \"%s\":\n%s", tempDir, filepath.Join(tempDir, "docs", "README.md")),
-			expectedReturnDisplay: fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \"%s\":\n%s", tempDir, filepath.Join(tempDir, "docs", "README.md")),
+			expectedLLMContent:    fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \".\":\n%s", filepath.Join(tempDir, "docs", "README.md")),
+			expectedReturnDisplay: fmt.Sprintf("Found 1 file(s) matching \"docs/*.md\" in path \".\":\n%s", filepath.Join(tempDir, "docs", "README.md")),
 		},
 		{
 			name: "case sensitive glob - no match",
-			args: map[string]any{"pattern": "docs/*.MD", "path": tempDir, "case_sensitive": true},
+			args: map[string]any{"pattern": "docs/*.MD", "path": ".", "case_sensitive": true},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, nil).Once()
 			},
-			expectedLLMContent:    fmt.Sprintf("No files found matching pattern \"docs/*.MD\" in path \"%s\"", tempDir),
-			expectedReturnDisplay: fmt.Sprintf("No files found matching pattern \"docs/*.MD\" in path \"%s\"", tempDir),
+			expectedLLMContent:    "No files found matching pattern \"docs/*.MD\" in path \".\"",
+			expectedReturnDisplay: "No files found matching pattern \"docs/*.MD\" in path \".\"",
 		},
 		{
 			name: "GetIgnorePatterns returns error",
-			args: map[string]any{"pattern": "**/*.go", "path": tempDir},
+			args: map[string]any{"pattern": "**/*.go", "path": "."},
 			setupMock: func(mockFSS *MockFileSystemService) {
 				mockFSS.On("GetIgnorePatterns", mock.AnythingOfType("string"), true, true).Return([]glob.Glob{}, fmt.Errorf("ignore error")).Once()
 			},
@@ -146,7 +147,9 @@ func TestGlobTool_Execute(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mockFSS := new(MockFileSystemService) // Create a new mock for each subtest
-			tool := NewGlobTool(mockFSS)          // Pass the new mock to the tool
+			mockWorkspace := new(MockWorkspaceService)
+			mockWorkspace.On("GetProjectRoot").Return(tempDir)
+			tool := NewGlobTool(mockFSS, mockWorkspace) // Pass the new mock to the tool
 
 			tt.setupMock(mockFSS) // Pass the mock to the setup function
 

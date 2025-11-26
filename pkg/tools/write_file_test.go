@@ -12,15 +12,7 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockWorkspaceService implements types.WorkspaceServiceIface for testing
-type MockWorkspaceService struct {
-	mock.Mock
-}
 
-func (m *MockWorkspaceService) GetProjectRoot() string {
-	args := m.Called()
-	return args.String(0)
-}
 
 func TestWriteFileTool_Execute(t *testing.T) {
 	mockFSS := new(MockFileSystemService)

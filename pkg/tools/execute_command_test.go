@@ -11,21 +11,6 @@ import (
 	"github.com/stretchr/testify/mock"
 )
 
-// MockShellExecutionService is a mock implementation of services.ShellExecutionService
-type MockShellExecutionService struct {
-	mock.Mock
-}
-
-func (m *MockShellExecutionService) ExecuteCommand(ctx context.Context, command string, dir string) (string, string, error) {
-	args := m.Called(ctx, command, dir)
-	return args.String(0), args.String(1), args.Error(2)
-}
-
-func (m *MockShellExecutionService) ExecuteCommandInBackground(command string, dir string) (int, error) {
-	args := m.Called(command, dir)
-	return args.Int(0), args.Error(1)
-}
-
 func (m *MockShellExecutionService) KillAllProcesses() {
 	m.Called()
 }

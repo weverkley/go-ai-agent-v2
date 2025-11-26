@@ -10,8 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+
 func TestRenameSymbolTool_Execute(t *testing.T) {
-	tool := NewRenameSymbolTool()
+	mockWorkspace := new(MockWorkspaceService)
+	mockWorkspace.On("GetProjectRoot").Return("") // Project root is joined, but can be empty for this test
+	tool := NewRenameSymbolTool(mockWorkspace)
 
 	// Save original function and restore after test
 	originalRenameSymbolFunc := analysis.RenameSymbolFunc

@@ -10,8 +10,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+
 func TestReadFileTool_Execute(t *testing.T) {
-	tool := NewReadFileTool()
+	mockWorkspace := new(MockWorkspaceService)
+	mockWorkspace.On("GetProjectRoot").Return("") // Project root is joined, so an empty root means paths are relative to current dir
+	tool := NewReadFileTool(mockWorkspace)
 
 	tests := []struct {
 		name          string
@@ -22,26 +25,26 @@ func TestReadFileTool_Execute(t *testing.T) {
 		expectedError string
 	}{
 		{
-			name:          "missing absolute_path argument",
+			name:          "missing file_path argument",
 			args:          map[string]any{},
 			setup:         func(t *testing.T) (string, func()) { return "", func() {} },
-			expectedError: "invalid or missing 'absolute_path' argument",
+			expectedError: "invalid or missing 'file_path' argument",
 		},
 		{
-			name:          "empty absolute_path argument",
-			args:          map[string]any{"absolute_path": ""},
+			name:          "empty file_path argument",
+			args:          map[string]any{"file_path": ""},
 			setup:         func(t *testing.T) (string, func()) { return "", func() {} },
-			expectedError: "invalid or missing 'absolute_path' argument",
+			expectedError: "invalid or missing 'file_path' argument",
 		},
 		{
 			name:          "file not found",
-			args:          map[string]any{"absolute_path": "/nonexistent/file.txt"},
+			args:          map[string]any{"file_path": "/nonexistent/file.txt"},
 			setup:         func(t *testing.T) (string, func()) { return "", func() {} },
 			expectedError: "file not found: /nonexistent/file.txt",
 		},
 		{
 			name: "path is a directory",
-			args: map[string]any{"absolute_path": t.TempDir()},
+			args: map[string]any{"file_path": t.TempDir()},
 			setup: func(t *testing.T) (string, func()) {
 				dir := t.TempDir()
 				return dir, func() {}
@@ -50,7 +53,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 		},
 		{
 			name: "binary file (png)",
-			args: map[string]any{"absolute_path": "/path/to/image.png"},
+			args: map[string]any{"file_path": "/path/to/image.png"},
 			setup: func(t *testing.T) (string, func()) {
 				tempFile := filepath.Join(t.TempDir(), "image.png")
 				err := os.WriteFile(tempFile, []byte("dummy image data"), 0644)
@@ -62,7 +65,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 		},
 		{
 			name: "successful text file read - entire file",
-			args: map[string]any{"absolute_path": "/path/to/file.txt"},
+			args: map[string]any{"file_path": "/path/to/file.txt"},
 			setup: func(t *testing.T) (string, func()) {
 				tempFile := filepath.Join(t.TempDir(), "file.txt")
 				content := "line 1\nline 2\nline 3"
@@ -75,7 +78,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 		},
 		{
 			name: "successful text file read - with offset and limit",
-			args: map[string]any{"absolute_path": "/path/to/file.txt", "offset": float64(1), "limit": float64(1)},
+			args: map[string]any{"file_path": "/path/to/file.txt", "offset": float64(1), "limit": float64(1)},
 			setup: func(t *testing.T) (string, func()) {
 				tempFile := filepath.Join(t.TempDir(), "file.txt")
 				content := "line 1\nline 2\nline 3"
@@ -88,7 +91,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 		},
 		{
 			name: "offset beyond file end",
-			args: map[string]any{"absolute_path": "/path/to/file.txt", "offset": float64(5), "limit": float64(1)},
+			args: map[string]any{"file_path": "/path/to/file.txt", "offset": float64(5), "limit": float64(1)},
 			setup: func(t *testing.T) (string, func()) {
 				tempFile := filepath.Join(t.TempDir(), "file.txt")
 				content := "line 1\nline 2\nline 3"
@@ -100,7 +103,7 @@ func TestReadFileTool_Execute(t *testing.T) {
 		},
 		{
 			name: "limit exceeding file end",
-			args: map[string]any{"absolute_path": "/path/to/file.txt", "offset": float64(1), "limit": float64(5)},
+			args: map[string]any{"file_path": "/path/to/file.txt", "offset": float64(1), "limit": float64(5)},
 			setup: func(t *testing.T) (string, func()) {
 				tempFile := filepath.Join(t.TempDir(), "file.txt")
 				content := "line 1\nline 2\nline 3"
@@ -119,12 +122,12 @@ func TestReadFileTool_Execute(t *testing.T) {
 			actualPath, cleanup := tt.setup(t)
 			defer cleanup()
 
-			if path, ok := tt.args["absolute_path"].(string); ok && strings.Contains(path, "/path/to/") {
+			if path, ok := tt.args["file_path"].(string); ok && strings.Contains(path, "/path/to/") {
 				tempArgs := make(map[string]any)
 				for k, v := range tt.args {
 					tempArgs[k] = v
 				}
-				tempArgs["absolute_path"] = actualPath
+				tempArgs["file_path"] = actualPath
 				tt.args = tempArgs
 				if strings.Contains(tt.expectedLLMContent, "/path/to/") {
 					tt.expectedLLMContent = strings.ReplaceAll(tt.expectedLLMContent, "/path/to/image.png", actualPath)

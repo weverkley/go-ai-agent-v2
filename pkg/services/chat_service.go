@@ -239,10 +239,18 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 						switch outcome {
 						case types.ToolConfirmationOutcomeProceedOnce:
-							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
+								toolExecutionResult = "continue"
+							} else {
+								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							}
 						case types.ToolConfirmationOutcomeProceedAlways:
 							cs.proceedAlwaysTools[fc.Name] = true
-							toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
+								toolExecutionResult = "continue"
+							} else {
+								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+							}
 						case types.ToolConfirmationOutcomeCancel:
 							toolExecutionResult = "Tool execution cancelled by user."
 							toolExecutionError = fmt.Errorf("tool execution cancelled by user")

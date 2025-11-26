@@ -118,6 +118,16 @@ func (m *MockGitService) Clone(url string, directory string, ref string) error {
 	return args.Error(0)
 }
 
+func (m *MockGitService) StageFiles(dir string, files []string) error {
+	args := m.Called(dir, files)
+	return args.Error(0)
+}
+
+func (m *MockGitService) Commit(dir, message string) error {
+	args := m.Called(dir, message)
+	return args.Error(0)
+}
+
 // ManagerTestSuite is the test suite for the ExtensionManager
 type ManagerTestSuite struct {
 	suite.Suite
