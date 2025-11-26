@@ -72,13 +72,15 @@ func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 	sessionService, cleanup := setupTestSessionService(t)
 	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.
 
+	contextService := services.NewContextService(".")
+
 	sessionID := "test-session"
 	// Pass an empty generation config for the test setup
 	generationConfig := types.GenerateContentConfig{}
-	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, sessionID, mockSettingsService, appConfig, generationConfig, nil)
+	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, sessionID, mockSettingsService, contextService, appConfig, generationConfig, nil)
 	assert.NoError(t, err)
 
-	model := NewChatModel(chatService, sessionService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)
+	model := NewChatModel(chatService, sessionService, contextService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)
 	return model
 }
 

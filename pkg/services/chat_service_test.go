@@ -91,8 +91,9 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 	mockExecutor := &core.MockExecutor{}
 
 	appConfig := config.NewConfig(&config.ConfigParameters{}) // Create a simple mock config
+	contextService := NewContextService(projectRoot)
 
-	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService, appConfig, types.GenerateContentConfig{}, nil)
+	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService, contextService, appConfig, types.GenerateContentConfig{}, nil)
 	assert.NoError(t, err)
 
 	cleanup := func() {

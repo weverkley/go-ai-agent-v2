@@ -90,8 +90,14 @@ func loadPromptsFromDir(dir string) {
 }
 
 // GetCoreSystemPrompt constructs the system prompt from the loaded markdown files.
-func GetCoreSystemPrompt(toolRegistry types.ToolRegistryInterface, config types.Config) (string, error) {
+func GetCoreSystemPrompt(toolRegistry types.ToolRegistryInterface, config types.Config, contextContent string) (string, error) {
 	var sb strings.Builder
+
+	// Prepend context from GOAIAGENT.md files
+	if contextContent != "" {
+		sb.WriteString(contextContent)
+		sb.WriteString("\n\n---\n\n") // Separator
+	}
 
 	// Add preamble and core mandates
 	sb.WriteString(corePrompts["preamble"])

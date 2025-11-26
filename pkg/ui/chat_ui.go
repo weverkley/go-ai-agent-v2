@@ -40,11 +40,13 @@ type ChatModel struct {
 
 	// Services
 
-	chatService      *services.ChatService
+		chatService *services.ChatService
 
-	sessionService   *services.SessionService
+		sessionService *services.SessionService
 
-	shellService     services.ShellExecutionService
+		contextService *services.ContextService
+
+		shellService services.ShellExecutionService
 
 	gitService       services.GitService
 
@@ -116,29 +118,55 @@ type ChatModel struct {
 
 	todosSummary   string
 
+	subagentStatus string
+
 }
 
 
 
 func NewChatModel(
 
+
+
 	chatService *services.ChatService,
+
+
 
 	sessionService *services.SessionService,
 
+
+
+	contextService *services.ContextService,
+
+
+
 	executorType string,
+
+
 
 	config types.Config,
 
+
+
 	commandExecutor func(args []string) (string, error),
+
+
 
 	shellService services.ShellExecutionService,
 
+
+
 	gitService services.GitService,
+
+
 
 	workspaceService *services.WorkspaceService,
 
+
+
 	sessionID string,
+
+
 
 ) *ChatModel {
 
@@ -246,11 +274,13 @@ func NewChatModel(
 
 		messages:                 createInitialMessages(),
 
-		chatService:              chatService,
+				chatService:              chatService,
 
-		sessionService:           sessionService,
+				sessionService:           sessionService,
 
-		executorType:             executorType,
+				contextService:           contextService,
+
+				executorType:             executorType,
 
 		config:                   config,
 
@@ -311,6 +341,7 @@ func NewChatModel(
 		sessionID:                sessionID,
 
 		todosSummary:             "",
+		subagentStatus:           "",
 
 	}
 
@@ -530,6 +561,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				tc.Result = event.Result
 				tc.Err = event.Err
 			}
+		case types.SubagentActivityEvent:
+			status := fmt.Sprintf("🤖 %s", event.AgentName)
+			if event.ToolName != "" {
+				status += fmt.Sprintf(" -> %s", event.ToolName)
+			}
+			if event.Thought != "" {
+				status += fmt.Sprintf(" 🤔 %s", event.Thought)
+			}
+			m.subagentStatus = status
 		case types.FinalResponseEvent:
 			botMsg := BotMessage{Content: event.Content}
 			m.messages = append(m.messages, botMsg)
@@ -561,6 +601,7 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.status = "Ready"
 		m.streamCh = nil
 		m.activeToolCalls = make(map[string]*ToolCallStatus) // Clear active tool calls
+		m.subagentStatus = ""                                // Clear sub-agent status
 		m.cancelFunc = nil                                   // Clear cancel function
 		m.cancelCtx = nil                                    // Clear context
 		// Save history after each completed turn
@@ -644,6 +685,13 @@ func (m *ChatModel) View() string {
 			contextInfo += lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(" | ")
 		}
 		contextInfo += lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Render(m.todosSummary)
+	}
+
+	if m.subagentStatus != "" {
+		subagentLine := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("14")).
+			Render(m.subagentStatus)
+		contextInfo = lipgloss.JoinVertical(lipgloss.Left, contextInfo, subagentLine)
 	}
 
 	return fmt.Sprintf(
@@ -815,7 +863,7 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 					return m, nil
 				}
 				sessionID := args[2]
-				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.config, m.chatService.GetGenerationConfig(), nil)
+				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.contextService, m.config, m.chatService.GetGenerationConfig(), nil)
 				if err != nil {
 					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
 					m.updateViewport()
@@ -992,6 +1040,7 @@ func ReinitializeChatCmd(oldChatService *services.ChatService, sessionService *s
 			sessionService,
 			chatState.SessionID,
 			settingsService,
+			oldChatService.GetContextService(),
 			appConfig,
 			oldChatService.GetGenerationConfig(), // Pass the existing generation config
 			chatState,                             // Pass the captured state

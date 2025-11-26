@@ -48,18 +48,37 @@ func NewSubagentToolWrapper(
 }
 
 // CreateInvocation creates an invocation instance for executing the subagent.
-func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs) types.ToolInvocation {
+func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs, activityChan chan SubagentActivityEvent) types.ToolInvocation {
 	return NewSubagentInvocation(
 		params,
 		stw.definition,
 		stw.config,
 		stw.BaseDeclarativeTool.MessageBus,
+		activityChan,
 	)
 }
 
 // Execute is part of the types.Tool interface. It delegates to the invocation.
 func (stw *SubagentToolWrapper) Execute(ctx context.Context, args map[string]interface{}) (types.ToolResult, error) {
-	invocation := stw.CreateInvocation(args)
+	eventChan, ok := ctx.Value("eventChan").(chan any)
+	if !ok {
+		// If the channel is not in the context, we can't stream activities.
+		// We can proceed without it, but the UI won't show sub-agent activity.
+		eventChan = nil
+	}
+
+	activityChan := make(chan SubagentActivityEvent)
+	invocation := stw.CreateInvocation(args, activityChan)
+
+	// Start a goroutine to listen for activity and forward it to the main event channel
+	if eventChan != nil {
+		go func() {
+			for activity := range activityChan {
+				eventChan <- activity
+			}
+		}()
+	}
+
 	// For now, we'll call execute with a dummy context and updateOutput.
 	// The actual execution will happen within the AgentExecutor.
 	result, err := invocation.Execute(ctx, nil, nil, nil)

@@ -15,6 +15,8 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
+var eventChanKey = struct{}{}
+
 // ChatService orchestrates the interactive chat session, handling the tool-calling loop.
 type ChatService struct {
 	executor             core.Executor
@@ -23,6 +25,7 @@ type ChatService struct {
 	sessionService       *SessionService
 	sessionID            string
 	settingsService      types.SettingsServiceIface
+	contextService       *ContextService
 	appConfig            types.Config
 	generationConfig     types.GenerateContentConfig
 	tokenUsage           map[string]*types.ModelTokenUsage
@@ -34,13 +37,20 @@ type ChatService struct {
 }
 
 // NewChatService creates a new ChatService.
-func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface, appConfig types.Config, generationConfig types.GenerateContentConfig, initialState *types.ChatState) (*ChatService, error) {
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface, contextService *ContextService, appConfig types.Config, generationConfig types.GenerateContentConfig, initialState *types.ChatState) (*ChatService, error) {
+	// Prepend context to system instruction
+	contextContent := contextService.GetContext()
+	if contextContent != "" {
+		generationConfig.SystemInstruction = contextContent + "\n\n" + generationConfig.SystemInstruction
+	}
+
 	cs := &ChatService{
 		executor:             executor,
 		toolRegistry:         toolRegistry,
 		sessionService:       sessionService,
 		sessionID:            sessionID,
 		settingsService:      settingsService,
+		contextService:       contextService,
 		appConfig:            appConfig,
 		generationConfig:     generationConfig,
 		tokenUsage:           make(map[string]*types.ModelTokenUsage),
@@ -242,14 +252,14 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 								toolExecutionResult = "continue"
 							} else {
-								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry)
 							}
 						case types.ToolConfirmationOutcomeProceedAlways:
 							cs.proceedAlwaysTools[fc.Name] = true
 							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 								toolExecutionResult = "continue"
 							} else {
-								toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry)
 							}
 						case types.ToolConfirmationOutcomeCancel:
 							toolExecutionResult = "Tool execution cancelled by user."
@@ -261,7 +271,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							cs.toolErrorCounter++
 						}
 					} else {
-						toolExecutionResult, toolExecutionError = executeTool(ctx, fc, cs.toolRegistry)
+						toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry)
 					}
 
 					if toolExecutionError == nil && fc.Name == types.WRITE_TODOS_TOOL_NAME {
@@ -361,6 +371,10 @@ func (cs *ChatService) GetToolRegistry() types.ToolRegistryInterface { return cs
 func (cs *ChatService) GetExecutor() core.Executor                   { return cs.executor }
 func (cs *ChatService) GetSettingsService() types.SettingsServiceIface {
 	return cs.settingsService
+}
+
+func (cs *ChatService) GetContextService() *ContextService {
+	return cs.contextService
 }
 func (cs *ChatService) GetToolConfirmationChannel() chan types.ToolConfirmationOutcome {
 	return cs.ToolConfirmationChan

@@ -31,7 +31,7 @@ var executorType string
 var chatService *services.ChatService           // Declare package-level chatService
 var WorkspaceService *services.WorkspaceService // Declare package-level workspaceService
 var ExtensionManager *extension.Manager         // Declare package-level extensionManager
-var MemoryService *services.MemoryService       // Declare package-level memoryService
+var ContextService *services.ContextService     // Declare package-level contextService
 var SettingsService types.SettingsServiceIface  // Declare package-level settingsService as interface
 var SessionService *services.SessionService     // Declare package-level sessionService
 
@@ -53,12 +53,14 @@ func initServices(projectRoot string) (
 	*extension.Manager,
 	types.SettingsServiceIface, // Changed to interface
 	*services.FileFilteringService,
+	*services.ContextService,
 ) {
 	workspaceService := services.NewWorkspaceService(projectRoot)
 	fsService := services.NewFileSystemService()
 	shellService := services.NewShellExecutionService()
 	extensionManager := extension.NewManager(projectRoot, fsService, services.NewGitService())
 	settingsService := services.NewSettingsService(projectRoot)
+	contextService := services.NewContextService(projectRoot)
 
 	fileFilteringService, err := services.NewFileFilteringService(projectRoot)
 	if err != nil {
@@ -66,7 +68,7 @@ func initServices(projectRoot string) (
 		os.Exit(1)
 	}
 
-	return workspaceService, fsService, shellService, extensionManager, settingsService, fileFilteringService
+	return workspaceService, fsService, shellService, extensionManager, settingsService, fileFilteringService, contextService
 }
 
 func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.TelemetrySettings {
@@ -177,7 +179,7 @@ func init() {
 		}
 
 		var fileFilteringService *services.FileFilteringService
-		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService = initServices(projectRoot)
+		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService, ContextService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
 
 		// Initialize Cfg before tool registry

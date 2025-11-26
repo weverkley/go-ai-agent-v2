@@ -111,7 +111,8 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 
 	// Create Executor
 	toolRegistry, _ := appConfig.Get("toolRegistry")
-	systemPrompt, err := prompts.GetCoreSystemPrompt(toolRegistry.(types.ToolRegistryInterface), appConfig)
+	contextContent := ContextService.GetContext()
+	systemPrompt, err := prompts.GetCoreSystemPrompt(toolRegistry.(types.ToolRegistryInterface), appConfig, contextContent)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating system prompt: %v\n", err)
 		os.Exit(1)
@@ -125,7 +126,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 		os.Exit(1)
 	}
 
-	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID, SettingsService, appConfig, generationConfig, nil)
+	chatService, err := services.NewChatService(executor, toolRegistry.(types.ToolRegistryInterface), SessionService, currentSessionID, SettingsService, ContextService, appConfig, generationConfig, nil)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating chat service: %v\n", err)
 		os.Exit(1)
@@ -159,7 +160,7 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 	// Initialize GitService
 	gitService := services.NewGitService()
 
-	p := tea.NewProgram(ui.NewChatModel(chatService, SessionService, executorType, appConfig, commandExecutor, shellService, gitService, WorkspaceService, currentSessionID), tea.WithAltScreen())
+	p := tea.NewProgram(ui.NewChatModel(chatService, SessionService, ContextService, executorType, appConfig, commandExecutor, shellService, gitService, WorkspaceService, currentSessionID), tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
 		fmt.Printf("Error running interactive chat: %v\n", err)

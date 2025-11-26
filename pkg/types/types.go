@@ -725,6 +725,14 @@ type TelemetrySettings struct {
 	LogLevel     string `json:"logLevel,omitempty"`
 }
 
+// SubagentActivityEvent represents an activity event from a sub-agent.
+type SubagentActivityEvent struct {
+	AgentName string
+	ToolName  string
+	Thought   string
+	IsComplete bool
+}
+
 // Streaming Event types for the UI
 type StreamingStartedEvent struct{}
 type ThinkingEvent struct{}
@@ -753,6 +761,7 @@ const (
 	ActivityTypeProtocolViolation    = "protocol_violation"
 	ActivityTypeToolCallUnauthorized = "tool_call_unauthorized"
 	ActivityTypeToolCall             = "tool_call"
+	ActivityTypeSubagentActivity     = "subagent_activity"
 )
 
 type FinalResponseEvent struct {

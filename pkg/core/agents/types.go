@@ -54,8 +54,9 @@ type BaseToolInvocation struct {
 // SubagentInvocation represents a validated, executable instance of a subagent tool.
 type SubagentInvocation struct {
 	BaseToolInvocation
-	Definition AgentDefinition
-	Config     *config.Config
+	Definition   AgentDefinition
+	Config       *config.Config
+	ActivityChan chan SubagentActivityEvent
 }
 
 // PromptConfig defines the prompting strategy for the agent.

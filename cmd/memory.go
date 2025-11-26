@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -10,57 +11,70 @@ import (
 // memoryCmd represents the memory command group
 var memoryCmd = &cobra.Command{
 	Use:   "memory",
-	Short: "Manage user memory",
-	Long:  `The memory command group allows you to manage user-specific memories that the AI can access.`, //nolint:staticcheck
+	Short: "Manage contextual memory files (GOAIAGENT.md)",
+	Long:  `The memory command group allows you to manage the hierarchical GOAIAGENT.md context files.`, 
 	Run: func(cmd *cobra.Command, args []string) {
-		// If no subcommand is provided, print help
 		cmd.Help()
 	},
 }
 
 func init() {
-	memoryCmd.AddCommand(memoryGetCmd)
-	memoryCmd.AddCommand(memorySetCmd)
-	memoryCmd.AddCommand(memoryClearCmd)
+	memoryCmd.AddCommand(memoryShowCmd)
+	memoryCmd.AddCommand(memoryRefreshCmd)
+	memoryCmd.AddCommand(memoryAddCmd)
+	memoryCmd.AddCommand(memoryListCmd)
 }
 
-var memoryGetCmd = &cobra.Command{
-	Use:   "get",
-	Short: "Get the current user memory",
+var memoryShowCmd = &cobra.Command{
+	Use:   "show",
+	Short: "Show the full, concatenated context from all GOAIAGENT.md files",
 	Run: func(cmd *cobra.Command, args []string) {
-		memoryContent := MemoryService.GetMemory()
-		if memoryContent == "" {
-			fmt.Println("Memory is currently empty.")
+		contextContent := ContextService.ShowMemory()
+		if contextContent == "" {
+			fmt.Println("No context found.")
 		} else {
-			fmt.Printf("Current memory content:\n%s\n", memoryContent)
+			fmt.Printf("Current context:\n%s\n", contextContent)
 		}
 	},
 }
 
-var memorySetCmd = &cobra.Command{
-	Use:   "set <memory_content>",
-	Short: "Set the user memory",
-	Args:  cobra.ExactArgs(1),
+var memoryRefreshCmd = &cobra.Command{
+	Use:   "refresh",
+	Short: "Force a re-scan and reload of all GOAIAGENT.md files",
 	Run: func(cmd *cobra.Command, args []string) {
-		memoryContent := args[0]
-		err := MemoryService.SetMemory(memoryContent)
+		err := ContextService.Load()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error setting user memory: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error refreshing context: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("User memory set to: '%s'.\n", memoryContent)
+		fmt.Println("Context has been refreshed.")
 	},
 }
 
-var memoryClearCmd = &cobra.Command{
-	Use:   "clear",
-	Short: "Clear the user memory",
+var memoryAddCmd = &cobra.Command{
+	Use:   "add <text>",
+	Short: "Append text to the global GOAIAGENT.md file",
+	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		err := MemoryService.ClearMemory()
+		textToAdd := strings.Join(args, " ")
+		err := ContextService.AddToGlobalMemory(textToAdd)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error clearing user memory: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error adding to global memory: %v\n", err)
 			os.Exit(1)
 		}
-		fmt.Println("User memory cleared.")
+		fmt.Printf("Added to global memory: '%s'.\n", textToAdd)
+	},
+}
+
+var memoryListCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List the paths of the GOAIAGENT.md files in use",
+	Run: func(cmd *cobra.Command, args []string) {
+		files := ContextService.ListMemoryFiles()
+		if len(files) == 0 {
+			fmt.Println("No GOAIAGENT.md files in use.")
+		} else {
+			fmt.Printf("There are %d GOAIAGENT.md file(s) in use:\n\n%s\n", len(files), strings.Join(files, "\n"))
+		}
 	},
 }
