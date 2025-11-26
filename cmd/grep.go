@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/spf13/cobra"
@@ -28,8 +29,9 @@ var grepCmd = &cobra.Command{
 	Short: "Searches for a regular expression pattern within file contents",
 	Long:  `Searches for a regular expression pattern within the content of files in a specified directory (or current working directory). Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		grepTool := tools.NewGrepTool()
-		result, err := grepTool.Execute(context.Background(), map[string]any{
+		workspaceService := services.NewWorkspaceService(".")
+		tool := tools.NewGrepTool(workspaceService)
+		result, err := tool.Execute(context.Background(), map[string]any{
 			"pattern": grepPattern,
 			"path":    grepPath,
 			"include": grepInclude,

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"go-ai-agent-v2/go-cli/pkg/core/agents"
 	"go-ai-agent-v2/go-cli/pkg/services" // Added
@@ -15,10 +16,11 @@ const EXTRACT_FUNCTION_TOOL_NAME = "extract_function"
 type ExtractFunctionTool struct {
 	*types.BaseDeclarativeTool
 	fileSystemService services.FileSystemService
+	workspaceService  types.WorkspaceServiceIface
 }
 
 // NewExtractFunctionTool creates a new ExtractFunctionTool.
-func NewExtractFunctionTool(fileSystemService services.FileSystemService) *ExtractFunctionTool {
+func NewExtractFunctionTool(fileSystemService services.FileSystemService, workspaceService types.WorkspaceServiceIface) *ExtractFunctionTool {
 	return &ExtractFunctionTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			EXTRACT_FUNCTION_TOOL_NAME,
@@ -30,7 +32,7 @@ func NewExtractFunctionTool(fileSystemService services.FileSystemService) *Extra
 				Properties: map[string]*types.JsonSchemaProperty{
 					"filePath": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "The absolute path to the Go file.",
+						Description: "The path to the Go file, relative to the project root.",
 					},
 					"startLine": &types.JsonSchemaProperty{
 						Type:        "integer",
@@ -56,6 +58,7 @@ func NewExtractFunctionTool(fileSystemService services.FileSystemService) *Extra
 			nil,   // MessageBus
 		),
 		fileSystemService: fileSystemService,
+		workspaceService:  workspaceService,
 	}
 }
 
@@ -105,7 +108,10 @@ func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) 
 
 	receiver, _ := args["receiver"].(string) // Optional, can be empty
 
-	extracted, err := agents.ExtractFunction(filePath, startLine, endLine, newFunctionName, receiver)
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, filePath)
+
+	extracted, err := agents.ExtractFunction(absolutePath, startLine, endLine, newFunctionName, receiver)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
@@ -115,7 +121,7 @@ func (t *ExtractFunctionTool) Execute(ctx context.Context, args map[string]any) 
 		}, fmt.Errorf("failed to extract function: %w", err)
 	}
 
-	err = t.fileSystemService.WriteFile(filePath, extracted.NewCode)
+	err = t.fileSystemService.WriteFile(absolutePath, extracted.NewCode)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{

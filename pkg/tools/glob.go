@@ -19,10 +19,11 @@ import (
 type GlobTool struct {
 	*types.BaseDeclarativeTool
 	fileSystemService services.FileSystemService
+	workspaceService  types.WorkspaceServiceIface
 }
 
 // NewGlobTool creates a new instance of GlobTool.
-func NewGlobTool(fileSystemService services.FileSystemService) *GlobTool {
+func NewGlobTool(fileSystemService services.FileSystemService, workspaceService types.WorkspaceServiceIface) *GlobTool {
 	return &GlobTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			types.GLOB_TOOL_NAME,
@@ -38,7 +39,7 @@ func NewGlobTool(fileSystemService services.FileSystemService) *GlobTool {
 					},
 					"path": &types.JsonSchemaProperty{
 						Type:        "string",
-						Description: "Optional: The path to the directory to search within. If omitted, searches the current working directory.",
+						Description: "Optional: The path to the directory to search within, relative to the project root. If omitted, searches the current working directory.",
 					},
 					"case_sensitive": &types.JsonSchemaProperty{
 						Type:        "boolean",
@@ -60,6 +61,7 @@ func NewGlobTool(fileSystemService services.FileSystemService) *GlobTool {
 			nil,   // MessageBus
 		),
 		fileSystemService: fileSystemService,
+		workspaceService:  workspaceService,
 	}
 }
 
@@ -86,6 +88,9 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		searchPath = p
 	}
 
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, searchPath)
+
 	caseSensitive := false
 	if cs, ok := args["case_sensitive"].(bool); ok {
 		caseSensitive = cs
@@ -102,7 +107,7 @@ func (t *GlobTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	}
 
 	// Resolve the search path
-	absSearchPath, err := filepath.Abs(searchPath)
+	absSearchPath, err := filepath.Abs(absolutePath)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{

@@ -3,6 +3,8 @@ package tools
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+
 	"go-ai-agent-v2/go-cli/pkg/analysis"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
@@ -12,10 +14,11 @@ const RENAME_SYMBOL_TOOL_NAME = "rename_symbol"
 // RenameSymbolTool implements the Tool interface for safely renaming a symbol.
 type RenameSymbolTool struct {
 	*types.BaseDeclarativeTool
+	workspaceService types.WorkspaceServiceIface
 }
 
 // NewRenameSymbolTool creates a new RenameSymbolTool.
-func NewRenameSymbolTool() *RenameSymbolTool {
+func NewRenameSymbolTool(workspaceService types.WorkspaceServiceIface) *RenameSymbolTool {
 	return &RenameSymbolTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			RENAME_SYMBOL_TOOL_NAME,
@@ -27,7 +30,7 @@ func NewRenameSymbolTool() *RenameSymbolTool {
 			}).SetProperties(map[string]*types.JsonSchemaProperty{
 				"file_path": {
 					Type:        "string",
-					Description: "Path to the file containing the symbol's definition.",
+					Description: "Path to the file containing the symbol's definition, relative to the project root.",
 				},
 				"line": {
 					Type:        "integer",
@@ -46,6 +49,7 @@ func NewRenameSymbolTool() *RenameSymbolTool {
 			true,  // canUpdateOutput - This tool modifies files
 			nil,   // MessageBus
 		),
+		workspaceService: workspaceService,
 	}
 }
 
@@ -93,7 +97,10 @@ func (t *RenameSymbolTool) Execute(ctx context.Context, args map[string]any) (ty
 		}, fmt.Errorf("missing or invalid 'new_name' argument")
 	}
 
-	err := analysis.RenameSymbol(filePath, line, column, newName)
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, filePath)
+
+	err := analysis.RenameSymbol(absolutePath, line, column, newName)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
@@ -103,7 +110,7 @@ func (t *RenameSymbolTool) Execute(ctx context.Context, args map[string]any) (ty
 		}, fmt.Errorf("failed to rename symbol: %w", err)
 	}
 
-	output := fmt.Sprintf("Successfully renamed symbol at %s:%d:%d to '%s'", filePath, line, column, newName)
+	output := fmt.Sprintf("Successfully renamed symbol at %s:%d:%d to '%s'", absolutePath, line, column, newName)
 	return types.ToolResult{
 		LLMContent:    output,
 		ReturnDisplay: output,

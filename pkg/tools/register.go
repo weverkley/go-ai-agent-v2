@@ -31,20 +31,20 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	if err := registry.Register(NewExecuteCommandTool(shellService)); err != nil {
 		telemetry.LogErrorf("Error registering ExecuteCommandTool: %v", err)
 	}
-	if err := registry.Register(NewRunTestsTool(shellService, fs)); err != nil {
+	if err := registry.Register(NewRunTestsTool(shellService, fs, workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering RunTestsTool: %v", err)
 	}
 	// File system tools
-	if err := registry.Register(NewGrepTool()); err != nil {
+	if err := registry.Register(NewGrepTool(workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering GrepTool: %v", err)
 	}
-	if err := registry.Register(NewGlobTool(fs)); err != nil {
+	if err := registry.Register(NewGlobTool(fs, workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering GlobTool: %v", err)
 	}
-	if err := registry.Register(NewLsTool()); err != nil {
+	if err := registry.Register(NewLsTool(workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering LsTool: %v", err)
 	}
-	if err := registry.Register(NewReadFileTool()); err != nil {
+	if err := registry.Register(NewReadFileTool(workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering ReadFileTool: %v", err)
 	}
 	if err := registry.Register(NewWriteFileTool(fs, workspaceService)); err != nil {
@@ -56,20 +56,20 @@ func RegisterAllTools(fs services.FileSystemService, shellService services.Shell
 	if err := registry.Register(NewListDirectoryTool(fs)); err != nil {
 		telemetry.LogErrorf("Error registering ListDirectoryTool: %v", err)
 	}
-	if err := registry.Register(NewSmartEditTool(fs)); err != nil {
+	if err := registry.Register(NewSmartEditTool(fs, workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering SmartEditTool: %v", err)
 	}
 	// Agents related tools
 	if err := registry.Register(NewFindUnusedCodeTool()); err != nil {
 		telemetry.LogErrorf("Error registering FindUnusedCodeTool: %v", err)
 	}
-	if err := registry.Register(NewFindReferencesTool()); err != nil {
+	if err := registry.Register(NewFindReferencesTool(workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering FindReferencesTool: %v", err)
 	}
-	if err := registry.Register(NewRenameSymbolTool()); err != nil {
+	if err := registry.Register(NewRenameSymbolTool(workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering RenameSymbolTool: %v", err)
 	}
-	if err := registry.Register(NewExtractFunctionTool(fs)); err != nil {
+	if err := registry.Register(NewExtractFunctionTool(fs, workspaceService)); err != nil {
 		telemetry.LogErrorf("Error registering ExtractFunctionTool: %v", err)
 	}
 	// Behavioral tools

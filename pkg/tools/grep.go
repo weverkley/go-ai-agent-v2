@@ -18,12 +18,13 @@ import (
 // GrepTool represents the grep tool.
 type GrepTool struct {
 	*types.BaseDeclarativeTool
+	workspaceService types.WorkspaceServiceIface
 }
 
 // NewGrepTool creates a new instance of GrepTool.
-func NewGrepTool() *GrepTool {
+func NewGrepTool(workspaceService types.WorkspaceServiceIface) *GrepTool {
 	return &GrepTool{
-		types.NewBaseDeclarativeTool(
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			types.GREP_TOOL_NAME,
 			types.GREP_TOOL_DISPLAY_NAME,
 			"Searches for a regular expression pattern within files in a specified directory.",
@@ -37,7 +38,7 @@ func NewGrepTool() *GrepTool {
 				},
 				"path": &types.JsonSchemaProperty{
 					Type:        "string",
-					Description: "Optional: The path to the directory to search within. Defaults to the current directory.",
+					Description: "Optional: The path to the directory to search within, relative to the project root. Defaults to the current directory.",
 				},
 				"include": &types.JsonSchemaProperty{
 					Type:        "string",
@@ -48,6 +49,7 @@ func NewGrepTool() *GrepTool {
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
+		workspaceService: workspaceService,
 	}
 }
 
@@ -76,6 +78,9 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 		searchPath = p
 	}
 
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, searchPath)
+
 	var include string
 	if i, ok := args["include"].(string); ok {
 		include = i
@@ -93,7 +98,7 @@ func (t *GrepTool) Execute(ctx context.Context, args map[string]any) (types.Tool
 	}
 
 	// Resolve the search path
-	absSearchPath, err := filepath.Abs(searchPath)
+	absSearchPath, err := filepath.Abs(absolutePath)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{

@@ -14,12 +14,13 @@ import (
 // ReadFileTool represents the read-file tool.
 type ReadFileTool struct {
 	*types.BaseDeclarativeTool
+	workspaceService types.WorkspaceServiceIface
 }
 
 // NewReadFileTool creates a new instance of ReadFileTool.
-func NewReadFileTool() *ReadFileTool {
+func NewReadFileTool(workspaceService types.WorkspaceServiceIface) *ReadFileTool {
 	return &ReadFileTool{
-		types.NewBaseDeclarativeTool(
+		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			types.READ_FILE_TOOL_NAME,
 			types.READ_FILE_TOOL_DISPLAY_NAME,
 			"Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred and will provide details on how to read more of the file using the 'offset' and 'limit' parameters. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it can read specific line ranges.",
@@ -27,33 +28,34 @@ func NewReadFileTool() *ReadFileTool {
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{
-					"absolute_path": &types.JsonSchemaProperty{
+					"file_path": {
 						Type:        "string",
-						Description: "The absolute path to the file to read (e.g., '/home/user/project/file.txt').",
+						Description: "The path to the file to read, relative to the project root (e.g., 'README.md', 'src/main.js').",
 					},
-					"offset": &types.JsonSchemaProperty{
+					"offset": {
 						Type:        "number",
 						Description: "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
 					},
-					"limit": &types.JsonSchemaProperty{
+					"limit": {
 						Type:        "number",
 						Description: "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (if feasible, up to a default limit).",
 					},
 				},
-				Required: []string{"absolute_path"},
+				Required: []string{"file_path"},
 			},
 			false, // isOutputMarkdown
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
+		workspaceService: workspaceService,
 	}
 }
 
 // Execute performs a read-file operation.
 func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
-	absolutePath, ok := args["absolute_path"].(string)
-	if !ok || absolutePath == "" {
-		return types.ToolResult{}, fmt.Errorf("invalid or missing 'absolute_path' argument")
+	filePath, ok := args["file_path"].(string)
+	if !ok || filePath == "" {
+		return types.ToolResult{}, fmt.Errorf("invalid or missing 'file_path' argument")
 	}
 
 	var offset int
@@ -65,6 +67,9 @@ func (t *ReadFileTool) Execute(ctx context.Context, args map[string]any) (types.
 	if l, ok := args["limit"].(float64); ok {
 		limit = int(l)
 	}
+
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, filePath)
 
 	// Check if file exists
 	info, err := os.Stat(absolutePath)

@@ -3,6 +3,7 @@ package tools
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"go-ai-agent-v2/go-cli/pkg/analysis" // Import the new analysis package
@@ -14,10 +15,11 @@ const FIND_REFERENCES_TOOL_NAME = "find_references"
 // FindReferencesTool implements the Tool interface for finding references to a symbol.
 type FindReferencesTool struct {
 	*types.BaseDeclarativeTool
+	workspaceService types.WorkspaceServiceIface
 }
 
 // NewFindReferencesTool creates a new FindReferencesTool.
-func NewFindReferencesTool() *FindReferencesTool {
+func NewFindReferencesTool(workspaceService types.WorkspaceServiceIface) *FindReferencesTool {
 	return &FindReferencesTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			FIND_REFERENCES_TOOL_NAME,
@@ -29,7 +31,7 @@ func NewFindReferencesTool() *FindReferencesTool {
 			}).SetProperties(map[string]*types.JsonSchemaProperty{
 				"file_path": {
 					Type:        "string",
-					Description: "Path to the file containing the symbol's definition.",
+					Description: "Path to the file containing the symbol's definition, relative to the project root.",
 				},
 				"line": {
 					Type:        "integer",
@@ -44,6 +46,7 @@ func NewFindReferencesTool() *FindReferencesTool {
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
+		workspaceService: workspaceService,
 	}
 }
 
@@ -81,7 +84,10 @@ func (t *FindReferencesTool) Execute(ctx context.Context, args map[string]any) (
 	}
 	column := int(columnFloat)
 
-	references, err := analysis.FindSymbolReferences(filePath, line, column)
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, filePath)
+
+	references, err := analysis.FindSymbolReferences(absolutePath, line, column)
 	if err != nil {
 		return types.ToolResult{
 			Error: &types.ToolError{
@@ -93,12 +99,12 @@ func (t *FindReferencesTool) Execute(ctx context.Context, args map[string]any) (
 
 	if len(references) == 0 {
 		return types.ToolResult{
-			LLMContent:    fmt.Sprintf("No references found for symbol at %s:%d:%d", filePath, line, column),
-			ReturnDisplay: fmt.Sprintf("No references found for symbol at %s:%d:%d", filePath, line, column),
+			LLMContent:    fmt.Sprintf("No references found for symbol at %s:%d:%d", absolutePath, line, column),
+			ReturnDisplay: fmt.Sprintf("No references found for symbol at %s:%d:%d", absolutePath, line, column),
 		}, nil
 	}
 
-	output := fmt.Sprintf("Found references for symbol at %s:%d:%d:\n%s", filePath, line, column, strings.Join(references, "\n"))
+	output := fmt.Sprintf("Found references for symbol at %s:%d:%d:\n%s", absolutePath, line, column, strings.Join(references, "\n"))
 	return types.ToolResult{
 		LLMContent:    output,
 		ReturnDisplay: output,

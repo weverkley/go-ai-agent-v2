@@ -13,12 +13,13 @@ const RUN_TESTS_TOOL_NAME = "run_tests"
 // RunTestsTool is a dedicated tool to execute project-specific tests.
 type RunTestsTool struct {
 	*types.BaseDeclarativeTool
-	shellService services.ShellExecutionService
-	fsService    services.FileSystemService
+	shellService     services.ShellExecutionService
+	fsService        services.FileSystemService
+	workspaceService types.WorkspaceServiceIface
 }
 
 // NewRunTestsTool creates a new RunTestsTool.
-func NewRunTestsTool(shellService services.ShellExecutionService, fsService services.FileSystemService) *RunTestsTool {
+func NewRunTestsTool(shellService services.ShellExecutionService, fsService services.FileSystemService, workspaceService types.WorkspaceServiceIface) *RunTestsTool {
 	return &RunTestsTool{
 		BaseDeclarativeTool: types.NewBaseDeclarativeTool(
 			RUN_TESTS_TOOL_NAME,
@@ -37,8 +38,8 @@ func NewRunTestsTool(shellService services.ShellExecutionService, fsService serv
 						Description: "Optional: If true, generates and includes a code coverage report in the output. Defaults to false.",
 					},
 					"dir": {
-						Type: "string",
-						Description: "Optional: The directory to run the tests in. Defaults to the current working directory.",
+						Type:        "string",
+						Description: "Optional: The directory to run the tests in, relative to the project root. Defaults to the current working directory.",
 					},
 				},
 			},
@@ -46,8 +47,9 @@ func NewRunTestsTool(shellService services.ShellExecutionService, fsService serv
 			false, // canUpdateOutput
 			nil,   // MessageBus
 		),
-		shellService: shellService,
-		fsService:    fsService,
+		shellService:     shellService,
+		fsService:        fsService,
+		workspaceService: workspaceService,
 	}
 }
 
@@ -60,9 +62,12 @@ func (t *RunTestsTool) Execute(ctx context.Context, args map[string]any) (types.
 		dir = d
 	}
 
+	projectRoot := t.workspaceService.GetProjectRoot()
+	absolutePath := filepath.Join(projectRoot, dir)
+
 	// Detect project type and build command
 	var command string
-	if exists, _ := t.fsService.PathExists(filepath.Join(dir, "go.mod")); exists {
+	if exists, _ := t.fsService.PathExists(filepath.Join(absolutePath, "go.mod")); exists {
 		// Go project
 		command = "go test"
 		if target != "" {
@@ -73,7 +78,7 @@ func (t *RunTestsTool) Execute(ctx context.Context, args map[string]any) (types.
 		if coverage {
 			command += " -cover"
 		}
-	} else if exists, _ := t.fsService.PathExists(filepath.Join(dir, "package.json")); exists {
+	} else if exists, _ := t.fsService.PathExists(filepath.Join(absolutePath, "package.json")); exists {
 		// Node.js project
 		command = "npm test"
 		if target != "" {
@@ -82,7 +87,7 @@ func (t *RunTestsTool) Execute(ctx context.Context, args map[string]any) (types.
 		if coverage {
 			command += " -- --coverage"
 		}
-	} else if exists, _ := t.fsService.PathExists(filepath.Join(dir, "requirements.txt")); exists {
+	} else if exists, _ := t.fsService.PathExists(filepath.Join(absolutePath, "requirements.txt")); exists {
 		// Python project
 		command = "pytest"
 		if target != "" {
@@ -93,33 +98,33 @@ func (t *RunTestsTool) Execute(ctx context.Context, args map[string]any) (types.
 		}
 	} else {
 		return types.ToolResult{
-			Error: &types.ToolError{
-				Message: "could not determine project type to run tests",
-				Type:    types.ToolErrorTypeExecutionFailed,
+				Error: &types.ToolError{
+					Message: "could not determine project type to run tests",
+					Type:    types.ToolErrorTypeExecutionFailed,
+				},
 			},
-		},
-			fmt.Errorf("could not determine project type to run tests in directory %s", dir)
+			fmt.Errorf("could not determine project type to run tests in directory %s", absolutePath)
 	}
 
-	stdout, stderr, err := t.shellService.ExecuteCommand(ctx, command, dir)
+	stdout, stderr, err := t.shellService.ExecuteCommand(ctx, command, absolutePath)
 
 	output := "Stdout:\n" + stdout + "\nStderr:\n" + stderr
 	if err != nil {
 		output += "\nError: " + err.Error()
 		return types.ToolResult{
-			LLMContent:    output,
-			ReturnDisplay: output,
-			Error: &types.ToolError{
-				Message: fmt.Sprintf("test command failed: %v", err),
-				Type:    types.ToolErrorTypeExecutionFailed,
+				LLMContent:    output,
+				ReturnDisplay: output,
+				Error: &types.ToolError{
+					Message: fmt.Sprintf("test command failed: %v", err),
+					Type:    types.ToolErrorTypeExecutionFailed,
+				},
 			},
-		},
-		err
+			err
 	}
 
 	return types.ToolResult{
-		LLMContent:    output,
-		ReturnDisplay: output,
-	},
-	nil
+			LLMContent:    output,
+			ReturnDisplay: output,
+		},
+		nil
 }

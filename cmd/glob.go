@@ -34,8 +34,9 @@ var globCmd = &cobra.Command{
 	Long:  `Efficiently finds files matching specific glob patterns (e.g., src/**/*.ts, **/*.md), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		fileSystemService := services.NewFileSystemService()
-		globTool := tools.NewGlobTool(fileSystemService)
-		result, err := globTool.Execute(context.Background(), map[string]any{
+		workspaceService := services.NewWorkspaceService(".")
+		tool := tools.NewGlobTool(fileSystemService, workspaceService)
+		result, err := tool.Execute(context.Background(), map[string]any{
 			"pattern":                  globPattern,
 			"path":                     globPath,
 			"case_sensitive":           globCaseSensitive,
