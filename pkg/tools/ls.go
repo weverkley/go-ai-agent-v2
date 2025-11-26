@@ -23,7 +23,7 @@ func NewLsTool(workspaceService types.WorkspaceServiceIface) *LsTool {
 			types.LS_TOOL_NAME,
 			"List Directory Contents",
 			"Lists the contents of a directory.",
-			types.KindOther,
+			types.KindRead,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

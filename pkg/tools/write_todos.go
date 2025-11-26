@@ -32,7 +32,7 @@ func NewWriteTodosTool(settingsService types.SettingsServiceIface) *WriteTodosTo
 			types.WRITE_TODOS_TOOL_NAME,
 			"Write Todos",
 			"Creates or replaces the full list of subtasks required to complete a user request.",
-			types.KindOther,
+			types.KindEdit,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

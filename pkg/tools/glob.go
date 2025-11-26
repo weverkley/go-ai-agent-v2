@@ -29,7 +29,7 @@ func NewGlobTool(fileSystemService services.FileSystemService, workspaceService 
 			types.GLOB_TOOL_NAME,
 			types.GLOB_TOOL_DISPLAY_NAME,
 			"Efficiently finds files matching specific glob patterns.",
-			types.KindOther, // Assuming KindOther for now
+			types.KindSearch, // Assuming KindOther for now
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

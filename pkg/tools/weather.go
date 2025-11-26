@@ -19,7 +19,7 @@ func NewWeatherTool() *WeatherTool {
 			"get_weather",
 			"Get Weather",
 			"Gets the current weather for a given location.",
-			types.KindOther,
+			types.KindFetch,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

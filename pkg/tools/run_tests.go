@@ -25,7 +25,7 @@ func NewRunTestsTool(shellService services.ShellExecutionService, fsService serv
 			RUN_TESTS_TOOL_NAME,
 			"Run Tests",
 			"A dedicated tool to execute project-specific tests. It intelligently discovers and uses the correct test command for the project (e.g., `go test`, `npm test`, `pytest`).",
-			types.KindOther,
+			types.KindExecute,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

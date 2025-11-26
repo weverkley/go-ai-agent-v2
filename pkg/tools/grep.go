@@ -28,7 +28,7 @@ func NewGrepTool(workspaceService types.WorkspaceServiceIface) *GrepTool {
 			types.GREP_TOOL_NAME,
 			types.GREP_TOOL_DISPLAY_NAME,
 			"Searches for a regular expression pattern within files in a specified directory.",
-			types.KindOther, // Assuming KindOther for now
+			types.KindSearch, // Assuming KindOther for now
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

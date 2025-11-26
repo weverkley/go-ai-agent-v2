@@ -25,7 +25,7 @@ func NewWriteFileTool(fileSystemService services.FileSystemService, workspaceSer
 			WRITE_FILE_TOOL_NAME,
 			"Write File",
 			"Writes content to a specified file in the local filesystem.",
-			types.KindOther,
+			types.KindEdit,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

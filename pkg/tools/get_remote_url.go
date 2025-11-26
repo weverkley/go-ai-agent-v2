@@ -21,7 +21,7 @@ func NewGetRemoteURLTool(gitService services.GitService) *GetRemoteURLTool {
 			"get_remote_url",
 			"Get Git Remote URL",
 			"Returns the URL of the 'origin' remote for the given Git repository.",
-			types.KindOther,
+			types.KindRead,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

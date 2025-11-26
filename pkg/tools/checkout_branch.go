@@ -21,7 +21,7 @@ func NewCheckoutBranchTool(gitService services.GitService) *CheckoutBranchTool {
 			types.CHECKOUT_BRANCH_TOOL_NAME,
 			"Checkout Branch",
 			"Checks out a Git branch.",
-			types.KindOther,
+			types.KindExecute,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

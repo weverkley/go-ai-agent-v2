@@ -21,7 +21,7 @@ func NewPullTool(gitService services.GitService) *PullTool {
 			types.PULL_TOOL_NAME,
 			"Pull",
 			"Pulls changes from a remote Git repository.",
-			types.KindOther,
+			types.KindExecute,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

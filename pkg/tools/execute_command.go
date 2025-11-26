@@ -22,7 +22,7 @@ func NewExecuteCommandTool(shellService services.ShellExecutionService) *Execute
 			types.EXECUTE_COMMAND_TOOL_NAME,
 			"Execute Command",
 			"Executes a shell command and returns its output.",
-			types.KindOther,
+			types.KindExecute,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

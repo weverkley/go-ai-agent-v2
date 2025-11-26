@@ -55,7 +55,7 @@ func NewWebSearchTool(
 			types.WEB_SEARCH_TOOL_NAME,
 			types.WEB_SEARCH_TOOL_DISPLAY_NAME,
 			"Performs a web search using Google Search (via the Gemini API) and returns the results.",
-			types.KindOther,
+			types.KindSearch,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

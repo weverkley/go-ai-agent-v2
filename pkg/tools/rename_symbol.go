@@ -24,7 +24,7 @@ func NewRenameSymbolTool(workspaceService types.WorkspaceServiceIface) *RenameSy
 			RENAME_SYMBOL_TOOL_NAME,
 			"Rename Symbol",
 			"Safely renames a symbol (variable, function, struct, etc.) across all its usages in the codebase.",
-			types.KindOther,
+			types.KindEdit,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

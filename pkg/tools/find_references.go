@@ -25,7 +25,7 @@ func NewFindReferencesTool(workspaceService types.WorkspaceServiceIface) *FindRe
 			FIND_REFERENCES_TOOL_NAME,
 			"Find References",
 			"Finds all usages of a specific symbol (function, variable, etc.) in the codebase.",
-			types.KindOther,
+			types.KindSearch,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

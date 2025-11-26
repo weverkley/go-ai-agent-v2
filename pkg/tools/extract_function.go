@@ -26,7 +26,7 @@ func NewExtractFunctionTool(fileSystemService services.FileSystemService, worksp
 			EXTRACT_FUNCTION_TOOL_NAME,
 			"Extract Function/Method",
 			"Extracts a code block into a new function or method in a Go file.",
-			types.KindOther,
+			types.KindEdit,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

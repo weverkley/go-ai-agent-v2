@@ -24,7 +24,7 @@ func NewSmartEditTool(fileSystemService services.FileSystemService, workspaceSer
 			types.SMART_EDIT_TOOL_NAME,
 			types.SMART_EDIT_TOOL_DISPLAY_NAME,
 			"Replaces text within a file. Replaces a single occurrence. This tool requires providing significant context around the change to ensure precise targeting. Always use the read_file tool to examine the file's current content before attempting a text replacement.",
-			types.KindOther, // Assuming KindOther for now
+			types.KindEdit, // Assuming KindOther for now
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

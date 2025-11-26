@@ -23,7 +23,7 @@ func NewFindUnusedCodeTool() *FindUnusedCodeTool {
 			types.FIND_UNUSED_CODE_TOOL_NAME,
 			"Find Unused Code",
 			"Finds unused code in the specified directory.",
-			types.KindOther,
+			types.KindSearch,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

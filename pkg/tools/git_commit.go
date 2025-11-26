@@ -22,7 +22,7 @@ func NewGitCommitTool(gitService services.GitService) *GitCommitTool {
 			GIT_COMMIT_TOOL_NAME,
 			"Git Commit",
 			"Stages files and creates a Git commit.",
-			types.KindOther,
+			types.KindEdit,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

@@ -22,7 +22,7 @@ func NewListDirectoryTool(fs services.FileSystemService) *ListDirectoryTool {
 			types.LIST_DIRECTORY_TOOL_NAME,
 			"List Directory",
 			"Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns.",
-			types.KindOther,
+			types.KindRead,
 			&types.JsonSchemaObject{
 				Type: "object",
 				Properties: map[string]*types.JsonSchemaProperty{

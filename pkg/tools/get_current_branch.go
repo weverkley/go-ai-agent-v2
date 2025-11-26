@@ -21,7 +21,7 @@ func NewGetCurrentBranchTool(gitService services.GitService) *GetCurrentBranchTo
 			types.GET_CURRENT_BRANCH_TOOL_NAME,
 			"Get Current Branch",
 			"Retrieves the name of the current Git branch.",
-			types.KindOther,
+			types.KindRead,
 			(&types.JsonSchemaObject{
 				Type: "object",
 			}).SetProperties(map[string]*types.JsonSchemaProperty{

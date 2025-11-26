@@ -433,6 +433,7 @@ type Tool interface {
 	Description() string
 	ServerName() string // Add ServerName to the interface
 	Parameters() *JsonSchemaObject
+	Kind() Kind
 	Execute(ctx context.Context, args map[string]any) (ToolResult, error)
 }
 
@@ -447,7 +448,15 @@ type ToolInvocation interface {
 type Kind string
 
 const (
-	KindOther Kind = "OTHER"
+	KindRead    Kind = "READ"
+	KindEdit    Kind = "EDIT"
+	KindDelete  Kind = "DELETE"
+	KindMove    Kind = "MOVE"
+	KindSearch  Kind = "SEARCH"
+	KindExecute Kind = "EXECUTE"
+	KindThink   Kind = "THINK"
+	KindFetch   Kind = "FETCH"
+	KindOther   Kind = "OTHER"
 )
 
 // BaseDeclarativeTool provides a base implementation for declarative tools.
@@ -505,6 +514,11 @@ func (bdt *BaseDeclarativeTool) ServerName() string {
 // Parameters returns the tool's parameter schema.
 func (bdt *BaseDeclarativeTool) Parameters() *JsonSchemaObject {
 	return bdt.parameterSchema
+}
+
+// Kind returns the kind of the tool.
+func (bdt *BaseDeclarativeTool) Kind() Kind {
+	return bdt.kind
 }
 
 // Execute is a placeholder and should be implemented by concrete tool types.
