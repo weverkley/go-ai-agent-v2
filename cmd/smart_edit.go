@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/spf13/cobra"
@@ -34,9 +33,7 @@ var smartEditCmd = &cobra.Command{
 	Short: "Replaces text within a file using smart strategies",
 	Long:  `Replaces text within a file using smart strategies (exact, flexible, regex) and includes self-correction logic.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fileSystemService := services.NewFileSystemService()
-		workspaceService := services.NewWorkspaceService(".")
-		tool := tools.NewSmartEditTool(fileSystemService, workspaceService)
+		tool := tools.NewSmartEditTool(FSService, WorkspaceService)
 		result, err := tool.Execute(context.Background(), map[string]any{
 			"file_path":   smartEditFilePath,
 			"instruction": smartEditInstruction,

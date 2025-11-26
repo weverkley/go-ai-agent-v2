@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 
-	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/tools"
 
 	"github.com/spf13/cobra"
@@ -33,9 +32,7 @@ var globCmd = &cobra.Command{
 	Short: "Efficiently finds files matching specific glob patterns",
 	Long:  `Efficiently finds files matching specific glob patterns (e.g., src/**/*.ts, **/*.md), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fileSystemService := services.NewFileSystemService()
-		workspaceService := services.NewWorkspaceService(".")
-		tool := tools.NewGlobTool(fileSystemService, workspaceService)
+		tool := tools.NewGlobTool(FSService, WorkspaceService)
 		result, err := tool.Execute(context.Background(), map[string]any{
 			"pattern":                  globPattern,
 			"path":                     globPath,
