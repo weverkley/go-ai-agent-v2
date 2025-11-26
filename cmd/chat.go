@@ -171,10 +171,17 @@ func runChatCmd(rootCmd *cobra.Command, cmd *cobra.Command, args []string, setti
 
 	// Print final stats after the UI exits
 	if m, ok := finalModel.(*ui.ChatModel); ok {
-		toolCount, errorCount, duration := m.GetStats()
-		fmt.Printf("\n\nSession ended.\n")
+		toolCount, errorCount, duration, tokenUsage := m.GetStats()
+		fmt.Printf("\n\nSession ended.\n\n")
 		fmt.Printf("Total tool calls: %d\n", toolCount)
 		fmt.Printf("Failed tool calls: %d\n", errorCount)
-		fmt.Printf("Total session time: %s\n", duration.Round(time.Second))
+		fmt.Printf("Total session time: %s\n\n", duration.Round(time.Second))
+		if len(tokenUsage) > 0 {
+			fmt.Println("Token Usage:")
+			for model, usage := range tokenUsage {
+				fmt.Printf("  - %s: Input: %d, Output: %d\n", model, usage.InputTokens, usage.OutputTokens)
+			}
+		}
+		fmt.Printf("\nGood Bye!\n\n")
 	}
 }

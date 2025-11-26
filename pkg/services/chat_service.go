@@ -25,6 +25,7 @@ type ChatService struct {
 	settingsService      types.SettingsServiceIface
 	appConfig            types.Config
 	generationConfig     types.GenerateContentConfig
+	tokenUsage           map[string]*types.ModelTokenUsage
 	proceedAlwaysTools   map[string]bool
 	toolCallCounter      int
 	toolErrorCounter     int
@@ -42,6 +43,7 @@ func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInter
 		settingsService:      settingsService,
 		appConfig:            appConfig,
 		generationConfig:     generationConfig,
+		tokenUsage:           make(map[string]*types.ModelTokenUsage),
 		proceedAlwaysTools:   make(map[string]bool),
 		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
 		userConfirmationChan: make(chan bool, 1),
@@ -114,6 +116,12 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 						textResponse.WriteString(e.Text)
 						eventChan <- e
 					}
+				case types.TokenCountEvent:
+					if _, ok := cs.tokenUsage[cs.executor.Name()]; !ok {
+						cs.tokenUsage[cs.executor.Name()] = &types.ModelTokenUsage{}
+					}
+					cs.tokenUsage[cs.executor.Name()].InputTokens += e.InputTokens
+					cs.tokenUsage[cs.executor.Name()].OutputTokens += e.OutputTokens
 				case types.ErrorEvent:
 					streamErr = e.Err
 					goto EndStream
@@ -365,6 +373,12 @@ func (cs *ChatService) CompressHistory() (*types.ChatCompressionResult, error) {
 		return nil, err
 	}
 
+	if _, ok := cs.tokenUsage[cs.executor.Name()]; !ok {
+		cs.tokenUsage[cs.executor.Name()] = &types.ModelTokenUsage{}
+	}
+	cs.tokenUsage[cs.executor.Name()].InputTokens += result.InputTokens
+	cs.tokenUsage[cs.executor.Name()].OutputTokens += result.OutputTokens
+
 	// Create a new history with the system prompt and the summary
 	newHistory := []*types.Content{}
 	if cs.generationConfig.SystemInstruction != "" {
@@ -394,4 +408,8 @@ func (cs *ChatService) CompressHistory() (*types.ChatCompressionResult, error) {
 }
 func (cs *ChatService) GetGenerationConfig() types.GenerateContentConfig {
 	return cs.generationConfig
+}
+
+func (cs *ChatService) GetTokenUsage() map[string]*types.ModelTokenUsage {
+	return cs.tokenUsage
 }

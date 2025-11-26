@@ -213,11 +213,18 @@ type JsonError struct {
 
 // SessionMetrics represents session-related metrics for telemetry.
 type SessionMetrics struct {
-	TotalTurns   int `json:"totalTurns"`
-	TotalTimeMs  int `json:"totalTimeMs"`
+	TotalTurns   int                         `json:"totalTurns"`
+	TotalTimeMs  int                         `json:"totalTimeMs"`
+	InputTokens  int                         `json:"inputTokens"`
+	OutputTokens int                         `json:"outputTokens"`
+	TotalTokens  int                         `json:"totalTokens"`
+	TokenUsage   map[string]*ModelTokenUsage `json:"tokenUsage"`
+}
+
+// ModelTokenUsage holds the token usage for a specific model.
+type ModelTokenUsage struct {
 	InputTokens  int `json:"inputTokens"`
 	OutputTokens int `json:"outputTokens"`
-	TotalTokens  int `json:"totalTokens"`
 }
 
 // JsonStreamEvent represents a single event in the JSON stream.
@@ -346,6 +353,8 @@ type ChatCompressionResult struct {
 	Summary            string `json:"summary"`
 	OriginalTokenCount int    `json:"originalTokenCount"`
 	NewTokenCount      int    `json:"newTokenCount"`
+	InputTokens        int    `json:"inputTokens"`
+	OutputTokens       int    `json:"outputTokens"`
 	CompressionStatus  string `json:"compressionStatus"`
 }
 
@@ -738,6 +747,11 @@ type FinalResponseEvent struct {
 
 type ErrorEvent struct {
 	Err error
+}
+
+type TokenCountEvent struct {
+	InputTokens  int
+	OutputTokens int
 }
 
 // ModelSwitchEvent is sent when the model is switched, e.g., due to fallback.

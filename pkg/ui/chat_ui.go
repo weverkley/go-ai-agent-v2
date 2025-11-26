@@ -336,8 +336,8 @@ func (m *ChatModel) Close() error {
 	return nil
 }
 
-func (m *ChatModel) GetStats() (int, int, time.Duration) {
-	return m.toolCallCount, m.toolErrorCount, time.Since(m.startTime)
+func (m *ChatModel) GetStats() (int, int, time.Duration, map[string]*types.ModelTokenUsage) {
+	return m.toolCallCount, m.toolErrorCount, time.Since(m.startTime), m.chatService.GetTokenUsage()
 }
 
 // SetChatService updates the ChatModel's chatService and executorType.

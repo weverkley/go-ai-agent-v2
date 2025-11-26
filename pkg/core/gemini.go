@@ -11,6 +11,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/google/generative-ai-go/genai"
+	"github.com/pkoukk/tiktoken-go"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -211,66 +212,85 @@ func buildGeminiTools(toolRegistry types.ToolRegistryInterface, logger telemetry
 func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Content) (<-chan any, error) {
 	eventChan := make(chan any)
 
-	go func() {
-		defer close(eventChan)
-		gc.logger.LogDebugf("GeminiExecutor: StreamContent goroutine started.")
-
-		// Use the model from the struct, which has been configured.
-		if gc.toolRegistry != nil {
-			gc.model.Tools = buildGeminiTools(gc.toolRegistry, gc.logger)
-		}
-
-		cs := gc.model.StartChat()
-
-		if len(history) > 1 {
-			historyToSet := history[:len(history)-1]
-			gc.logger.LogDebugf("GeminiExecutor: Setting chat history with %d previous messages.", len(historyToSet))
-			cs.History = toGenaiContents(historyToSet)
-		} else {
-			gc.logger.LogDebugf("GeminiExecutor: No previous history to set.")
-		}
-
-		var lastParts []genai.Part
-		if len(history) > 0 {
-			lastContent := history[len(history)-1]
-			if convertedContent := toGenaiContent(lastContent); convertedContent != nil {
-				lastParts = convertedContent.Parts
+			go func() {
+			defer close(eventChan)
+			gc.logger.LogDebugf("GeminiExecutor: StreamContent goroutine started.")
+	
+			// Use the model from the struct, which has been configured.
+			if gc.toolRegistry != nil {
+				gc.model.Tools = buildGeminiTools(gc.toolRegistry, gc.logger)
 			}
-		} else {
-			gc.logger.LogErrorf("GeminiExecutor: StreamContent called with empty history.")
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("StreamContent called with empty history")}
-			return
-		}
-		gc.logger.LogDebugf("GeminiExecutor: Sending last message with %d parts.", len(lastParts))
-
-		iter := cs.SendMessageStream(ctx, lastParts...)
-		gc.logger.LogDebugf("GeminiExecutor: SendMessageStream called. Waiting for response...")
-
-		for {
-			resp, err := iter.Next()
-			if err == iterator.Done {
-				gc.logger.LogDebugf("GeminiExecutor: Stream iterator finished (Done).")
-				break
+	
+			cs := gc.model.StartChat()
+	
+			if len(history) > 1 {
+				historyToSet := history[:len(history)-1]
+				gc.logger.LogDebugf("GeminiExecutor: Setting chat history with %d previous messages.", len(historyToSet))
+				cs.History = toGenaiContents(historyToSet)
+			} else {
+				gc.logger.LogDebugf("GeminiExecutor: No previous history to set.")
 			}
-			if err != nil {
-				gc.logger.LogErrorf("GeminiExecutor: Error receiving from Gemini stream: %v", err)
-				eventChan <- types.ErrorEvent{Err: err}
-				return
-			}
-			gc.logger.LogDebugf("GeminiExecutor: Received a response chunk from Gemini stream.")
-
-			if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
-				for _, part := range resp.Candidates[0].Content.Parts {
-					eventChan <- fromGenaiPart(part, gc.logger)
+	
+			// Count input tokens
+			var inputText strings.Builder
+			for _, content := range history {
+				for _, part := range content.Parts {
+					inputText.WriteString(part.Text)
 				}
 			}
-		}
-		gc.logger.LogDebugf("GeminiExecutor: Finished processing Gemini stream.")
-	}()
-
-	return eventChan, nil
-}
-
+			tke, err := tiktoken.GetEncoding("cl100k_base")
+			if err != nil {
+				eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to get tiktoken encoding: %w", err)}
+				return
+			}
+			inputTokens := len(tke.Encode(inputText.String(), nil, nil))
+	
+			var lastParts []genai.Part
+			if len(history) > 0 {
+				lastContent := history[len(history)-1]
+				if convertedContent := toGenaiContent(lastContent); convertedContent != nil {
+					lastParts = convertedContent.Parts
+				}
+			} else {
+				gc.logger.LogErrorf("GeminiExecutor: StreamContent called with empty history.")
+				eventChan <- types.ErrorEvent{Err: fmt.Errorf("StreamContent called with empty history")}
+				return
+			}
+			gc.logger.LogDebugf("GeminiExecutor: Sending last message with %d parts.", len(lastParts))
+	
+			iter := cs.SendMessageStream(ctx, lastParts...)
+			gc.logger.LogDebugf("GeminiExecutor: SendMessageStream called. Waiting for response...")
+	
+			var outputText strings.Builder
+			for {
+				resp, err := iter.Next()
+				if err == iterator.Done {
+					gc.logger.LogDebugf("GeminiExecutor: Stream iterator finished (Done).")
+					break
+				}
+				if err != nil {
+					gc.logger.LogErrorf("GeminiExecutor: Error receiving from Gemini stream: %v", err)
+					eventChan <- types.ErrorEvent{Err: err}
+					return
+				}
+				gc.logger.LogDebugf("GeminiExecutor: Received a response chunk from Gemini stream.")
+	
+				if resp != nil && len(resp.Candidates) > 0 && resp.Candidates[0].Content != nil {
+					for _, part := range resp.Candidates[0].Content.Parts {
+						if text, ok := part.(genai.Text); ok {
+							outputText.WriteString(string(text))
+						}
+						eventChan <- fromGenaiPart(part, gc.logger)
+					}
+				}
+			}
+			outputTokens := len(tke.Encode(outputText.String(), nil, nil))
+			eventChan <- types.TokenCountEvent{InputTokens: inputTokens, OutputTokens: outputTokens}
+			gc.logger.LogDebugf("GeminiExecutor: Finished processing Gemini stream.")
+		}()
+	
+		return eventChan, nil
+	}
 // Methods to satisfy the Executor interface
 func (gc *GeminiChat) SetUserConfirmationChannel(ch chan bool) {
 	gc.userConfirmationChan = ch
@@ -325,6 +345,7 @@ func (gc *GeminiChat) CompressChat(history []*types.Content, promptID string) (*
 	if err != nil {
 		return nil, fmt.Errorf("failed to count original tokens: %w", err)
 	}
+	inputTokens := int(originalCount.TotalTokens)
 
 	// 4. Call the model to get the summary
 	resp, err := gc.model.GenerateContent(context.Background(), genai.Text(fullPrompt))
@@ -343,15 +364,18 @@ func (gc *GeminiChat) CompressChat(history []*types.Content, promptID string) (*
 	}
 
 	// 5. Count new tokens
-	newCount, err := gc.model.CountTokens(context.Background(), genai.Text(summaryText))
+	newCount, err := gc.model.CountTokens(context.Background(), summaryPart)
 	if err != nil {
 		return nil, fmt.Errorf("failed to count new tokens: %w", err)
 	}
+	outputTokens := int(newCount.TotalTokens)
 
 	return &types.ChatCompressionResult{
 		Summary:            string(summaryText),
-		OriginalTokenCount: int(originalCount.TotalTokens),
-		NewTokenCount:      int(newCount.TotalTokens),
+		OriginalTokenCount: inputTokens,
+		NewTokenCount:      outputTokens,
+		InputTokens:        inputTokens,
+		OutputTokens:       outputTokens,
 		CompressionStatus:  "OK",
 	}, nil
 }

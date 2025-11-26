@@ -208,6 +208,19 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 			messages = append([]openai.ChatCompletionMessage{systemMessage}, messages...)
 			qc.logger.LogDebugf("QwenExecutor: Prepended system message.")
 		}
+		// Count input tokens
+		var inputText strings.Builder
+		for _, content := range contents {
+			for _, part := range content.Parts {
+				inputText.WriteString(part.Text)
+			}
+		}
+		tke, err := tiktoken.GetEncoding("cl100k_base")
+		if err != nil {
+			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to get tiktoken encoding: %w", err)}
+			return
+		}
+		inputTokens := len(tke.Encode(inputText.String(), nil, nil))
 
 		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
@@ -233,6 +246,7 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 		defer stream.Close()
 		qc.logger.LogDebugf("QwenExecutor: Stream created. Waiting for response...")
 
+		var outputText strings.Builder
 		toolCallBuffers := make(map[string]strings.Builder)
 		toolCallNames := make(map[string]string)
 		var lastToolCallId string
@@ -253,6 +267,7 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 			if len(response.Choices) > 0 {
 				delta := response.Choices[0].Delta
 				if delta.Content != "" {
+					outputText.WriteString(delta.Content)
 					eventChan <- types.Part{Text: delta.Content}
 				}
 				if delta.ToolCalls != nil {
@@ -304,12 +319,13 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 				}
 			}
 		}
+		outputTokens := len(tke.Encode(outputText.String(), nil, nil))
+		eventChan <- types.TokenCountEvent{InputTokens: inputTokens, OutputTokens: outputTokens}
 		qc.logger.LogDebugf("QwenExecutor: Finished processing stream.")
 	}()
 
 	return eventChan, nil
 }
-
 // SetHistory sets the chat history for QwenChat.
 func (qc *QwenChat) SetHistory(history []*types.Content) error {
 	qc.startHistory = history
@@ -409,7 +425,7 @@ func (qc *QwenChat) CompressChat(history []*types.Content, promptId string) (*ty
 	if err != nil {
 		return nil, fmt.Errorf("failed to get tiktoken encoding: %w", err)
 	}
-	originalTokenCount := len(tke.Encode(fullPrompt, nil, nil))
+	inputTokens := len(tke.Encode(fullPrompt, nil, nil))
 
 	// 4. Call the model to get the summary
 	req := openai.ChatCompletionRequest{
@@ -435,12 +451,14 @@ func (qc *QwenChat) CompressChat(history []*types.Content, promptId string) (*ty
 	summaryText := resp.Choices[0].Message.Content
 
 	// 5. Count new tokens
-	newTokenCount := len(tke.Encode(summaryText, nil, nil))
+	outputTokens := len(tke.Encode(summaryText, nil, nil))
 
 	return &types.ChatCompressionResult{
 		Summary:            summaryText,
-		OriginalTokenCount: originalTokenCount,
-		NewTokenCount:      newTokenCount,
+		OriginalTokenCount: inputTokens,
+		NewTokenCount:      outputTokens,
+		InputTokens:        inputTokens,
+		OutputTokens:       outputTokens,
 		CompressionStatus:  "OK",
 	}, nil
 }

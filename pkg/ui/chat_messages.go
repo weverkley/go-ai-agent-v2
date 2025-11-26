@@ -45,12 +45,15 @@ type BotMessage struct {
 
 func (m BotMessage) Render(model *ChatModel) string {
 	botHeader := model.botStyle.Render("Bot:")
-	
+
 	// Use the new safe formatter
 	formattedContent := FormatMessage(m.Content)
-	
-	botContent := lipgloss.NewStyle().Padding(0, 2).Render(formattedContent)
-	
+
+	// Set a width on the style used for the content to enable wrapping
+	contentWidth := model.viewport.Width - 4 // 4 for horizontal padding
+	botContentStyle := lipgloss.NewStyle().Padding(0, 2).Width(contentWidth)
+	botContent := botContentStyle.Render(formattedContent)
+
 	return lipgloss.JoinVertical(lipgloss.Left, botHeader, botContent)
 }
 

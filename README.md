@@ -1,6 +1,6 @@
-# Go AI Agent v2
+# Project GAIA
 
-Go AI Agent v2 is a powerful and extensible command-line interface (CLI) built with Go. It provides a rich, interactive terminal experience for chatting with different AI models, leveraging a sophisticated tool-calling system and a hierarchical agent framework to perform complex software engineering tasks.
+Project GAIA is a powerful and extensible command-line interface (CLI) built with Go. It provides a rich, interactive terminal experience for chatting with different AI models, leveraging a sophisticated tool-calling system and a hierarchical agent framework to perform complex software engineering tasks.
 
 ## Core Features
 
