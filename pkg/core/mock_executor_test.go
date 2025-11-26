@@ -240,18 +240,18 @@ func TestMockExecutor(t *testing.T) {
 	t.Run("CompressChat should call the provided function", func(t *testing.T) {
 		expectedResult := &types.ChatCompressionResult{CompressionStatus: "compressed"}
 		mockExecutor := &core.MockExecutor{
-			CompressChatFunc: func(promptId string, force bool) (*types.ChatCompressionResult, error) {
+			CompressChatFunc: func(history []*types.Content, promptId string) (*types.ChatCompressionResult, error) {
 				return expectedResult, nil
 			},
 		}
-		result, err := mockExecutor.CompressChat("", false)
+		result, err := mockExecutor.CompressChat(nil, "")
 		assert.NoError(t, err)
 		assert.Equal(t, expectedResult, result)
 	})
 
 	t.Run("CompressChat should return error if function not provided", func(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
-		result, err := mockExecutor.CompressChat("", false)
+		result, err := mockExecutor.CompressChat(nil, "")
 		assert.Error(t, err)
 		assert.Nil(t, result)
 		assert.Contains(t, err.Error(), "CompressChat not implemented in mock")

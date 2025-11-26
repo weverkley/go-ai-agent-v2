@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/prompts"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -43,6 +45,11 @@ func NewGeminiChat(cfg types.Config, generationConfig types.GenerateContentConfi
 	model := client.GenerativeModel(modelName)
 	model.SetTemperature(generationConfig.Temperature)
 	model.SetTopP(generationConfig.TopP)
+	if generationConfig.SystemInstruction != "" {
+		model.SystemInstruction = &genai.Content{
+			Parts: []genai.Part{genai.Text(generationConfig.SystemInstruction)},
+		}
+	}
 
 	var toolRegistry types.ToolRegistryInterface
 	if toolRegistryVal, ok := cfg.Get("toolRegistry"); ok && toolRegistryVal != nil {
@@ -208,15 +215,12 @@ func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Conte
 		defer close(eventChan)
 		gc.logger.LogDebugf("GeminiExecutor: StreamContent goroutine started.")
 
-		model := gc.client.GenerativeModel(gc.modelName)
-		model.SetTemperature(gc.generationConfig.Temperature)
-		model.SetTopP(gc.generationConfig.TopP)
-
+		// Use the model from the struct, which has been configured.
 		if gc.toolRegistry != nil {
-			model.Tools = buildGeminiTools(gc.toolRegistry, gc.logger)
+			gc.model.Tools = buildGeminiTools(gc.toolRegistry, gc.logger)
 		}
 
-		cs := model.StartChat()
+		cs := gc.model.StartChat()
 
 		if len(history) > 1 {
 			historyToSet := history[:len(history)-1]
@@ -293,9 +297,62 @@ func (gc *GeminiChat) GetHistory() ([]*types.Content, error) {
 func (gc *GeminiChat) SetHistory(history []*types.Content) error {
 	return fmt.Errorf("history is managed by ChatService")
 }
-func (gc *GeminiChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	return nil, fmt.Errorf("not implemented")
-}
+
 func (gc *GeminiChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
+
+// CompressChat summarizes the chat history.
+func (gc *GeminiChat) CompressChat(history []*types.Content, promptID string) (*types.ChatCompressionResult, error) {
+	// 1. Get the summarization prompt
+	summarizePrompt, ok := prompts.GetPrompt("compression")
+	if !ok {
+		return nil, fmt.Errorf("chat compression prompt not found")
+	}
+
+	// 2. Combine the prompt and the history
+	var historyText strings.Builder
+	for _, content := range history {
+		for _, part := range content.Parts {
+			historyText.WriteString(fmt.Sprintf("%s: %s\n", content.Role, part.Text))
+		}
+	}
+
+	fullPrompt := summarizePrompt + "\n\n--- CONVERSATION HISTORY ---\n" + historyText.String()
+
+	// 3. Count original tokens
+	originalCount, err := gc.model.CountTokens(context.Background(), genai.Text(fullPrompt))
+	if err != nil {
+		return nil, fmt.Errorf("failed to count original tokens: %w", err)
+	}
+
+	// 4. Call the model to get the summary
+	resp, err := gc.model.GenerateContent(context.Background(), genai.Text(fullPrompt))
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary: %w", err)
+	}
+
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil || len(resp.Candidates[0].Content.Parts) == 0 {
+		return nil, fmt.Errorf("received an empty summary response from the model")
+	}
+
+	summaryPart := resp.Candidates[0].Content.Parts[0]
+	summaryText, ok := summaryPart.(genai.Text)
+	if !ok {
+		return nil, fmt.Errorf("unexpected response part type for summary: %T", summaryPart)
+	}
+
+	// 5. Count new tokens
+	newCount, err := gc.model.CountTokens(context.Background(), genai.Text(summaryText))
+	if err != nil {
+		return nil, fmt.Errorf("failed to count new tokens: %w", err)
+	}
+
+	return &types.ChatCompressionResult{
+		Summary:            string(summaryText),
+		OriginalTokenCount: int(originalCount.TotalTokens),
+		NewTokenCount:      int(newCount.TotalTokens),
+		CompressionStatus:  "OK",
+	}, nil
+}
+

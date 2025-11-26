@@ -343,6 +343,7 @@ type EditorType string
 
 // ChatCompressionResult represents the result of a chat compression operation.
 type ChatCompressionResult struct {
+	Summary            string `json:"summary"`
 	OriginalTokenCount int    `json:"originalTokenCount"`
 	NewTokenCount      int    `json:"newTokenCount"`
 	CompressionStatus  string `json:"compressionStatus"`

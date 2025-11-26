@@ -16,7 +16,7 @@ type MockExecutor struct {
 	ListModelsFunc               func() ([]string, error)
 	GetHistoryFunc               func() ([]*types.Content, error)
 	SetHistoryFunc               func(history []*types.Content) error
-	CompressChatFunc             func(promptId string, force bool) (*types.ChatCompressionResult, error)
+	CompressChatFunc             func(history []*types.Content, promptId string) (*types.ChatCompressionResult, error)
 	StreamContentFunc            func(ctx context.Context, contents ...*types.Content) (<-chan any, error)
 	toolRegistry                 types.ToolRegistryInterface
 	UserConfirmationChan         chan bool                          // Expose for testing
@@ -335,9 +335,9 @@ func (m *MockExecutor) SetHistory(history []*types.Content) error {
 }
 
 // CompressChat mocks the CompressChat method.
-func (m *MockExecutor) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
+func (m *MockExecutor) CompressChat(history []*types.Content, promptId string) (*types.ChatCompressionResult, error) {
 	if m.CompressChatFunc != nil {
-		return m.CompressChatFunc(promptId, force)
+		return m.CompressChatFunc(history, promptId)
 	}
 	return nil, fmt.Errorf("CompressChat not implemented in mock")
 }

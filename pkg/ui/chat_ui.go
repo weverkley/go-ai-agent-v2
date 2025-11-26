@@ -605,6 +605,19 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.updateViewport()
 		return m, nil
+	case compressionResultMsg:
+		m.isStreaming = false
+		m.status = "Ready"
+		if msg.err != nil {
+			errmsg := ErrorMessage{Err: msg.err}
+			m.messages = append(m.messages, errmsg)
+		} else {
+			compressionMessage := fmt.Sprintf("History compressed successfully. Original tokens: %d, New tokens: %d.", msg.result.OriginalTokenCount, msg.result.NewTokenCount)
+			botMsg := BotMessage{Content: compressionMessage}
+			m.messages = append(m.messages, botMsg)
+		}
+		m.updateViewport()
+		return m, nil
 	case chatServiceReloadedMsg:
 		m.SetChatService(msg.newService, msg.newExecutorType)
 		m.messages = m.repopulateMessagesFromHistory(m.chatService.GetHistory()) // Repopulate messages from the new service's history
@@ -738,6 +751,10 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 	// ---
 	if len(args) > 0 {
 		switch args[0] {
+		case "compress":
+			m.status = "Compressing history..."
+			m.isStreaming = true // Show spinner
+			return m, compressHistoryCmd(m.chatService)
 		case "clear":
 			m.chatService.ClearHistory()
 			m.messages = createInitialMessages()
@@ -749,6 +766,7 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 
 **Session Management**
 * ` + "`/clear`" + ` - Clears the current chat session history.
+* ` + "`/compress`" + ` - Summarizes the current session to save tokens.
 * ` + "`/sessions list`" + ` - Lists all saved chat sessions.
 * ` + "`/sessions resume <id>`" + ` - Resumes a session by its ID or list number.
 
@@ -797,7 +815,7 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 					return m, nil
 				}
 				sessionID := args[2]
-				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.config, nil)
+				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.config, m.chatService.GetGenerationConfig(), nil)
 				if err != nil {
 					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
 					m.updateViewport()
@@ -974,13 +992,21 @@ func ReinitializeChatCmd(oldChatService *services.ChatService, sessionService *s
 			sessionService,
 			chatState.SessionID,
 			settingsService,
-			appConfig, // Pass the appConfig
-			chatState, // Pass the captured state
+			appConfig,
+			oldChatService.GetGenerationConfig(), // Pass the existing generation config
+			chatState,                             // Pass the captured state
 		)
 		if err != nil {
 			return streamErrorMsg{fmt.Errorf("error creating new chat service: %w", err)}
 		}
 
 		return chatServiceReloadedMsg{newService: newChatService, newExecutorType: executorType}
+	}
+}
+
+func compressHistoryCmd(cs *services.ChatService) tea.Cmd {
+	return func() tea.Msg {
+		res, err := cs.CompressHistory()
+		return compressionResultMsg{result: res, err: err}
 	}
 }

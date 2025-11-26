@@ -73,7 +73,9 @@ func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 	t.Cleanup(cleanup) // Use t.Cleanup to automatically call the cleanup function when the test finishes.
 
 	sessionID := "test-session"
-	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, sessionID, mockSettingsService, appConfig, nil)
+	// Pass an empty generation config for the test setup
+	generationConfig := types.GenerateContentConfig{}
+	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, sessionID, mockSettingsService, appConfig, generationConfig, nil)
 	assert.NoError(t, err)
 
 	model := NewChatModel(chatService, sessionService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)

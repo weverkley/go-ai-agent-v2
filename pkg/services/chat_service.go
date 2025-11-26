@@ -24,6 +24,7 @@ type ChatService struct {
 	sessionID            string
 	settingsService      types.SettingsServiceIface
 	appConfig            types.Config
+	generationConfig     types.GenerateContentConfig
 	proceedAlwaysTools   map[string]bool
 	toolCallCounter      int
 	toolErrorCounter     int
@@ -32,7 +33,7 @@ type ChatService struct {
 }
 
 // NewChatService creates a new ChatService.
-func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface, appConfig types.Config, initialState *types.ChatState) (*ChatService, error) {
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface, appConfig types.Config, generationConfig types.GenerateContentConfig, initialState *types.ChatState) (*ChatService, error) {
 	cs := &ChatService{
 		executor:             executor,
 		toolRegistry:         toolRegistry,
@@ -40,6 +41,7 @@ func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInter
 		sessionID:            sessionID,
 		settingsService:      settingsService,
 		appConfig:            appConfig,
+		generationConfig:     generationConfig,
 		proceedAlwaysTools:   make(map[string]bool),
 		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
 		userConfirmationChan: make(chan bool, 1),
@@ -349,4 +351,47 @@ func (cs *ChatService) GetToolConfirmationChannel() chan types.ToolConfirmationO
 }
 func (cs *ChatService) GetUserConfirmationChannel() chan bool {
 	return cs.userConfirmationChan
+}
+
+// CompressHistory compresses the current chat history.
+func (cs *ChatService) CompressHistory() (*types.ChatCompressionResult, error) {
+	if cs.executor == nil {
+		return nil, fmt.Errorf("executor is not initialized")
+	}
+
+	promptID := "compress-" + cs.sessionID // Or generate a unique ID
+	result, err := cs.executor.CompressChat(cs.history, promptID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create a new history with the system prompt and the summary
+	newHistory := []*types.Content{}
+	if cs.generationConfig.SystemInstruction != "" {
+		newHistory = append(newHistory, &types.Content{
+			Role:  "system",
+			Parts: []types.Part{{Text: cs.generationConfig.SystemInstruction}},
+		})
+	}
+	newHistory = append(newHistory, &types.Content{
+		Role:  "user",
+		Parts: []types.Part{{Text: "Summary of previous conversation:\n" + result.Summary}},
+	})
+	newHistory = append(newHistory, &types.Content{
+		Role:  "model",
+		Parts: []types.Part{{Text: "Okay, I have reviewed the summary and am ready to continue."}},
+	})
+
+	cs.history = newHistory
+
+	// Save the new compressed history
+	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+		// Log the error but don't fail the whole operation, as the compression itself succeeded.
+		telemetry.LogErrorf("Failed to save compressed history for session %s: %v", cs.sessionID, err)
+	}
+
+	return result, nil
+}
+func (cs *ChatService) GetGenerationConfig() types.GenerateContentConfig {
+	return cs.generationConfig
 }

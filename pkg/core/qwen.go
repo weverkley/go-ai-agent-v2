@@ -9,9 +9,11 @@ import (
 	"os"
 	"strings"
 
+	"go-ai-agent-v2/go-cli/pkg/prompts"
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 
+	"github.com/pkoukk/tiktoken-go"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -128,6 +130,7 @@ func toOpenAITools(toolRegistry types.ToolRegistryInterface, logger telemetry.Te
 type QwenChat struct {
 	client               *openai.Client
 	modelName            string
+	generationConfig     types.GenerateContentConfig // New field
 	startHistory         []*types.Content
 	toolRegistry         types.ToolRegistryInterface
 	ToolConfirmationChan chan types.ToolConfirmationOutcome
@@ -167,6 +170,7 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 	return &QwenChat{
 		client:               client,
 		modelName:            modelName,
+		generationConfig:     generationConfig, // Initialize new field
 		startHistory:         startHistory,
 		toolRegistry:         qwenChatToolRegistry,
 		ToolConfirmationChan: make(chan types.ToolConfirmationOutcome, 1),
@@ -194,6 +198,16 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 			return
 		}
 		qc.logger.LogDebugf("QwenExecutor: Converted %d messages for OpenAI API.", len(messages))
+
+		// Prepend system message if provided
+		if qc.generationConfig.SystemInstruction != "" {
+			systemMessage := openai.ChatCompletionMessage{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: qc.generationConfig.SystemInstruction,
+			}
+			messages = append([]openai.ChatCompletionMessage{systemMessage}, messages...)
+			qc.logger.LogDebugf("QwenExecutor: Prepended system message.")
+		}
 
 		var openaiTools []openai.Tool
 		if qc.toolRegistry != nil {
@@ -373,8 +387,62 @@ func (qc *QwenChat) GetHistory() ([]*types.Content, error) {
 	return qc.startHistory, nil
 }
 
-func (qc *QwenChat) CompressChat(promptId string, force bool) (*types.ChatCompressionResult, error) {
-	return nil, fmt.Errorf("CompressChat not implemented for QwenChat")
+func (qc *QwenChat) CompressChat(history []*types.Content, promptId string) (*types.ChatCompressionResult, error) {
+	// 1. Get the summarization prompt
+	summarizePrompt, ok := prompts.GetPrompt("compression")
+	if !ok {
+		return nil, fmt.Errorf("chat compression prompt not found")
+	}
+
+	// 2. Combine the prompt and the history
+	var historyText strings.Builder
+	for _, content := range history {
+		for _, part := range content.Parts {
+			historyText.WriteString(fmt.Sprintf("%s: %s\n", content.Role, part.Text))
+		}
+	}
+
+	fullPrompt := summarizePrompt + "\n\n--- CONVERSATION HISTORY ---\n" + historyText.String()
+
+	// 3. Count original tokens using tiktoken
+	tke, err := tiktoken.GetEncoding("cl100k_base")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get tiktoken encoding: %w", err)
+	}
+	originalTokenCount := len(tke.Encode(fullPrompt, nil, nil))
+
+	// 4. Call the model to get the summary
+	req := openai.ChatCompletionRequest{
+		Model: qc.modelName,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: summarizePrompt,
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: historyText.String(),
+			},
+		},
+	}
+	resp, err := qc.client.CreateChatCompletion(context.Background(), req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate summary from qwen: %w", err)
+	}
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("received an empty summary response from qwen")
+	}
+	summaryText := resp.Choices[0].Message.Content
+
+	// 5. Count new tokens
+	newTokenCount := len(tke.Encode(summaryText, nil, nil))
+
+	return &types.ChatCompressionResult{
+		Summary:            summaryText,
+		OriginalTokenCount: originalTokenCount,
+		NewTokenCount:      newTokenCount,
+		CompressionStatus:  "OK",
+	}, nil
 }
 
 // GenerateContentWithTools is a placeholder implementation for QwenChat.

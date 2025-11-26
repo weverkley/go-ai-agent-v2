@@ -2,6 +2,7 @@ package ui
 
 import (
 	"go-ai-agent-v2/go-cli/pkg/services"
+	"go-ai-agent-v2/go-cli/pkg/types"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,6 +26,12 @@ type commandFinishedMsg struct {
 type chatServiceReloadedMsg struct {
 	newService      *services.ChatService
 	newExecutorType string
+}
+
+// compressionResultMsg is sent when the chat history compression is complete.
+type compressionResultMsg struct {
+	result *types.ChatCompressionResult
+	err    error
 }
 
 // executeCommandCmd runs the commandExecutor in a goroutine and returns a
