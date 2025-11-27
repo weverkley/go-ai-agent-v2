@@ -26,7 +26,7 @@ func (f *GeminiExecutorFactory) NewExecutor(cfg types.Config, generationConfig t
 		History:      []string{},
 		Request:      "dummy request",
 		Signal:       context.Background(),
-		ExecutorType: "gemini",
+		ExecutorType: types.ExecutorTypeGemini,
 	}
 
 	decision, err := f.Router.Route(routingCtx, cfg)
@@ -72,13 +72,13 @@ func (f *QwenExecutorFactory) NewExecutor(cfg types.Config, generationConfig typ
 // NewExecutorFactory creates an ExecutorFactory based on the provided type.
 func NewExecutorFactory(executorType string, cfg types.Config) (ExecutorFactory, error) {
 	switch executorType {
-	case "gemini":
+	case types.ExecutorTypeGemini:
 		return &GeminiExecutorFactory{
 			Router: routing.NewModelRouterService(cfg),
 		}, nil
-	case "qwen":
+	case types.ExecutorTypeQwen:
 		return &QwenExecutorFactory{}, nil
-	case "mock":
+	case types.ExecutorTypeMock:
 		return &MockExecutorFactory{}, nil
 	default:
 		return nil, fmt.Errorf("unknown executor type: %s", executorType)

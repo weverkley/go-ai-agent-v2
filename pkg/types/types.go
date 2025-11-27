@@ -62,7 +62,8 @@ const (
 // Executor Types
 const (
 	ExecutorTypeQwen   = "qwen"
-	ExecutorTypeGemini = "goaiagent"
+	ExecutorTypeGemini = "gemini"
+	ExecutorTypeMock   = "mock"
 )
 
 // MCPServerStatus represents the connection status of an MCP server.
