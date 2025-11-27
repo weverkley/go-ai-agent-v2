@@ -557,6 +557,8 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.status = "Got tool result..."
 			if event.Err != nil {
 				m.toolErrorCount++
+				// Add the error as a message to the chat history for persistence.
+				m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("tool '%s' failed: %w", event.ToolName, event.Err)})
 			}
 			m.logSystemMessage(fmt.Sprintf("Tool Ended: %s. Result: %s, Error: %v", event.ToolName, event.Result, event.Err))
 			if tc, ok := m.activeToolCalls[event.ToolCallID]; ok {
