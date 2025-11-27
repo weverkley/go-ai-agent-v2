@@ -14,6 +14,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
+	"go-ai-agent-v2/go-cli/pkg/core/agents" // Add this import
 
 	"go-ai-agent-v2/go-cli/pkg/types"
 
@@ -81,6 +82,7 @@ func registerTools(cfg types.Config, fsService services.FileSystemService, shell
 
 func initConfig(
 	toolRegistry *types.ToolRegistry,
+	agentRegistry types.AgentRegistryInterface,
 	telemetrySettings *types.TelemetrySettings,
 	workspaceService *services.WorkspaceService,
 	fileFilteringService *services.FileFilteringService,
@@ -103,6 +105,7 @@ func initConfig(
 		ModelName:    modelName,
 		Telemetry:    telemetrySettings,
 		ToolRegistry: toolRegistry,
+		AgentRegistry: agentRegistry,
 	}
 
 	cfg := config.NewConfig(params)
@@ -182,11 +185,24 @@ func init() {
 		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService, ContextService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
 
-		// Initialize Cfg before tool registry
-		Cfg = initConfig(nil, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
+		// 1. Initialize Cfg with minimal parameters first
+		Cfg = initConfig(nil, nil, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
 
+		// 2. Create AgentRegistry using the initial Cfg
+		agentRegistry := agents.NewAgentRegistry(Cfg)
+
+		// 3. Set the AgentRegistry into Cfg immediately
+		Cfg.AgentRegistry = agentRegistry
+
+		// 4. Register all tools (standard tools and wrapped agents)
+		// tools.RegisterAllTools will now get the AgentRegistry from Cfg.AgentRegistry
 		toolRegistry := registerTools(Cfg, FSService, ShellService, SettingsService, WorkspaceService)
-		Cfg.ToolRegistry = toolRegistry // Set the tool registry in the config
+
+		// 5. Set the fully populated ToolRegistry into Cfg
+		Cfg.ToolRegistry = toolRegistry
+
+		// 6. Initialize AgentRegistry after Cfg is fully set up
+		agentRegistry.Initialize()
 
 		// Initialize SessionService now that Cfg is available
 		SessionService, err = services.NewSessionService(Cfg.GetGoaiagentDir())
@@ -194,8 +210,6 @@ func init() {
 			fmt.Fprintf(os.Stderr, "Error initializing SessionService: %v\n", err)
 			os.Exit(1)
 		}
-
-		// Initialize the global executor (removed as part of dynamic executor refactor)
 
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)

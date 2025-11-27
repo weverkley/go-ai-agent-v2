@@ -563,11 +563,15 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case types.SubagentActivityEvent:
 			status := fmt.Sprintf("🤖 %s", event.AgentName)
-			if event.ToolName != "" {
-				status += fmt.Sprintf(" -> %s", event.ToolName)
+			if toolNameVal, ok := event.Data["toolName"]; ok {
+				if toolName, isString := toolNameVal.(string); isString && toolName != "" {
+					status += fmt.Sprintf(" -> %s", toolName)
+				}
 			}
-			if event.Thought != "" {
-				status += fmt.Sprintf(" 🤔 %s", event.Thought)
+			if thoughtVal, ok := event.Data["thought"]; ok {
+				if thought, isString := thoughtVal.(string); isString && thought != "" {
+					status += fmt.Sprintf(" 🤔 %s", thought)
+				}
 			}
 			m.subagentStatus = status
 		case types.FinalResponseEvent:

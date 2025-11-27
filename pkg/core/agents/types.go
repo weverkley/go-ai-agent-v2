@@ -8,16 +8,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
-// SubagentActivityEvent represents an activity event emitted by a subagent.
-type SubagentActivityEvent struct {
-	IsSubagentActivityEvent bool                   `json:"isSubagentActivityEvent"`
-	AgentName               string                 `json:"agentName"`
-	Type                    string                 `json:"type"`
-	Data                    map[string]interface{} `json:"data"`
-}
 
-// ActivityCallback is a callback function to report on agent activity.
-type ActivityCallback func(activity SubagentActivityEvent)
 
 // AgentDefinition defines the structure and behavior of an agent.
 type AgentDefinition struct {
@@ -56,7 +47,7 @@ type SubagentInvocation struct {
 	BaseToolInvocation
 	Definition   AgentDefinition
 	Config       *config.Config
-	ActivityChan chan SubagentActivityEvent
+	ActivityChan chan types.SubagentActivityEvent // Changed to types.SubagentActivityEvent
 }
 
 // PromptConfig defines the prompting strategy for the agent.

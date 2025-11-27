@@ -577,6 +577,12 @@ type SettingsServiceIface interface {
 	Save() error
 }
 
+// AgentRegistryInterface defines the interface for managing agent definitions.
+type AgentRegistryInterface interface {
+	SetConfig(cfg Config)
+	Initialize()
+}
+
 // ToolRegistry manages the registration and retrieval of tools.
 type ToolRegistry struct {
 	mu    sync.RWMutex
@@ -725,13 +731,17 @@ type TelemetrySettings struct {
 	LogLevel     string `json:"logLevel,omitempty"`
 }
 
-// SubagentActivityEvent represents an activity event from a sub-agent.
+// SubagentActivityEvent represents an activity event emitted by a subagent.
+// This definition is now canonical and should be used throughout the application.
 type SubagentActivityEvent struct {
-	AgentName string
-	ToolName  string
-	Thought   string
-	IsComplete bool
+	IsSubagentActivityEvent bool                   `json:"isSubagentActivityEvent"`
+	AgentName               string                 `json:"agentName"`
+	Type                    string                 `json:"type"`
+	Data                    map[string]interface{} `json:"data"`
 }
+
+// ActivityCallback is a callback function to report on agent activity.
+type ActivityCallback func(activity SubagentActivityEvent)
 
 // Streaming Event types for the UI
 type StreamingStartedEvent struct{}

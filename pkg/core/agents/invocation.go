@@ -20,7 +20,7 @@ func NewSubagentInvocation(
 	definition AgentDefinition,
 	cfg *config.Config,
 	messageBus interface{}, // Placeholder for MessageBus
-	activityChan chan SubagentActivityEvent,
+	activityChan chan types.SubagentActivityEvent, // Changed type here
 ) *SubagentInvocation {
 	return &SubagentInvocation{
 		BaseToolInvocation: BaseToolInvocation{
@@ -64,7 +64,7 @@ func (si *SubagentInvocation) Execute(
 
 	// Create an activity callback to bridge the executor's events to the
 	// tool's streaming output.
-	onActivity := func(activity SubagentActivityEvent) {
+	onActivity := func(activity types.SubagentActivityEvent) { // Changed type here
 		if si.ActivityChan != nil {
 			si.ActivityChan <- activity
 		}

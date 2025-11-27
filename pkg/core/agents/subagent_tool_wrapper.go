@@ -48,7 +48,7 @@ func NewSubagentToolWrapper(
 }
 
 // CreateInvocation creates an invocation instance for executing the subagent.
-func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs, activityChan chan SubagentActivityEvent) types.ToolInvocation {
+func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs, activityChan chan types.SubagentActivityEvent) types.ToolInvocation {
 	return NewSubagentInvocation(
 		params,
 		stw.definition,
@@ -67,7 +67,7 @@ func (stw *SubagentToolWrapper) Execute(ctx context.Context, args map[string]int
 		eventChan = nil
 	}
 
-	activityChan := make(chan SubagentActivityEvent)
+	activityChan := make(chan types.SubagentActivityEvent) // Changed type here
 	invocation := stw.CreateInvocation(args, activityChan)
 
 	// Start a goroutine to listen for activity and forward it to the main event channel

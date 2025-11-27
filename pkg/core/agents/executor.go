@@ -20,7 +20,7 @@ type AgentExecutor struct {
 	AgentID        string
 	ToolRegistry   *types.ToolRegistry
 	RuntimeContext *config.Config
-	OnActivity     ActivityCallback
+	OnActivity     types.ActivityCallback // Changed to types.ActivityCallback
 	parentPromptId string
 }
 
@@ -537,7 +537,7 @@ func (ae *AgentExecutor) processFunctionCalls(
 // emitActivity emits an activity event to the configured callback.
 func (ae *AgentExecutor) emitActivity(activityType string, data map[string]interface{}) {
 	if ae.OnActivity != nil {
-		event := SubagentActivityEvent{
+		event := types.SubagentActivityEvent{ // Changed to types.SubagentActivityEvent
 			IsSubagentActivityEvent: true,
 			AgentName:               ae.Definition.Name,
 			Type:                    activityType,
@@ -548,7 +548,7 @@ func (ae *AgentExecutor) emitActivity(activityType string, data map[string]inter
 }
 
 // CreateAgentExecutor creates and validates a new AgentExecutor instance.
-func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity ActivityCallback) (*AgentExecutor, error) {
+func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity types.ActivityCallback) (*AgentExecutor, error) {
 	agentToolRegistry := types.NewToolRegistry()
 
 	if definition.ToolConfig != nil {

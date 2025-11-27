@@ -44,6 +44,7 @@ type ConfigParameters struct {
 	CodebaseInvestigator *types.CodebaseInvestigatorSettings
 	ToolRegistry         types.ToolRegistryInterface
 	ToolDiscoveryCommand string
+	AgentRegistry          types.AgentRegistryInterface
 	ToolCallCommand      string
 }
 
@@ -60,6 +61,7 @@ type Config struct {
 	output                       *OutputSettings
 	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
 	ToolRegistry                 types.ToolRegistryInterface // Changed to interface
+	AgentRegistry                types.AgentRegistryInterface
 	toolDiscoveryCommand         string
 	toolCallCommand              string
 	telemetryLogger              telemetry.TelemetryLogger
@@ -81,6 +83,7 @@ func NewConfig(params *ConfigParameters) *Config {
 		output:                       params.Output,
 		codebaseInvestigatorSettings: params.CodebaseInvestigator,
 		ToolRegistry:                 params.ToolRegistry, // This will need to be cast to types.ToolRegistryInterface
+		AgentRegistry:                params.AgentRegistry,
 		toolDiscoveryCommand:         params.ToolDiscoveryCommand,
 		toolCallCommand:              params.ToolCallCommand,
 		// telemetryLogger and fileFilteringService will be set separately
@@ -127,6 +130,8 @@ func (c *Config) Get(key string) (interface{}, bool) {
 		return false, true // Default to false if telemetry settings are nil
 	case "toolRegistry":
 		return c.ToolRegistry, true
+	case "agentRegistry":
+		return c.AgentRegistry, true
 	// Add more cases for other settings as needed
 	default:
 		return nil, false

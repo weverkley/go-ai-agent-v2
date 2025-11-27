@@ -1,7 +1,6 @@
 package agents
 
 import (
-	"go-ai-agent-v2/go-cli/pkg/config" // Added
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
@@ -9,15 +8,20 @@ import (
 // AgentRegistry manages the discovery, loading, validation, and registration of AgentDefinitions.
 type AgentRegistry struct {
 	agents map[string]AgentDefinition
-	config *config.Config
+	config types.Config
 }
 
 // NewAgentRegistry creates a new instance of AgentRegistry.
-func NewAgentRegistry(cfg *config.Config) *AgentRegistry {
+func NewAgentRegistry(cfg types.Config) *AgentRegistry {
 	return &AgentRegistry{
 		agents: make(map[string]AgentDefinition),
 		config: cfg,
 	}
+}
+
+// SetConfig updates the configuration for the AgentRegistry.
+func (ar *AgentRegistry) SetConfig(cfg types.Config) {
+	ar.config = cfg
 }
 
 // Initialize discovers and loads agents.
