@@ -1,0 +1,33 @@
+{
+  "extensionPaths": [
+    "/home/wever-kley/Workspace/go-ai-agent-v2/.goaiagent/extensions"
+  ],
+  "approvalMode": "DEFAULT",
+  "dangerousTools": [
+    "execute_command",
+    "write_file",
+    "smart_edit",
+    "user_confirm"
+  ],
+  "model": "mock-flash",
+  "executor": "mock",
+  "telemetry": {
+    "enabled": true,
+    "outdir": "/home/wever-kley/Workspace/go-ai-agent-v2/.goaiagent/tmp/",
+    "logLevel": "debug"
+  },
+  "webSearchProvider": "googleCustomSearch",
+  "googleCustomSearch": {
+    "apiKey": "API_KEY_GOES_HERE",
+    "cxId": "CX_ID_GOES_HERE"
+  },
+  "tavily": {
+    "apiKey": "API_KEY_GOES_HERE"
+  },
+  "codebaseInvestigator": {
+    "enabled": true
+  },
+  "testWriter": {
+    "enabled": true
+  }
+}
