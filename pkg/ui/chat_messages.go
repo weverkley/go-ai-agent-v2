@@ -143,12 +143,14 @@ func (msg *ToolCallGroupMessage) Render(m *ChatModel) string {
 				argument = argument[:57] + "..."
 			}
 		}
+
 		legend := fmt.Sprintf("%s %s %s",
 			lipgloss.NewStyle().Foreground(iconColor).Render(statusIcon),
 			actionWordStyle.Render(actionWord),
 			argumentStyle.Render(argument),
 		)
 		boxContent.WriteString(legend)
+
 		if (tc.ToolName == "write_file" || tc.ToolName == "smart_edit") && tc.Args != nil {
 			var contentToDisplay string
 			var filePathForLexer string
