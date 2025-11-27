@@ -3,8 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
-
-	"go-ai-agent-v2/go-cli/pkg/types"
+	"go-ai-agent-v2/go-cli/pkg/types" // Ensure types is imported
 )
 
 // MockExecutor is a mock implementation of the Executor interface for testing.
@@ -124,9 +123,9 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 		go func() {
 			defer close(eventChan)
 
-			// Simple state machine based on history length to simulate a conversation
-			switch len(contents) {
-			case 1: // Initial user prompt -> Calls write_todos
+			// Simple state machine based on MockStep to simulate a conversation
+			switch mock.MockStep {
+			case 0: // Initial user prompt -> Calls write_todos
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
@@ -139,46 +138,41 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 						},
 					},
 				}}
-			case 3: // After write_todos response -> Calls user_confirm
+			case 1: // After write_todos response -> Calls user_confirm
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.USER_CONFIRM_TOOL_NAME,
 					Args: map[string]interface{}{
 						"message": "I have created the plan. Shall I proceed with writing the first file?",
 					},
 				}}
-			case 5: // After user confirms -> Update todos and call write_file
-				lastMessage := contents[len(contents)-1]
-				if len(lastMessage.Parts) > 0 && lastMessage.Parts[0].FunctionResponse != nil {
-					response := lastMessage.Parts[0].FunctionResponse.Response
-					if result, ok := response["result"].(map[string]any); ok {
-						if result["result"] == "continue" {
-							// Update todos status
-							eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-								Name: types.WRITE_TODOS_TOOL_NAME,
-								Args: map[string]interface{}{
-									"todos": []interface{}{
-										map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
-										map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "in_progress"},
-										map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "pending"},
-										map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
-										map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
-									},
-								},
-							}}
-							// Write the initial file
-							eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-								Name: types.WRITE_FILE_TOOL_NAME,
-								Args: map[string]interface{}{
-									"file_path": "api.js",
-									"content":   jsContentTodoApi,
-								},
-							}}
-						} else {
-							eventChan <- types.Part{Text: "Okay, I will not proceed."}
-						}
-					}
-				}
-			case 7: // After writing the file -> Update todos and call smart_edit for GET /todos
+			case 2: // After user confirms -> Update todos and call write_file
+				// Assuming 'contents' here would be the full history including confirmation response
+				// To get the last message's FunctionResponse, we'd typically look at the last item in 'contents'.
+				// For this mock, we'll simplify and just proceed based on MockStep.
+				// In a real test, the test harness would feed a specific response for the user_confirm.
+
+				// Update todos status
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_TODOS_TOOL_NAME,
+					Args: map[string]interface{}{
+						"todos": []interface{}{
+							map[string]interface{}{"description": "Create api.js with basic Express server.", "status": "completed"},
+							map[string]interface{}{"description": "Add GET /todos endpoint.", "status": "in_progress"},
+							map[string]interface{}{"description": "Add POST /todos endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Add GET /todos/:id endpoint.", "status": "pending"},
+							map[string]interface{}{"description": "Provide final instructions.", "status": "pending"},
+						},
+					},
+				}}
+				// Write the initial file
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.WRITE_FILE_TOOL_NAME,
+					Args: map[string]interface{}{
+						"file_path": "api.js",
+						"content":   jsContentTodoApi,
+					},
+				}}
+			case 3: // After writing the file -> Update todos and call smart_edit for GET /todos
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
@@ -200,7 +194,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 						"new_string":  jsNewStringTodoApiGet,
 					},
 				}}
-			case 9: // After adding GET /todos -> Update todos and call smart_edit for POST /todos
+			case 4: // After adding GET /todos -> Update todos and call smart_edit for POST /todos
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
@@ -222,7 +216,7 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 						"new_string":  jsNewStringTodoApiPost,
 					},
 				}}
-			case 11: // After adding POST /todos -> Update todos and call smart_edit for GET by ID
+			case 5: // After adding POST /todos -> Update todos and call smart_edit for GET by ID
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
@@ -244,14 +238,14 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 						"new_string":  jsNewStringTodoApiGetById,
 					},
 				}}
-			case 13: // After adding GET by ID -> Final confirmation
+			case 6: // After adding GET by ID -> Final confirmation
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.USER_CONFIRM_TOOL_NAME,
 					Args: map[string]interface{}{
 						"message": "I have implemented all API endpoints. Shall I provide the final instructions on how to run the server?",
 					},
 				}}
-			case 15: // After final confirmation -> Final todo update and text response
+			case 7: // After final confirmation -> Final todo update and text response
 				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
 					Name: types.WRITE_TODOS_TOOL_NAME,
 					Args: map[string]interface{}{
@@ -266,13 +260,61 @@ func NewRealisticMockExecutor(toolRegistry types.ToolRegistryInterface) *MockExe
 				}}
 				finalResponse := "The `api.js` file is complete.\n\nTo run the server, first install the dependencies:\n```sh\nnpm init -y\nnpm install express body-parser\n```\n\nThen, start the server:\n```sh\nnode api.js\n```"
 				eventChan <- types.Part{Text: finalResponse}
+			case 8: // Simulate a call to a subagent
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.CODEBASE_INVESTIGATOR_TOOL_NAME,
+					Args: map[string]interface{}{
+						"objective": "Find all unused functions in api.js",
+					},
+				}}
+			case 9: // Simulate subagent activity after it has been invoked
+				eventChan <- types.SubagentActivityEvent{
+					IsSubagentActivityEvent: true,
+					AgentName:               types.CODEBASE_INVESTIGATOR_TOOL_NAME,
+					Type:                    types.ActivityTypeThoughtChunk,
+					Data: map[string]interface{}{
+						"thought": "Starting investigation to find unused functions.",
+					},
+				}
+				eventChan <- types.SubagentActivityEvent{
+					IsSubagentActivityEvent: true,
+					AgentName:               types.CODEBASE_INVESTIGATOR_TOOL_NAME,
+					Type:                    types.ActivityTypeToolCallStart,
+					Data: map[string]interface{}{
+						"name": types.LS_TOOL_NAME,
+						"args": map[string]interface{}{"path": "api.js"},
+					},
+				}
+				eventChan <- types.SubagentActivityEvent{
+					IsSubagentActivityEvent: true,
+					AgentName:               types.CODEBASE_INVESTIGATOR_TOOL_NAME,
+					Type:                    types.ActivityTypeToolCallEnd,
+					Data: map[string]interface{}{
+						"name":   types.LS_TOOL_NAME,
+						"output": "api.js",
+					},
+				}
+				eventChan <- types.SubagentActivityEvent{
+					IsSubagentActivityEvent: true,
+					AgentName:               types.CODEBASE_INVESTIGATOR_TOOL_NAME,
+					Type:                    types.ActivityTypeThoughtChunk,
+					Data: map[string]interface{}{
+						"thought": "Analyzed api.js, found no unused functions.",
+					},
+				}
+				eventChan <- types.Part{FunctionCall: &types.FunctionCall{
+					Name: types.TASK_COMPLETE_TOOL_NAME,
+					Args: map[string]interface{}{
+						"report": "No unused functions found in api.js.",
+					},
+				}}
 			default:
 				eventChan <- types.Part{Text: "Mock: I have completed my tasks."}
 			}
+			mock.MockStep++ // Increment for the next call
 		}()
 		return eventChan, nil
 	}
-
 	return mock
 }
 
@@ -284,7 +326,7 @@ func (m *MockExecutor) GenerateContent(contents ...*types.Content) (*types.Gener
 	return nil, fmt.Errorf("GenerateContent not implemented in mock")
 }
 
-// GenerateContentWithTools mocks the GenerateContentWithTools method.
+// GenerateContentWithTools mocks the GenerateContentWithTools method.S
 func (m *MockExecutor) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
 	if m.GenerateContentWithToolsFunc != nil {
 		return m.GenerateContentWithToolsFunc(ctx, history, tools)
