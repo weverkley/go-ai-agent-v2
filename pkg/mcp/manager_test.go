@@ -91,6 +91,10 @@ type MockConfig struct {
 	GetFunc    func(key string) (interface{}, bool)
 }
 
+func (m *MockConfig) GetDirectoryContextString() (string, error) {
+	return "mock-directory-context", nil
+}
+
 func (m *MockConfig) WithModel(modelName string) types.Config {
 	return &MockConfig{ModelValue: modelName}
 }

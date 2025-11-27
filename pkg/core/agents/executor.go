@@ -21,6 +21,7 @@ type AgentExecutor struct {
 	RuntimeContext types.Config
 	OnActivity     types.ActivityCallback 
 	parentPromptId string
+	Executor       types.Executor // Add this field
 }
 
 // Run executes the agent loop.
@@ -131,6 +132,11 @@ MainLoop:
 
 // createChatObject initializes a GeminiChat instance for the agent run.
 func (ae *AgentExecutor) createChatObject(inputs AgentInputs) (core.Executor, error) {
+	// If an executor is already provided (e.g., from the parent ChatService), use it.
+	if ae.Executor != nil {
+		return ae.Executor, nil
+	}
+
 	promptConfig := ae.Definition.PromptConfig
 	modelConfig := ae.Definition.ModelConfig
 
@@ -557,7 +563,7 @@ func (ae *AgentExecutor) emitActivity(activityType string, data map[string]inter
 }
 
 // CreateAgentExecutor creates and validates a new AgentExecutor instance.
-func CreateAgentExecutor(definition AgentDefinition, runtimeContext types.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity types.ActivityCallback) (*AgentExecutor, error) {
+func CreateAgentExecutor(definition AgentDefinition, runtimeContext types.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity types.ActivityCallback, providedExecutor types.Executor) (*AgentExecutor, error) {
 	agentToolRegistry := types.NewToolRegistry()
 
 	if definition.ToolConfig != nil {
@@ -590,6 +596,7 @@ func CreateAgentExecutor(definition AgentDefinition, runtimeContext types.Config
 		RuntimeContext: runtimeContext,
 		OnActivity:     onActivity,
 		parentPromptId: parentPromptId,
+		Executor:       providedExecutor, // Assign the provided executor
 	}, nil
 }
 

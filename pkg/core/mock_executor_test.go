@@ -20,6 +20,10 @@ type MockConfig struct {
 	CodebaseInvestigatorSettings *types.CodebaseInvestigatorSettings
 }
 
+func (m *MockConfig) GetDirectoryContextString() (string, error) {
+	return "mock-directory-context", nil
+}
+
 func (m *MockConfig) WithModel(modelName string) types.Config {
 	return &MockConfig{ModelName: modelName}
 }

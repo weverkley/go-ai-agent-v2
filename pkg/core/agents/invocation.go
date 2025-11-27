@@ -21,6 +21,7 @@ func NewSubagentInvocation(
 	cfg *config.Config,
 	messageBus interface{}, // Placeholder for MessageBus
 	activityChan chan types.SubagentActivityEvent, // Changed type here
+	executor types.Executor,
 ) *SubagentInvocation {
 	return &SubagentInvocation{
 		BaseToolInvocation: BaseToolInvocation{
@@ -30,6 +31,7 @@ func NewSubagentInvocation(
 		Definition:   definition,
 		Config:       cfg,
 		ActivityChan: activityChan,
+		Executor:     executor,
 	}
 }
 
@@ -85,6 +87,7 @@ func (si *SubagentInvocation) Execute(
 		toolRegistry, // Pass the main tool registry for subagent to discover tools
 		"",           // parentPromptId - SubagentInvocation is top-level for its own execution
 		onActivity,
+		si.Executor,  // Pass the stored executor
 	)
 	if err != nil {
 		return types.ToolResult{

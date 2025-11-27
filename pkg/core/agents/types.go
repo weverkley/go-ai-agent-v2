@@ -79,6 +79,7 @@ type SubagentInvocation struct {
 	Definition   AgentDefinition
 	Config       *config.Config
 	ActivityChan chan types.SubagentActivityEvent // Changed to types.SubagentActivityEvent
+	Executor     types.Executor
 }
 
 // PromptConfig defines the prompting strategy for the agent.

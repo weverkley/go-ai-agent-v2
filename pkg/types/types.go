@@ -599,6 +599,28 @@ type SettingsServiceIface interface {
 	Save() error
 }
 
+// ContextKey is a type for context keys to avoid collisions.
+type ContextKey string
+
+// ExecutorContextKey is the key used to store and retrieve the Executor from the context.
+const ExecutorContextKey ContextKey = "executor"
+
+// Executor defines the interface for an AI model executor.
+type Executor interface {
+	Name() string // Returns the name/type of the executor (e.g., "gemini", "qwen", "mock")
+	GenerateContent(contents ...*Content) (*GenerateContentResponse, error)
+	GenerateContentWithTools(ctx context.Context, history []*Content, tools []Tool) (*GenerateContentResponse, error)
+	ExecuteTool(ctx context.Context, fc *FunctionCall) (ToolResult, error)
+	SendMessageStream(modelName string, messageParams MessageParams, promptId string) (<-chan StreamResponse, error)
+	ListModels() ([]string, error)
+	GetHistory() ([]*Content, error)
+	SetHistory(history []*Content) error
+	CompressChat(history []*Content, promptId string) (*ChatCompressionResult, error)
+	StreamContent(ctx context.Context, contents ...*Content) (<-chan any, error)
+	SetUserConfirmationChannel(chan bool)                          // New method for user confirmation
+	SetToolConfirmationChannel(chan ToolConfirmationOutcome) // New method for rich tool confirmation
+}
+
 // ToolRegistry manages the registration and retrieval of tools.
 type ToolRegistry struct {
 	mu    sync.RWMutex

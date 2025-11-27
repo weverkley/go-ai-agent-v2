@@ -65,6 +65,24 @@ func (m *MockSettingsService) GetWorkspaceDir() string {
 	return args.String(0)
 }
 
+// GetTestWriterSettings provides a mock function for GetTestWriterSettings.
+func (m *MockSettingsService) GetTestWriterSettings() *types.TestWriterSettings {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(*types.TestWriterSettings)
+}
+
+// GetCodebaseInvestigatorSettings provides a mock function for GetCodebaseInvestigatorSettings.
+func (m *MockSettingsService) GetCodebaseInvestigatorSettings() *types.CodebaseInvestigatorSettings {
+	args := m.Called()
+	if args.Get(0) == nil {
+		return nil
+	}
+	return args.Get(0).(*types.CodebaseInvestigatorSettings)
+}
+
 // Set provides a mock function for Set.
 func (m *MockSettingsService) Set(key string, value interface{}) error {
 	args := m.Called(key, value)

@@ -49,13 +49,14 @@ func NewSubagentToolWrapper(
 }
 
 // CreateInvocation creates an invocation instance for executing the subagent.
-func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs, activityChan chan types.SubagentActivityEvent) types.ToolInvocation {
+func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs, activityChan chan types.SubagentActivityEvent, executor types.Executor) types.ToolInvocation {
 	return NewSubagentInvocation(
 		params,
 		stw.definition,
 		stw.config,
 		stw.BaseDeclarativeTool.MessageBus,
 		activityChan,
+		executor,
 	)
 }
 
@@ -68,8 +69,15 @@ func (stw *SubagentToolWrapper) Execute(ctx context.Context, args map[string]int
 		eventChan = nil
 	}
 
+	executor, ok := ctx.Value(types.ExecutorContextKey).(types.Executor)
+	if !ok {
+		// Log an error or warning if the executor is not found in the context
+		fmt.Printf("Warning: Executor not found in context for subagent %s. This might lead to unexpected behavior.\n", stw.definition.Name)
+		executor = nil // Or handle this as an error if the executor is strictly required
+	}
+
 	activityChan := make(chan types.SubagentActivityEvent) // Changed type here
-	invocation := stw.CreateInvocation(args, activityChan)
+	invocation := stw.CreateInvocation(args, activityChan, executor)
 
 	// Start a goroutine to listen for activity and forward it to the main event channel
 	if eventChan != nil {
