@@ -501,6 +501,9 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.streamCh = msg.ch
 		return m, waitForEvent(m.streamCh)
 	case streamEventMsg:
+		// Log every event received for debugging
+		m.logSystemMessage(fmt.Sprintf("Received stream event: %T", msg.event))
+
 		switch event := msg.event.(type) {
 		case types.StreamingStartedEvent:
 			m.status = "Stream started..."
@@ -562,18 +565,26 @@ func (m *ChatModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				tc.Err = event.Err
 			}
 		case types.SubagentActivityEvent:
-			status := fmt.Sprintf("🤖 %s", event.AgentName)
-			if toolNameVal, ok := event.Data["toolName"]; ok {
-				if toolName, isString := toolNameVal.(string); isString && toolName != "" {
-					status += fmt.Sprintf(" -> %s", toolName)
+			var status strings.Builder
+			status.WriteString(fmt.Sprintf("🤖 %s", event.AgentName))
+
+			if event.Type == types.ActivityTypeError {
+				if errorMsg, ok := event.Data["error"].(string); ok {
+					status.WriteString(fmt.Sprintf(" 💥 Error: %s", errorMsg))
+				}
+			} else {
+				if toolNameVal, ok := event.Data["toolName"]; ok {
+					if toolName, isString := toolNameVal.(string); isString && toolName != "" {
+						status.WriteString(fmt.Sprintf(" -> %s", toolName))
+					}
+				}
+				if thoughtVal, ok := event.Data["thought"]; ok {
+					if thought, isString := thoughtVal.(string); isString && thought != "" {
+						status.WriteString(fmt.Sprintf(" 🤔 %s", thought))
+					}
 				}
 			}
-			if thoughtVal, ok := event.Data["thought"]; ok {
-				if thought, isString := thoughtVal.(string); isString && thought != "" {
-					status += fmt.Sprintf(" 🤔 %s", thought)
-				}
-			}
-			m.subagentStatus = status
+			m.subagentStatus = status.String()
 		case types.FinalResponseEvent:
 			botMsg := BotMessage{Content: event.Content}
 			m.messages = append(m.messages, botMsg)

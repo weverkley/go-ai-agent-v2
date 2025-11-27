@@ -15,7 +15,7 @@ import (
 	"google.golang.org/api/googleapi"
 )
 
-var eventChanKey = struct{}{}
+var EventChanKey = struct{}{}
 
 // ChatService orchestrates the interactive chat session, handling the tool-calling loop.
 type ChatService struct {
@@ -252,14 +252,14 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 								toolExecutionResult = "continue"
 							} else {
-								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
+								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, EventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
 							}
 						case types.ToolConfirmationOutcomeProceedAlways:
 							cs.proceedAlwaysTools[fc.Name] = true
 							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 								toolExecutionResult = "continue"
 							} else {
-								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
+								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, EventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
 							}
 						case types.ToolConfirmationOutcomeCancel:
 							toolExecutionResult = "Tool execution cancelled by user."
@@ -271,7 +271,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							cs.toolErrorCounter++
 						}
 					} else {
-						toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
+						toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, EventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
 					}
 
 					if toolExecutionError == nil && fc.Name == types.WRITE_TODOS_TOOL_NAME {
@@ -329,7 +329,17 @@ func executeTool(ctx context.Context, fc *types.FunctionCall, toolRegistry types
 	result, err := tool.Execute(ctx, fc.Args)
 	if err != nil {
 		logger.LogErrorf("Tool '%s' execution failed: %v", fc.Name, err)
+		// If the result contains a ToolError, we should propagate its details.
+		if result.Error != nil {
+			return result.LLMContent, result.Error
+		}
 		return nil, err
+	}
+
+	// Also handle cases where the tool execution itself doesn't fail but returns a business logic error.
+	if result.Error != nil {
+		logger.LogErrorf("Tool '%s' executed with a ToolError: %v", fc.Name, result.Error)
+		return result.LLMContent, result.Error
 	}
 
 	logger.LogInfof("Tool '%s' executed successfully. Result: %v", fc.Name, result.LLMContent)

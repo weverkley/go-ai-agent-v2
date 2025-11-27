@@ -476,7 +476,15 @@ func (ae *AgentExecutor) processFunctionCalls(
 
 			result, err := tool.Execute(ctx, fc.Args)
 			if err != nil {
-				// Handle tool execution error
+				ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
+					"context": types.ActivityTypeToolCall,
+					"name":    fc.Name,
+					"error":   err.Error(),
+				})
+				toolResponseChan <- types.Part{FunctionResponse: &types.FunctionResponse{
+					Name:     fc.Name,
+					Response: map[string]interface{}{"error": err.Error()},
+				}}
 				return
 			}
 

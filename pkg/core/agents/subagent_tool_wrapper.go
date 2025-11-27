@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/services"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
@@ -60,7 +61,7 @@ func (stw *SubagentToolWrapper) CreateInvocation(params AgentInputs, activityCha
 
 // Execute is part of the types.Tool interface. It delegates to the invocation.
 func (stw *SubagentToolWrapper) Execute(ctx context.Context, args map[string]interface{}) (types.ToolResult, error) {
-	eventChan, ok := ctx.Value("eventChan").(chan any)
+	eventChan, ok := ctx.Value(services.EventChanKey).(chan any)
 	if !ok {
 		// If the channel is not in the context, we can't stream activities.
 		// We can proceed without it, but the UI won't show sub-agent activity.
@@ -83,7 +84,7 @@ func (stw *SubagentToolWrapper) Execute(ctx context.Context, args map[string]int
 	// The actual execution will happen within the AgentExecutor.
 	result, err := invocation.Execute(ctx, nil, nil, nil)
 	if err != nil {
-		return types.ToolResult{}, err
+		return result, err
 	}
 	return result, nil
 }
