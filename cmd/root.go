@@ -6,6 +6,7 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core/agents" // Add this line
 
 	"go-ai-agent-v2/go-cli/pkg/extension"
 
@@ -14,8 +15,6 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 
 	"go-ai-agent-v2/go-cli/pkg/tools"
-	"go-ai-agent-v2/go-cli/pkg/core/agents" // Add this import
-
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/spf13/cobra"
@@ -84,6 +83,8 @@ func initConfig(
 	toolRegistry *types.ToolRegistry,
 	agentRegistry types.AgentRegistryInterface,
 	telemetrySettings *types.TelemetrySettings,
+	codebaseInvestigatorSettings *types.CodebaseInvestigatorSettings,
+	testWriterSettings *types.TestWriterSettings,
 	workspaceService *services.WorkspaceService,
 	fileFilteringService *services.FileFilteringService,
 	settingsService types.SettingsServiceIface, // Add settingsService
@@ -106,6 +107,8 @@ func initConfig(
 		Telemetry:    telemetrySettings,
 		ToolRegistry: toolRegistry,
 		AgentRegistry: agentRegistry,
+		CodebaseInvestigator: codebaseInvestigatorSettings,
+		TestWriterSettings:   testWriterSettings,
 	}
 
 	cfg := config.NewConfig(params)
@@ -185,25 +188,28 @@ func init() {
 		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService, ContextService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
 
+		// Retrieve agent-specific settings
+		codebaseInvestigatorSettings := SettingsService.GetCodebaseInvestigatorSettings()
+		testWriterSettings := SettingsService.GetTestWriterSettings()
+
 		// 1. Initialize Cfg with minimal parameters first
-		Cfg = initConfig(nil, nil, telemetrySettings, WorkspaceService, fileFilteringService, SettingsService)
+		Cfg = initConfig(nil, types.AgentRegistryInterface(nil), telemetrySettings, codebaseInvestigatorSettings, testWriterSettings, WorkspaceService, fileFilteringService, SettingsService) // Cfg is a *config.Config
 
 		// 2. Create AgentRegistry using the initial Cfg
-		agentRegistry := agents.NewAgentRegistry(Cfg)
+		agentRegistry := agents.NewAgentRegistry(Cfg) // agentRegistry is *agents.AgentRegistry
 
 		// 3. Set the AgentRegistry into Cfg immediately
-		Cfg.AgentRegistry = agentRegistry
+		Cfg.AgentRegistry = agentRegistry // Here Cfg.AgentRegistry is set
 
-		// 4. Register all tools (standard tools and wrapped agents)
-		// tools.RegisterAllTools will now get the AgentRegistry from Cfg.AgentRegistry
-		toolRegistry := registerTools(Cfg, FSService, ShellService, SettingsService, WorkspaceService)
-
-		// 5. Set the fully populated ToolRegistry into Cfg
-		Cfg.ToolRegistry = toolRegistry
-
-		// 6. Initialize AgentRegistry after Cfg is fully set up
+		// 4. Initialize AgentRegistry (now it's populated with definitions)
 		agentRegistry.Initialize()
 
+		// 5. Register all tools (standard tools and wrapped agents)
+		// tools.RegisterAllTools will now receive a Cfg with an initialized AgentRegistry
+		toolRegistry := registerTools(Cfg, FSService, ShellService, SettingsService, WorkspaceService)
+
+		// 6. Set the fully populated ToolRegistry into Cfg
+		Cfg.ToolRegistry = toolRegistry
 		// Initialize SessionService now that Cfg is available
 		SessionService, err = services.NewSessionService(Cfg.GetGoaiagentDir())
 		if err != nil {

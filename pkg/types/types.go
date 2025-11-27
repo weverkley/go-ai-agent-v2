@@ -3,7 +3,7 @@ package types
 import (
 	"context"
 	"fmt"
-	"sync" // Add sync import
+	"sync"
 )
 
 // ApprovalMode defines the approval mode for tool calls.
@@ -427,6 +427,15 @@ type JsonSchemaProperty struct {
 	Enum        []string                       `json:"enum,omitempty"` // Added Enum field
 }
 
+// Agent is the interface that all agents must implement.
+type Agent interface {
+	Name() string
+	Description() string
+	Kind() Kind
+	Execute(ctx context.Context, args map[string]any) (ToolResult, error)
+	// TODO: Add more agent-specific methods as needed, e.g., Plan, Observe, etc.
+}
+
 // Tool is the interface that all tools must implement.
 type Tool interface {
 	Name() string
@@ -546,6 +555,7 @@ type WorkspaceServiceIface interface {
 type Config interface {
 	Get(key string) (interface{}, bool)
 	WithModel(modelName string) Config
+	GetDirectoryContextString() (string, error)
 }
 
 // ToolConfig defines the interface for tool-specific configuration.
@@ -562,6 +572,15 @@ type ToolRegistryInterface interface {
 	GetFunctionDeclarationsFiltered(toolNames []string) []*FunctionDeclaration
 }
 
+// AgentRegistryInterface defines the interface for managing agents.
+type AgentRegistryInterface interface {
+	Register(a Agent) error
+	GetAgent(name string) (Agent, error)
+	GetAllAgents() []Agent
+	GetAllAgentNames() []string
+	GetAllAgentDefinitions() []interface{}
+}
+
 // SettingsServiceIface defines the interface for application settings management.
 type SettingsServiceIface interface {
 	Get(key string) (interface{}, bool)
@@ -571,16 +590,12 @@ type SettingsServiceIface interface {
 	GetTavilySettings() *TavilySettings
 	GetDangerousTools() []string // New method
 	GetWorkspaceDir() string
+	GetCodebaseInvestigatorSettings() *CodebaseInvestigatorSettings
+	GetTestWriterSettings() *TestWriterSettings
 	Set(key string, value interface{}) error
 	AllSettings() map[string]interface{}
 	Reset() error
 	Save() error
-}
-
-// AgentRegistryInterface defines the interface for managing agent definitions.
-type AgentRegistryInterface interface {
-	SetConfig(cfg Config)
-	Initialize()
 }
 
 // ToolRegistry manages the registration and retrieval of tools.
@@ -605,6 +620,39 @@ func NewToolRegistry() *ToolRegistry {
 	return &ToolRegistry{
 		tools: make(map[string]Tool),
 	}
+}
+
+// CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
+type CodebaseInvestigatorSettings struct {
+	Enabled        bool   `json:"enabled,omitempty"`
+	Model          string `json:"model,omitempty"`
+	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
+	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
+	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
+}
+
+// TestWriterSettings represents settings for the Test Writer agent.
+type TestWriterSettings struct {
+	Enabled        bool   `json:"enabled,omitempty"`
+	Model          string `json:"model,omitempty"`
+	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
+	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
+	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
+}
+
+// AgentStartEvent is a telemetry event.
+type AgentStartEvent struct {
+	AgentID   string
+	AgentName string
+}
+
+// AgentFinishEvent is a telemetry event.
+type AgentFinishEvent struct {
+	AgentID         string
+	AgentName       string
+	DurationMs      int64
+	TurnCounter     int
+	TerminateReason AgentTerminateMode
 }
 
 // Register adds a tool to the registry.
@@ -662,39 +710,6 @@ func (tr *ToolRegistry) GetFunctionDeclarationsFiltered(toolNames []string) []*F
 		}
 	}
 	return declarations
-}
-
-// CodebaseInvestigatorSettings represents settings for the Codebase Investigator agent.
-type CodebaseInvestigatorSettings struct {
-	Enabled        bool   `json:"enabled,omitempty"`
-	Model          string `json:"model,omitempty"`
-	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
-	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
-	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
-}
-
-// TestWriterSettings represents settings for the Test Writer agent.
-type TestWriterSettings struct {
-	Enabled        bool   `json:"enabled,omitempty"`
-	Model          string `json:"model,omitempty"`
-	ThinkingBudget *int   `json:"thinkingBudget,omitempty"`
-	MaxTimeMinutes *int   `json:"maxTimeMinutes,omitempty"`
-	MaxNumTurns    *int   `json:"maxNumTurns,omitempty"`
-}
-
-// AgentStartEvent is a telemetry event.
-type AgentStartEvent struct {
-	AgentID   string
-	AgentName string
-}
-
-// AgentFinishEvent is a telemetry event.
-type AgentFinishEvent struct {
-	AgentID         string
-	AgentName       string
-	DurationMs      int64
-	TurnCounter     int
-	TerminateReason AgentTerminateMode
 }
 
 // FolderStructureOptions for customizing folder structure retrieval.

@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
 	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/telemetry" // Import telemetry package
 	"go-ai-agent-v2/go-cli/pkg/types"
@@ -19,8 +18,8 @@ type AgentExecutor struct {
 	Definition     AgentDefinition
 	AgentID        string
 	ToolRegistry   *types.ToolRegistry
-	RuntimeContext *config.Config
-	OnActivity     types.ActivityCallback // Changed to types.ActivityCallback
+	RuntimeContext types.Config
+	OnActivity     types.ActivityCallback 
 	parentPromptId string
 }
 
@@ -72,12 +71,11 @@ MainLoop:
 		if err != nil {
 			ae.emitActivity(types.ActivityTypeError, map[string]interface{}{"error": err.Error()})
 			return OutputObject{}, err
-		}
-
-		if ctx.Err() != nil {
-			terminateReason = types.AgentTerminateModeAborted
-			break
-		}
+				}
+				if ctx.Err() != nil {
+					terminateReason = types.AgentTerminateModeAborted
+					break
+				}
 
 		if len(functionCalls) == 0 {
 			terminateReason = types.AgentTerminateModeError
@@ -429,16 +427,15 @@ func (ae *AgentExecutor) processFunctionCalls(
 					taskCompleted = false // Revoke completion
 					errorMsg := fmt.Sprintf("Missing required argument '%s' for completion.", outputName)
 					syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
-						Name:     types.TASK_COMPLETE_TOOL_NAME,
-						Response: map[string]interface{}{"error": errorMsg},
-					}})
-					ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
-						"context": types.ActivityTypeToolCall,
-						"name":    functionCall.Name,
-						"error":   errorMsg,
-					})
-				}
-			} else {
+											Name:     types.TASK_COMPLETE_TOOL_NAME,
+											Response: map[string]interface{}{"error": errorMsg},
+										}})
+										ae.emitActivity(types.ActivityTypeError, map[string]interface{}{
+											"context": types.ActivityTypeToolCall,
+											"name":    functionCall.Name,
+											"error":   errorMsg,
+										})
+									}			} else {
 				submittedOutput = "Task completed successfully."
 				syncResponseParts = append(syncResponseParts, types.Part{FunctionResponse: &types.FunctionResponse{
 					Name:     types.TASK_COMPLETE_TOOL_NAME,
@@ -534,21 +531,25 @@ func (ae *AgentExecutor) processFunctionCalls(
 	return &types.Content{Parts: toolResponseParts, Role: "user"}, submittedOutput, taskCompleted, nil
 }
 
-// emitActivity emits an activity event to the configured callback.
+// emitActivity emits an activity event to the configured callback and logs it via telemetry.
 func (ae *AgentExecutor) emitActivity(activityType string, data map[string]interface{}) {
+	event := types.SubagentActivityEvent{ // Changed to types.SubagentActivityEvent
+		IsSubagentActivityEvent: true,
+		AgentName:               ae.Definition.Name,
+		Type:                    activityType,
+		Data:                    data,
+	}
+	// Log the activity event to telemetry
+	telemetry.GlobalLogger.LogSubagentActivity(event)
+
+	// Also, emit to the OnActivity callback for real-time UI updates
 	if ae.OnActivity != nil {
-		event := types.SubagentActivityEvent{ // Changed to types.SubagentActivityEvent
-			IsSubagentActivityEvent: true,
-			AgentName:               ae.Definition.Name,
-			Type:                    activityType,
-			Data:                    data,
-		}
 		ae.OnActivity(event)
 	}
 }
 
 // CreateAgentExecutor creates and validates a new AgentExecutor instance.
-func CreateAgentExecutor(definition AgentDefinition, runtimeContext *config.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity types.ActivityCallback) (*AgentExecutor, error) {
+func CreateAgentExecutor(definition AgentDefinition, runtimeContext types.Config, parentToolRegistry *types.ToolRegistry, parentPromptId string, onActivity types.ActivityCallback) (*AgentExecutor, error) {
 	agentToolRegistry := types.NewToolRegistry()
 
 	if definition.ToolConfig != nil {
@@ -602,6 +603,7 @@ func validateTools(toolRegistry *types.ToolRegistry, agentName string) error {
 		types.WRITE_FILE_TOOL_NAME:       true,
 		types.SMART_EDIT_TOOL_NAME:       true,
 		types.EXTRACT_FUNCTION_TOOL_NAME: true,
+		types.FIND_UNUSED_CODE_TOOL_NAME: true, // Added FIND_UNUSED_CODE_TOOL_NAME
 	}
 
 	for _, tool := range toolRegistry.GetAllTools() {

@@ -18,24 +18,26 @@ const (
 
 // Settings represents the application settings.
 type Settings struct {
-	ExtensionPaths       []string                          `json:"extensionPaths"`
-	McpServers           map[string]types.MCPServerConfig  `json:"mcpServers,omitempty"`
-	DebugMode            bool                              `json:"debugMode,omitempty"`
-	UserMemory           string                            `json:"userMemory,omitempty"`
-	ApprovalMode         types.ApprovalMode                `json:"approvalMode,omitempty"`
-	DangerousTools       []string                          `json:"dangerousTools,omitempty"` // New field
-	ShowMemoryUsage      bool                              `json:"showMemoryUsage,omitempty"`
-	TelemetryEnabled     bool                              `json:"telemetryEnabled,omitempty"`
-	Model                string                            `json:"model,omitempty"`
-	Executor             string                            `json:"executor,omitempty"`
-	Proxy                string                            `json:"proxy,omitempty"`
-	EnabledExtensions    map[types.SettingScope][]string   `json:"enabledExtensions,omitempty"`
-	ToolDiscoveryCommand string                            `json:"toolDiscoveryCommand,omitempty"`
-	ToolCallCommand      string                            `json:"toolCallCommand,omitempty"`
-	Telemetry            *types.TelemetrySettings          `json:"telemetry,omitempty"`
-	GoogleCustomSearch   *types.GoogleCustomSearchSettings `json:"googleCustomSearch,omitempty"`
-	WebSearchProvider    types.WebSearchProvider           `json:"webSearchProvider,omitempty"`
-	Tavily               *types.TavilySettings             `json:"tavily,omitempty"`
+	ExtensionPaths       []string                            `json:"extensionPaths"`
+	McpServers           map[string]types.MCPServerConfig    `json:"mcpServers,omitempty"`
+	DebugMode            bool                                `json:"debugMode,omitempty"`
+	UserMemory           string                              `json:"userMemory,omitempty"`
+	ApprovalMode         types.ApprovalMode                  `json:"approvalMode,omitempty"`
+	DangerousTools       []string                            `json:"dangerousTools,omitempty"` // New field
+	ShowMemoryUsage      bool                                `json:"showMemoryUsage,omitempty"`
+	TelemetryEnabled     bool                                `json:"telemetryEnabled,omitempty"`
+	Model                string                              `json:"model,omitempty"`
+	Executor             string                              `json:"executor,omitempty"`
+	Proxy                string                              `json:"proxy,omitempty"`
+	EnabledExtensions    map[types.SettingScope][]string     `json:"enabledExtensions,omitempty"`
+	ToolDiscoveryCommand string                              `json:"toolDiscoveryCommand,omitempty"`
+	ToolCallCommand      string                              `json:"toolCallCommand,omitempty"`
+	Telemetry            *types.TelemetrySettings            `json:"telemetry,omitempty"`
+	GoogleCustomSearch   *types.GoogleCustomSearchSettings   `json:"googleCustomSearch,omitempty"`
+	WebSearchProvider    types.WebSearchProvider             `json:"webSearchProvider,omitempty"`
+	Tavily               *types.TavilySettings               `json:"tavily,omitempty"`
+	CodebaseInvestigator *types.CodebaseInvestigatorSettings `json:"codebaseInvestigator,omitempty"`
+	TestWriter           *types.TestWriterSettings           `json:"testWriter,omitempty"`
 }
 
 func newDefaultSettings(workspaceDir string) *Settings {
@@ -67,6 +69,8 @@ func newDefaultSettings(workspaceDir string) *Settings {
 		Tavily: &types.TavilySettings{
 			ApiKey: "your-tavily-api-key",
 		},
+		CodebaseInvestigator: &types.CodebaseInvestigatorSettings{Enabled: true},
+		TestWriter:           &types.TestWriterSettings{Enabled: true},
 	}
 }
 
@@ -126,6 +130,12 @@ func LoadSettings(workspaceDir string) *Settings {
 			types.SMART_EDIT_TOOL_NAME,
 			types.USER_CONFIRM_TOOL_NAME,
 		}
+	}
+	if settings.CodebaseInvestigator == nil {
+		settings.CodebaseInvestigator = &types.CodebaseInvestigatorSettings{Enabled: true}
+	}
+	if settings.TestWriter == nil {
+		settings.TestWriter = &types.TestWriterSettings{Enabled: true}
 	}
 
 	return &settings
@@ -247,6 +257,20 @@ func (ss *SettingsService) GetDangerousTools() []string {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
 	return ss.settings.DangerousTools
+}
+
+// GetCodebaseInvestigatorSettings returns the codebase investigator settings.
+func (ss *SettingsService) GetCodebaseInvestigatorSettings() *types.CodebaseInvestigatorSettings {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.CodebaseInvestigator
+}
+
+// GetTestWriterSettings returns the test writer settings.
+func (ss *SettingsService) GetTestWriterSettings() *types.TestWriterSettings {
+	ss.mu.RLock()
+	defer ss.mu.RUnlock()
+	return ss.settings.TestWriter
 }
 
 // GetTelemetryLogPath returns the configured telemetry log file path.
@@ -432,6 +456,8 @@ func (ss *SettingsService) AllSettings() map[string]interface{} {
 	all["extensionPaths"] = ss.settings.ExtensionPaths
 	all["mcpServers"] = ss.settings.McpServers
 	all["dangerousTools"] = ss.settings.DangerousTools
+	all["codebaseInvestigator"] = ss.settings.CodebaseInvestigator
+	all["testWriter"] = ss.settings.TestWriter
 	// Add other settings here
 	return all
 }

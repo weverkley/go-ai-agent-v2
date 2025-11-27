@@ -81,6 +81,9 @@ func RegisterAllTools(cfg types.Config, fs services.FileSystemService, shellServ
 	if err := registry.Register(NewUserConfirmTool()); err != nil {
 		telemetry.LogErrorf("Error registering UserConfirmTool: %v", err)
 	}
+	if err := registry.Register(NewTaskCompleteTool()); err != nil {
+		telemetry.LogErrorf("Error registering NewTaskCompleteTool: %v", err)
+	}
 	// Git related tools
 	if err := registry.Register(NewGetCurrentBranchTool(services.NewGitService())); err != nil {
 		telemetry.LogErrorf("Error registering GetCurrentBranchTool: %v", err)
@@ -99,9 +102,18 @@ func RegisterAllTools(cfg types.Config, fs services.FileSystemService, shellServ
 	}
 
 	// Register agents as tools
-	agentRegistry := agents.NewAgentRegistry(cfg.(*config.Config))
-	agentRegistry.Initialize()
-	for _, agentDef := range agentRegistry.GetAllDefinitions() {
+	agentRegistryVal, ok := cfg.Get("agentRegistry")
+	if !ok || agentRegistryVal == nil {
+		telemetry.LogErrorf("Agent registry not found in config. Subagents will not be registered.")
+		return registry // Continue without subagents
+	}
+	agentRegistry := agentRegistryVal.(types.AgentRegistryInterface)
+	for _, agentDefVal := range agentRegistry.GetAllAgentDefinitions() {
+		agentDef, ok := agentDefVal.(agents.AgentDefinition)
+		if !ok {
+			telemetry.LogErrorf("Failed to cast agent definition to agents.AgentDefinition: %v", agentDefVal)
+			continue
+		}
 		wrappedAgent, err := agents.NewSubagentToolWrapper(agentDef, cfg.(*config.Config), nil) // Assuming nil for messageBus for now
 		if err != nil {
 			telemetry.LogErrorf("Error wrapping agent %s: %v", agentDef.Name, err)

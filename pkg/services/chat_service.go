@@ -252,14 +252,14 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 								toolExecutionResult = "continue"
 							} else {
-								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry)
+								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
 							}
 						case types.ToolConfirmationOutcomeProceedAlways:
 							cs.proceedAlwaysTools[fc.Name] = true
 							if fc.Name == types.USER_CONFIRM_TOOL_NAME {
 								toolExecutionResult = "continue"
 							} else {
-								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry)
+								toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
 							}
 						case types.ToolConfirmationOutcomeCancel:
 							toolExecutionResult = "Tool execution cancelled by user."
@@ -271,7 +271,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 							cs.toolErrorCounter++
 						}
 					} else {
-						toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry)
+						toolExecutionResult, toolExecutionError = executeTool(context.WithValue(ctx, eventChanKey, eventChan), fc, cs.toolRegistry, telemetry.GlobalLogger)
 					}
 
 					if toolExecutionError == nil && fc.Name == types.WRITE_TODOS_TOOL_NAME {
@@ -317,15 +317,22 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 	return eventChan, nil
 }
 
-func executeTool(ctx context.Context, fc *types.FunctionCall, toolRegistry types.ToolRegistryInterface) (any, error) {
+func executeTool(ctx context.Context, fc *types.FunctionCall, toolRegistry types.ToolRegistryInterface, logger telemetry.TelemetryLogger) (any, error) {
+	logger.LogDebugf("Executing tool '%s' with args: %v", fc.Name, fc.Args)
+
 	tool, err := toolRegistry.GetTool(fc.Name)
 	if err != nil {
+		logger.LogErrorf("Error getting tool '%s': %v", fc.Name, err)
 		return nil, fmt.Errorf("tool %s not found: %w", fc.Name, err)
 	}
+
 	result, err := tool.Execute(ctx, fc.Args)
 	if err != nil {
+		logger.LogErrorf("Tool '%s' execution failed: %v", fc.Name, err)
 		return nil, err
 	}
+
+	logger.LogInfof("Tool '%s' executed successfully. Result: %v", fc.Name, result.LLMContent)
 	return result.LLMContent, nil
 }
 

@@ -2,6 +2,7 @@ package agents
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go-ai-agent-v2/go-cli/pkg/config"
@@ -22,6 +23,36 @@ type AgentDefinition struct {
 	RunConfig     RunConfig                `json:"runConfig"`
 	ToolConfig    *ToolConfig              `json:"toolConfig,omitempty"`
 	PromptConfig  PromptConfig             `json:"promptConfig"`
+}
+
+// agentDefinitionWrapper wraps AgentDefinition to implement the types.Agent interface.
+type agentDefinitionWrapper struct {
+	AgentDefinition
+}
+
+// NewAgentDefinitionWrapper creates a new agentDefinitionWrapper.
+func NewAgentDefinitionWrapper(def AgentDefinition) types.Agent {
+	return &agentDefinitionWrapper{AgentDefinition: def}
+}
+
+// Name returns the agent's name.
+func (aw *agentDefinitionWrapper) Name() string {
+	return aw.AgentDefinition.Name
+}
+
+// Description returns the agent's description.
+func (aw *agentDefinitionWrapper) Description() string {
+	return aw.AgentDefinition.Description
+}
+
+// Kind returns the agent's kind.
+func (aw *agentDefinitionWrapper) Kind() types.Kind {
+	return types.KindThink // Subagents are generally thinking agents
+}
+
+// Execute is not implemented for the wrapper; actual execution happens via ToolInvocation.
+func (aw *agentDefinitionWrapper) Execute(ctx context.Context, args map[string]any) (types.ToolResult, error) {
+	return types.ToolResult{}, fmt.Errorf("execute not implemented for AgentDefinitionWrapper; use ToolInvocation")
 }
 
 // InputConfig defines the input parameters for an agent.

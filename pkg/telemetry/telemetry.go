@@ -20,7 +20,8 @@ type TelemetryLogger interface {
 	LogWarnf(format string, args ...interface{})
 	LogInfof(format string, args ...interface{})
 	LogDebugf(format string, args ...interface{})
-	LogPrompt(prompt string) // New method
+	LogPrompt(prompt string)
+	LogSubagentActivity(event types.SubagentActivityEvent) // New method
 }
 
 // noopTelemetryLogger is a no-operation implementation of TelemetryLogger.
@@ -32,7 +33,8 @@ func (l *noopTelemetryLogger) LogErrorf(format string, args ...interface{}) {}
 func (l *noopTelemetryLogger) LogWarnf(format string, args ...interface{})  {}
 func (l *noopTelemetryLogger) LogInfof(format string, args ...interface{})  {}
 func (l *noopTelemetryLogger) LogDebugf(format string, args ...interface{}) {}
-func (l *noopTelemetryLogger) LogPrompt(prompt string)                      {} // New method
+func (l *noopTelemetryLogger) LogPrompt(prompt string)                      {}
+func (l *noopTelemetryLogger) LogSubagentActivity(event types.SubagentActivityEvent) {} // New method
 
 // fileTelemetryLogger logs telemetry events to a specified file.
 type fileTelemetryLogger struct {
@@ -209,6 +211,22 @@ func (l *fileTelemetryLogger) LogPrompt(prompt string) {
 	data, err := json.Marshal(logEntry)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error marshaling prompt log entry: %v\n", err)
+		return
+	}
+	l.writeLog(data)
+}
+
+func (l *fileTelemetryLogger) LogSubagentActivity(event types.SubagentActivityEvent) {
+	if !l.enabled || l.logLevel != "debug" { // Log subagent activity at debug level by default
+		return
+	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	// The event already contains necessary fields, just marshal and log
+	data, err := json.Marshal(event)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error marshaling SubagentActivity event: %v\n", err)
 		return
 	}
 	l.writeLog(data)

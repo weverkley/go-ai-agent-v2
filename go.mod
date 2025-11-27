@@ -11,6 +11,7 @@ require (
 	github.com/gobwas/glob v0.2.3
 	github.com/google/generative-ai-go v0.20.1
 	github.com/mbndr/figlet4go v0.0.0-20190224160619-d6cef5b186ea
+	github.com/pkoukk/tiktoken-go v0.1.8
 	github.com/sashabaranov/go-openai v1.41.2
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
@@ -60,7 +61,6 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/pjbgf/sha1cd v0.3.2 // indirect
-	github.com/pkoukk/tiktoken-go v0.1.8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect

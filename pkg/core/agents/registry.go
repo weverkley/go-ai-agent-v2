@@ -1,12 +1,16 @@
 package agents
 
 import (
+	"fmt"
+	"sync" // Import the sync package
+
 	"go-ai-agent-v2/go-cli/pkg/telemetry"
 	"go-ai-agent-v2/go-cli/pkg/types"
 )
 
 // AgentRegistry manages the discovery, loading, validation, and registration of AgentDefinitions.
 type AgentRegistry struct {
+	mu     sync.RWMutex // Add mutex for thread safety
 	agents map[string]AgentDefinition
 	config types.Config
 }
@@ -21,7 +25,39 @@ func NewAgentRegistry(cfg types.Config) *AgentRegistry {
 
 // SetConfig updates the configuration for the AgentRegistry.
 func (ar *AgentRegistry) SetConfig(cfg types.Config) {
+	ar.mu.Lock()
+	defer ar.mu.Unlock()
 	ar.config = cfg
+}
+
+// Register registers an agent.
+func (ar *AgentRegistry) Register(a types.Agent) error {
+	ar.mu.Lock()
+	defer ar.mu.Unlock()
+
+	// Attempt to cast the types.Agent to an agentDefinitionWrapper
+	wrapper, ok := a.(*agentDefinitionWrapper)
+	if !ok {
+		return fmt.Errorf("cannot register agent: provided agent does not contain an AgentDefinition")
+	}
+
+	if _, exists := ar.agents[wrapper.Name()]; exists {
+		return fmt.Errorf("agent with name '%s' already registered", wrapper.Name())
+	}
+	ar.agents[wrapper.Name()] = wrapper.AgentDefinition
+	return nil
+}
+
+// GetAgent retrieves an agent by its name.
+func (ar *AgentRegistry) GetAgent(name string) (types.Agent, error) {
+	ar.mu.RLock()
+	defer ar.mu.RUnlock()
+
+	agentDef, exists := ar.agents[name]
+	if !exists {
+		return nil, fmt.Errorf("no agent found with name '%s'", name)
+	}
+	return NewAgentDefinitionWrapper(agentDef), nil
 }
 
 // Initialize discovers and loads agents.
@@ -126,11 +162,35 @@ func (ar *AgentRegistry) GetDefinition(name string) (AgentDefinition, bool) {
 	return agent, exists
 }
 
-// GetAllDefinitions returns all active agent definitions.
-func (ar *AgentRegistry) GetAllDefinitions() []AgentDefinition {
-	definitions := make([]AgentDefinition, 0, len(ar.agents))
+// GetAllAgentDefinitions returns all active agent definitions as a slice of interface{}.
+func (ar *AgentRegistry) GetAllAgentDefinitions() []interface{} {
+	ar.mu.RLock()
+	defer ar.mu.RUnlock()
+	definitions := make([]interface{}, 0, len(ar.agents))
 	for _, agent := range ar.agents {
 		definitions = append(definitions, agent)
 	}
 	return definitions
+}
+
+// GetAllAgents returns all registered agents as a slice of types.Agent.
+func (ar *AgentRegistry) GetAllAgents() []types.Agent {
+	ar.mu.RLock()
+	defer ar.mu.RUnlock()
+	var registeredAgents []types.Agent
+	for _, agentDef := range ar.agents {
+		registeredAgents = append(registeredAgents, NewAgentDefinitionWrapper(agentDef))
+	}
+	return registeredAgents
+}
+
+// GetAllAgentNames returns a slice of all registered agent names.
+func (ar *AgentRegistry) GetAllAgentNames() []string {
+	ar.mu.RLock()
+	defer ar.mu.RUnlock()
+	names := make([]string, 0, len(ar.agents))
+	for name := range ar.agents {
+		names = append(names, name)
+	}
+	return names
 }
