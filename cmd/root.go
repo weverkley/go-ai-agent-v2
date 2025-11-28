@@ -192,7 +192,7 @@ func registerCommands() {
 		// This will be handled by the RootCmd.Run
 	}
 	RootCmd.AddCommand(chatCmd)
-	RootCmd.AddCommand(authCmd)
+
 
 	RootCmd.AddCommand(settingsCmd)
 	RootCmd.AddCommand(memoryCmd)
