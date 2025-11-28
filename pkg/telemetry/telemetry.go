@@ -418,7 +418,7 @@ func (l *fileTelemetryLogger) LogSubagentActivity(event types.SubagentActivityEv
 }
 
 // NewTelemetryLogger creates a TelemetryLogger based on the provided telemetry settings.
-func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
+func NewTelemetryLogger(settings *types.TelemetrySettings, runMode string) TelemetryLogger {
 	if settings == nil || !settings.Enabled {
 		return &noopTelemetryLogger{}
 	}
@@ -430,6 +430,10 @@ func NewTelemetryLogger(settings *types.TelemetrySettings) TelemetryLogger {
 
 	switch backend {
 	case "stdout":
+		// Only enable stdout telemetry in agent mode
+		if runMode == "cli" {
+			return &noopTelemetryLogger{}
+		}
 		return NewStdoutTelemetryLogger(true, settings.LogLevel)
 	case "file":
 		if settings.OutDir == "" {

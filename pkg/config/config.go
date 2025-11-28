@@ -47,7 +47,7 @@ type ConfigParameters struct {
 	ToolDiscoveryCommand string
 	AgentRegistry        types.AgentRegistryInterface
 	ToolCallCommand      string
-	RunMode              string
+	RunMode string
 }
 
 // Config represents the application's configuration.
@@ -67,7 +67,7 @@ type Config struct {
 	AgentRegistry                types.AgentRegistryInterface
 	toolDiscoveryCommand         string
 	toolCallCommand              string
-	runMode                      string
+		RunMode string
 	telemetryLogger              telemetry.TelemetryLogger
 	FileFilteringService         types.FileFilteringService // Exported FileFilteringService field
 	WorkspaceContext             types.WorkspaceContext     // Exported workspaceContext field
@@ -91,7 +91,7 @@ func NewConfig(params *ConfigParameters) *Config {
 		AgentRegistry:                params.AgentRegistry,
 		toolDiscoveryCommand:         params.ToolDiscoveryCommand,
 		toolCallCommand:              params.ToolCallCommand,
-		runMode:                      params.RunMode,
+		RunMode:                      params.RunMode,
 		// telemetryLogger and fileFilteringService will be set separately
 	}
 }
@@ -128,7 +128,7 @@ func (c *Config) Get(key string) (interface{}, bool) {
 	case "toolCallCommand":
 		return c.toolCallCommand, true
 	case "runMode":
-		return c.runMode, true
+		return c.RunMode, true
 	case "telemetry":
 		return c.Telemetry, c.Telemetry != nil
 	case "telemetryEnabled":

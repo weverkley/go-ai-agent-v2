@@ -7,8 +7,8 @@ import (
 var GlobalLogger TelemetryLogger = &noopTelemetryLogger{}
 
 // InitGlobalLogger initializes the global telemetry logger.
-func InitGlobalLogger(settings *types.TelemetrySettings) {
-	GlobalLogger = NewTelemetryLogger(settings)
+func InitGlobalLogger(settings *types.TelemetrySettings, runMode string) {
+	GlobalLogger = NewTelemetryLogger(settings, runMode)
 }
 
 // LogAgentStart logs the start of an agent's execution.

@@ -155,6 +155,7 @@ func initConfig(
 	workspaceService *services.WorkspaceService,
 	fileFilteringService *services.FileFilteringService,
 	settingsService types.SettingsServiceIface, // Add settingsService
+	runMode string,
 ) *config.Config {
 	debugModeVal, _ := settingsService.Get("debugMode")
 	debugMode, ok := debugModeVal.(bool)
@@ -176,6 +177,7 @@ func initConfig(
 		AgentRegistry: agentRegistry,
 		CodebaseInvestigator: codebaseInvestigatorSettings,
 		TestWriterSettings:   testWriterSettings,
+		RunMode:      runMode,
 	}
 
 	cfg := config.NewConfig(params)
@@ -259,8 +261,14 @@ func init() {
 		codebaseInvestigatorSettings := SettingsService.GetCodebaseInvestigatorSettings()
 		testWriterSettings := SettingsService.GetTestWriterSettings()
 
+		runModeVal, _ := SettingsService.Get("runMode")
+		runMode, ok := runModeVal.(string)
+		if !ok {
+			runMode = "cli" // Default to cli if not found or type assertion fails
+		}
+
 		// 1. Initialize Cfg with minimal parameters first
-		Cfg = initConfig(nil, types.AgentRegistryInterface(nil), telemetrySettings, codebaseInvestigatorSettings, testWriterSettings, WorkspaceService, fileFilteringService, SettingsService) // Cfg is a *config.Config
+		Cfg = initConfig(nil, types.AgentRegistryInterface(nil), telemetrySettings, codebaseInvestigatorSettings, testWriterSettings, WorkspaceService, fileFilteringService, SettingsService, runMode) // Cfg is a *config.Config
 
 		// 2. Create AgentRegistry using the initial Cfg
 		agentRegistry := agents.NewAgentRegistry(Cfg) // agentRegistry is *agents.AgentRegistry
@@ -278,7 +286,7 @@ func init() {
 		// 6. Set the fully populated ToolRegistry into Cfg
 		Cfg.ToolRegistry = toolRegistry
 
-		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
+		telemetry.InitGlobalLogger(Cfg.Telemetry, Cfg.RunMode)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
 
 		chatService, err = createChatService(Cfg, SettingsService, SessionService, ContextService)

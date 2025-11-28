@@ -24,7 +24,7 @@ func TestNewQwenChat(t *testing.T) {
 		ModelName: "qwen-turbo",
 	})
 
-	executor, err := NewQwenChat(cfg, types.GenerateContentConfig{}, nil, telemetry.NewTelemetryLogger(nil))
+	executor, err := NewQwenChat(cfg, types.GenerateContentConfig{}, nil, telemetry.NewTelemetryLogger(nil, "cli"))
 	assert.NoError(t, err)
 	assert.NotNil(t, executor)
 
@@ -51,8 +51,8 @@ func TestGenerateStream(t *testing.T) {
 	qwenChat := &QwenChat{
 		client:    client,
 		modelName: "qwen-turbo",
-		        logger:    telemetry.NewTelemetryLogger(nil), // Initialize logger
-			}
+		logger:    telemetry.NewTelemetryLogger(nil, "cli"), // Initialize logger
+	}
 		
 			eventChan, err := qwenChat.StreamContent(context.Background(), []*types.Content{{Parts: []types.Part{{Text: "test"}}}}, []types.Tool{})
 	assert.NoError(t, err)
@@ -101,7 +101,7 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 		client:       client,
 		modelName:    "qwen-turbo",
 		toolRegistry: toolRegistry,
-		logger:       telemetry.NewTelemetryLogger(nil), // Initialize logger
+		logger:       telemetry.NewTelemetryLogger(nil, "cli"), // Initialize logger
 	}
 
 	eventChan, err := qwenChat.StreamContent(context.Background(), []*types.Content{{Parts: []types.Part{{Text: "test"}}}}, []types.Tool{})
