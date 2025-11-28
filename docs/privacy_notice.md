@@ -1,4 +1,4 @@
-Go AI Agent Privacy Notice:
+Go AI Agent V2 Privacy Notice:
 
 This CLI tool may collect anonymous usage data to help improve its features and performance. This data does not include any personal identifiable information.
 

@@ -1,6 +1,6 @@
-# Project GAIA
+# GO Ai Agent V2
 
-Project GAIA is a powerful and extensible command-line interface (CLI) built with Go. It provides a rich, interactive terminal experience for chatting with different AI models, leveraging a sophisticated tool-calling system and a hierarchical agent framework to perform complex software engineering tasks.
+This project is a powerful and extensible command-line interface (CLI) built with Go. It provides a rich, interactive terminal experience for chatting with different AI models, leveraging a sophisticated tool-calling system and a hierarchical agent framework to perform complex software engineering tasks.
 
 ## Core Features
 
@@ -82,7 +82,8 @@ The following table lists all the available settings, their default values, and 
 | `enabledExtensions`    | `GOAIAGENT_ENABLEDEXTENSIONS`   | `{}`                                                                       | A map of enabled extensions.                                                                                                             |
 | `toolDiscoveryCommand` | `GOAIAGENT_TOOLDISCOVERYCOMMAND`| `""`                                                                       | A command to run to discover tools.                                                                                                      |
 | `toolCallCommand`      | `GOAIAGENT_TOOLCALLCOMMAND`     | `""`                                                                       | A command to run to call a tool.                                                                                                         |
-| `telemetry`            | `GOAIAGENT_TELEMETRY`           | `{ "enabled": true, "outdir": "./.goaiagent/tmp/", "logLevel": "debug" }`    | The telemetry settings.                                                                                                                  |
+| `telemetry`            | `GOAIAGENT_TELEMETRY`           | `{ "enabled": true, "backend": "stdout", "outdir": "./.goaiagent/tmp/", "logLevel": "debug" }`    | The telemetry settings, including the `backend` (e.g., `stdout`, `file`) and `logLevel`.             |
+| `runMode`              | `GOAIAGENT_RUNMODE`             | `cli`                                                                      | The application's run mode. Can be `cli` for interactive use or `agent` for a headless server.           |
 | `googleCustomSearch`   | `GOAIAGENT_GOOGLECUSTOMSEARCH`  | `{ "apiKey": "API_KEY_GOES_HERE", "cxId": "CX_ID_GOES_HERE" }`              | The Google Custom Search API settings.                                                                                                   |
 | `webSearchProvider`    | `GOAIAGENT_WEBSEARCHPROVIDER`   | `googleCustomSearch`                                                       | The web search provider to use. Can be `googleCustomSearch` or `tavily`.                                                                 |
 | `tavily`               | `GOAIAGENT_TAVILY`              | `{ "apiKey": "API_KEY_GOES_HERE" }`                                        | The Tavily API settings.                                                                                                                 |
@@ -104,9 +105,13 @@ When running the application in a Docker container, it is recommended to manage 
 
 ## Docker
 
-You can also run the `go-ai-agent` in a Docker container. This is the recommended way to run the application in a production environment.
+You can run Project GAIA in two distinct modes within Docker: as an interactive CLI or as a headless Agent server.
 
-### Build & Run
+### Running in CLI Mode (Interactive)
+
+This is the default mode for interacting with the agent via your terminal.
+
+#### Build & Run
 
 1.  **Build the Docker image:**
     ```bash
@@ -115,25 +120,44 @@ You can also run the `go-ai-agent` in a Docker container. This is the recommende
 
 2.  **Run the Docker container:**
     ```bash
-    docker-compose up
+    docker-compose up cli
     ```
 
-    This will start the `go-ai-agent` and a Redis container for session storage. The `go-ai-agent` will be configured to use the Redis container for session storage.
+    This will start the `go-ai-agent` in interactive CLI mode and a Redis container for session storage. You will be able to interact with the agent directly from your terminal.
 
-### Configuration
+### Running in Agent Mode (Headless Server)
 
-When running in a Docker container, you can configure the application with environment variables. The following environment variables are available:
+In this mode, Project GAIA runs as a headless server, exposing a WebSocket endpoint for real-time interaction and a webhook endpoint for task submission. This is ideal for integration into automated workflows or other applications.
 
-| Environment Variable                | Default Value        | Description                                            |
-| ----------------------------------- | -------------------- | ------------------------------------------------------ |
-| `GOAIAGENT_SESSIONSTORE_TYPE`       | `file`               | The type of session store to use. Can be `file` or `redis`. |
-| `GOAIAGENT_SESSIONSTORE_REDIS_ADDRESS` | `redis:6379`         | The address of the Redis server.                       |
-| `GOAIAGENT_SESSIONSTORE_REDIS_PASSWORD` | `""`                 | The password for the Redis server.                     |
-| `GOAIAGENT_SESSIONSTORE_REDIS_DB`       | `0`                  | The Redis database to use.                               |
+#### Build & Run
+
+1.  **Build the Docker image:**
+    ```bash
+    docker-compose build
+    ```
+
+2.  **Run the Docker container:**
+    ```bash
+    docker-compose up agent
+    ```
+
+    This will start the `go-ai-agent` as a server listening on port `8080` and a Redis container for session storage.
+
+### Configuration for Docker
+
+When running in a Docker container, you can configure the application with environment variables. The `GOAIAGENT_RUNMODE` environment variable is crucial for selecting the operating mode.
+
+The following environment variables are available:
+
+| Environment Variable                | Default Value        | Description                                                                  |
+| ----------------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| `GOAIAGENT_RUNMODE`                 | `cli`                | The application's run mode. Can be `cli` or `agent`.                         |
+| `GOAIAGENT_SESSIONSTORE_TYPE`       | `file`               | The type of session store to use. Can be `file` or `redis`.                  |
+| `GOAIAGENT_SESSIONSTORE_REDIS_ADDRESS` | `redis:6379`         | The address of the Redis server.                                             |
+| `GOAIAGENT_SESSIONSTORE_REDIS_PASSWORD` | `""`                 | The password for the Redis server.                                           |
+| `GOAIAGENT_SESSIONSTORE_REDIS_DB`       | `0`                  | The Redis database to use.                                                   |
 
 You can also override any of the settings in the `settings.json` file with environment variables. For example, to override the `model` setting, you can set the `GOAIAGENT_MODEL` environment variable.
-
----
 
 ## Getting Started
 
@@ -154,6 +178,9 @@ You can also override any of the settings in the `settings.json` file with envir
     Use the newly built executable to start the interactive chat.
     ```bash
     ./main-agent
+
+    # Or to run in agent (headless server) mode:
+    # ./main-agent agent
     ```
 
 3.  **Customize Your Settings:**
