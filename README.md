@@ -208,3 +208,7 @@ You can also override any of the settings in the `settings.json` file with envir
 - Validate switching between executors.
 - Loop detection tool.
 - Integrate agents.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
