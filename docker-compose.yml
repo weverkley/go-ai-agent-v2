@@ -1,0 +1,11 @@
+version: '3.8'
+
+services:
+  go-ai-agent:
+    build: .
+    volumes:
+      - ./.goaiagent:/app/.goaiagent
+    depends_on:
+      - redis
+  redis:
+    image: "redis:alpine"

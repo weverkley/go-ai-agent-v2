@@ -65,27 +65,73 @@ To handle API limits gracefully, the application uses a routing service.
 
 The application is configured using a `settings.json` file, which is automatically generated in the `.goaiagent` directory in your project's root on the first run. The default settings are based on the `example.settings.json` file.
 
-You can modify the `settings.json` file to customize the application's behavior. The following table lists all the available settings, their default values, and a brief description of what they do:
+You can modify the `settings.json` file to customize the application's behavior. You can also override any of the settings with environment variables. For example, to override the `model` setting, you can set the `GOAIAGENT_MODEL` environment variable.
 
-| Setting                | Default Value                                                              | Description                                                                                                                              |
-| ---------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `extensionPaths`       | `[./.goaiagent/extensions]`                                                | A list of paths where the application should look for extensions.                                                                        |
-| `mcpServers`           | `{}`                                                                       | A map of Multi-Component Protocol (MCP) servers to connect to.                                                                          |
-| `debugMode`            | `false`                                                                    | When set to `true`, the application will print debug information to the console.                                                        |
-| `approvalMode`         | `DEFAULT`                                                                  | The approval mode for "dangerous" tool calls. Can be `DEFAULT`, `ALWAYS`, or `NEVER`.                                                    |
-| `dangerousTools`       | `["execute_command", "write_file", "smart_edit", "user_confirm"]`            | A list of tools that require user confirmation before execution.                                                                         |
-| `model`                | `mock-flash`                                                               | The default AI model to use for chat.                                                                                                    |
-| `executor`             | `mock`                                                                     | The default AI model executor to use. Can be `gemini`, `qwen`, or `mock`.                                                                |
-| `proxy`                | `""`                                                                       | The proxy to use for all outgoing requests.                                                                                              |
-| `enabledExtensions`    | `{}`                                                                       | A map of enabled extensions.                                                                                                             |
-| `toolDiscoveryCommand` | `""`                                                                       | A command to run to discover tools.                                                                                                      |
-| `toolCallCommand`      | `""`                                                                       | A command to run to call a tool.                                                                                                         |
-| `telemetry`            | `{ "enabled": true, "outdir": "./.goaiagent/tmp/", "logLevel": "debug" }`    | The telemetry settings.                                                                                                                  |
-| `googleCustomSearch`   | `{ "apiKey": "API_KEY_GOES_HERE", "cxId": "CX_ID_GOES_HERE" }`              | The Google Custom Search API settings.                                                                                                   |
-| `webSearchProvider`    | `googleCustomSearch`                                                       | The web search provider to use. Can be `googleCustomSearch` or `tavily`.                                                                 |
-| `tavily`               | `{ "apiKey": "API_KEY_GOES_HERE" }`                                        | The Tavily API settings.                                                                                                                 |
-| `codebaseInvestigator` | `{ "enabled": true }`                                                      | The Codebase Investigator agent settings.                                                                                                |
-| `testWriter`           | `{ "enabled": true }`                                                      | The Test Writer agent settings.                                                                                                          |
+The following table lists all the available settings, their default values, and a brief description of what they do:
+
+| Setting                | Environment Variable          | Default Value                                                              | Description                                                                                                                              |
+| ---------------------- | ----------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `extensionPaths`       | `GOAIAGENT_EXTENSIONPATHS`      | `[./.goaiagent/extensions]`                                                | A list of paths where the application should look for extensions.                                                                        |
+| `mcpServers`           | `GOAIAGENT_MCPSERVERS`          | `{}`                                                                       | A map of Multi-Component Protocol (MCP) servers to connect to.                                                                          |
+| `debugMode`            | `GOAIAGENT_DEBUGMODE`           | `false`                                                                    | When set to `true`, the application will print debug information to the console.                                                        |
+| `approvalMode`         | `GOAIAGENT_APPROVALMODE`        | `DEFAULT`                                                                  | The approval mode for "dangerous" tool calls. Can be `DEFAULT`, `ALWAYS`, or `NEVER`.                                                    |
+| `dangerousTools`       | `GOAIAGENT_DANGEROUSTOOLS`      | `["execute_command", "write_file", "smart_edit", "user_confirm"]`            | A list of tools that require user confirmation before execution.                                                                         |
+| `model`                | `GOAIAGENT_MODEL`               | `mock-flash`                                                               | The default AI model to use for chat.                                                                                                    |
+| `executor`             | `GOAIAGENT_EXECUTOR`            | `mock`                                                                     | The default AI model executor to use. Can be `gemini`, `qwen`, or `mock`.                                                                |
+| `proxy`                | `GOAIAGENT_PROXY`               | `""`                                                                       | The proxy to use for all outgoing requests.                                                                                              |
+| `enabledExtensions`    | `GOAIAGENT_ENABLEDEXTENSIONS`   | `{}`                                                                       | A map of enabled extensions.                                                                                                             |
+| `toolDiscoveryCommand` | `GOAIAGENT_TOOLDISCOVERYCOMMAND`| `""`                                                                       | A command to run to discover tools.                                                                                                      |
+| `toolCallCommand`      | `GOAIAGENT_TOOLCALLCOMMAND`     | `""`                                                                       | A command to run to call a tool.                                                                                                         |
+| `telemetry`            | `GOAIAGENT_TELEMETRY`           | `{ "enabled": true, "outdir": "./.goaiagent/tmp/", "logLevel": "debug" }`    | The telemetry settings.                                                                                                                  |
+| `googleCustomSearch`   | `GOAIAGENT_GOOGLECUSTOMSEARCH`  | `{ "apiKey": "API_KEY_GOES_HERE", "cxId": "CX_ID_GOES_HERE" }`              | The Google Custom Search API settings.                                                                                                   |
+| `webSearchProvider`    | `GOAIAGENT_WEBSEARCHPROVIDER`   | `googleCustomSearch`                                                       | The web search provider to use. Can be `googleCustomSearch` or `tavily`.                                                                 |
+| `tavily`               | `GOAIAGENT_TAVILY`              | `{ "apiKey": "API_KEY_GOES_HERE" }`                                        | The Tavily API settings.                                                                                                                 |
+| `codebaseInvestigator` | `GOAIAGENT_CODEBASEINVESTIGATOR`| `{ "enabled": true }`                                                      | The Codebase Investigator agent settings.                                                                                                |
+| `testWriter`           | `GOAIAGENT_TESTWRITER`          | `{ "enabled": true }`                                                      | The Test Writer agent settings.                                                                                                          |
+| `sessionStore.type`    | `GOAIAGENT_SESSIONSTORE_TYPE`   | `file`                                                                     | The type of session store to use. Can be `file` or `redis`.                                                                              |
+| `sessionStore.redis.address` | `GOAIAGENT_SESSIONSTORE_REDIS_ADDRESS` | `localhost:6379`                                                           | The address of the Redis server.                                                                                                         |
+| `sessionStore.redis.password`| `GOAIAGENT_SESSIONSTORE_REDIS_PASSWORD`| `""`                                                                       | The password for the Redis server.                                                                                                       |
+| `sessionStore.redis.db`| `GOAIAGENT_SESSIONSTORE_REDIS_DB`| `0`                                                                        | The Redis database to use.                                                                                                               |
+
+---
+
+### A Note on Secrets
+
+When running the application in a Docker container, it is recommended to manage secrets (e.g., API keys) with environment variables. For example, to set the Gemini API key, you can set the `GEMINI_API_KEY` environment variable in your `docker-compose.yml` file or in your shell.
+
+---
+
+
+## Docker
+
+You can also run the `go-ai-agent` in a Docker container. This is the recommended way to run the application in a production environment.
+
+### Build & Run
+
+1.  **Build the Docker image:**
+    ```bash
+    docker-compose build
+    ```
+
+2.  **Run the Docker container:**
+    ```bash
+    docker-compose up
+    ```
+
+    This will start the `go-ai-agent` and a Redis container for session storage. The `go-ai-agent` will be configured to use the Redis container for session storage.
+
+### Configuration
+
+When running in a Docker container, you can configure the application with environment variables. The following environment variables are available:
+
+| Environment Variable                | Default Value        | Description                                            |
+| ----------------------------------- | -------------------- | ------------------------------------------------------ |
+| `GOAIAGENT_SESSIONSTORE_TYPE`       | `file`               | The type of session store to use. Can be `file` or `redis`. |
+| `GOAIAGENT_SESSIONSTORE_REDIS_ADDRESS` | `redis:6379`         | The address of the Redis server.                       |
+| `GOAIAGENT_SESSIONSTORE_REDIS_PASSWORD` | `""`                 | The password for the Redis server.                     |
+| `GOAIAGENT_SESSIONSTORE_REDIS_DB`       | `0`                  | The Redis database to use.                               |
+
+You can also override any of the settings in the `settings.json` file with environment variables. For example, to override the `model` setting, you can set the `GOAIAGENT_MODEL` environment variable.
 
 ---
 

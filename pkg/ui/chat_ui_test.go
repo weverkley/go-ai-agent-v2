@@ -3,7 +3,6 @@ package ui
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -41,17 +40,17 @@ func (m *MockShellExecutionService) KillAllProcesses() {
 
 // --- Helper for creating a test model ---
 func setupTestSessionService(t *testing.T) (*services.SessionService, func()) {
-	projectRoot, err := os.MkdirTemp("", "project_root_*")
-	assert.NoError(t, err)
-	goaiagentDir := filepath.Join(projectRoot, ".goaiagent")
-	err = os.Mkdir(goaiagentDir, 0755)
+	sessionsPath, err := os.MkdirTemp("", "sessions_*")
 	assert.NoError(t, err)
 
-	ss, err := services.NewSessionService(goaiagentDir)
+	store, err := services.NewFileSessionStore(sessionsPath)
+	assert.NoError(t, err)
+
+	ss, err := services.NewSessionService(store)
 	assert.NoError(t, err)
 
 	cleanup := func() {
-		os.RemoveAll(projectRoot)
+		os.RemoveAll(sessionsPath)
 	}
 	return ss, cleanup
 }

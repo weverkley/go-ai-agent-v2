@@ -1,15 +1,15 @@
 package services
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
-	"go-ai-agent-v2/go-cli/pkg/config"
-	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/types"
+
+	"github.com/spf13/viper"
 )
 
 const (
@@ -18,158 +18,53 @@ const (
 
 // Settings represents the application settings.
 type Settings struct {
-	ExtensionPaths       []string                            `json:"extensionPaths"`
-	McpServers           map[string]types.MCPServerConfig    `json:"mcpServers,omitempty"`
-	DebugMode            bool                                `json:"debugMode,omitempty"`
-	ApprovalMode         types.ApprovalMode                  `json:"approvalMode,omitempty"`
-	DangerousTools       []string                            `json:"dangerousTools,omitempty"` // New field
-	Model                string                              `json:"model,omitempty"`
-	Executor             string                              `json:"executor,omitempty"`
-	Proxy                string                              `json:"proxy,omitempty"`
-	EnabledExtensions    map[types.SettingScope][]string     `json:"enabledExtensions,omitempty"`
-	ToolDiscoveryCommand string                              `json:"toolDiscoveryCommand,omitempty"`
-	ToolCallCommand      string                              `json:"toolCallCommand,omitempty"`
-	Telemetry            *types.TelemetrySettings            `json:"telemetry,omitempty"`
-	GoogleCustomSearch   *types.GoogleCustomSearchSettings   `json:"googleCustomSearch,omitempty"`
-	WebSearchProvider    types.WebSearchProvider             `json:"webSearchProvider,omitempty"`
-	Tavily               *types.TavilySettings               `json:"tavily,omitempty"`
-	CodebaseInvestigator *types.CodebaseInvestigatorSettings `json:"codebaseInvestigator,omitempty"`
-	TestWriter           *types.TestWriterSettings           `json:"testWriter,omitempty"`
+	ExtensionPaths       []string                            `json:"extensionPaths" mapstructure:"extensionPaths"`
+	McpServers           map[string]types.MCPServerConfig    `json:"mcpServers,omitempty" mapstructure:"mcpServers"`
+	DebugMode            bool                                `json:"debugMode,omitempty" mapstructure:"debugMode"`
+	ApprovalMode         types.ApprovalMode                  `json:"approvalMode,omitempty" mapstructure:"approvalMode"`
+	DangerousTools       []string                            `json:"dangerousTools,omitempty" mapstructure:"dangerousTools"` // New field
+	Model                string                              `json:"model,omitempty" mapstructure:"model"`
+	Executor             string                              `json:"executor,omitempty" mapstructure:"executor"`
+	Proxy                string                              `json:"proxy,omitempty" mapstructure:"proxy"`
+	EnabledExtensions    map[types.SettingScope][]string     `json:"enabledExtensions,omitempty" mapstructure:"enabledExtensions"`
+	ToolDiscoveryCommand string                              `json:"toolDiscoveryCommand,omitempty" mapstructure:"toolDiscoveryCommand"`
+	ToolCallCommand      string                              `json:"toolCallCommand,omitempty" mapstructure:"toolCallCommand"`
+	Telemetry            *types.TelemetrySettings            `json:"telemetry,omitempty" mapstructure:"telemetry"`
+	GoogleCustomSearch   *types.GoogleCustomSearchSettings   `json:"googleCustomSearch,omitempty" mapstructure:"googleCustomSearch"`
+	WebSearchProvider    types.WebSearchProvider             `json:"webSearchProvider,omitempty" mapstructure:"webSearchProvider"`
+	Tavily               *types.TavilySettings               `json:"tavily,omitempty" mapstructure:"tavily"`
+	CodebaseInvestigator *types.CodebaseInvestigatorSettings `json:"codebaseInvestigator,omitempty" mapstructure:"codebaseInvestigator"`
+	TestWriter           *types.TestWriterSettings           `json:"testWriter,omitempty" mapstructure:"testWriter"`
 }
 
-func newDefaultSettings(workspaceDir string) *Settings {
+func newDefaultSettings(workspaceDir string) {
 	telemetryOutDir := filepath.Join(workspaceDir, ".goaiagent", "tmp")
-	return &Settings{
-		ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
-		McpServers:           make(map[string]types.MCPServerConfig),
-		DebugMode:            false,
-		ApprovalMode:         types.ApprovalModeDefault,
-		DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME},
-		Model:                "mock-flash",
-		Executor:             types.ExecutorTypeMock,
-		Proxy:                "",
-		EnabledExtensions:    make(map[types.SettingScope][]string),
-		ToolDiscoveryCommand: "",
-		ToolCallCommand:      "",
-		Telemetry: &types.TelemetrySettings{
-			Enabled:  true,
-			OutDir:   telemetryOutDir,
-			LogLevel: "info",
-		},
-		GoogleCustomSearch: &types.GoogleCustomSearchSettings{
-			ApiKey: "API_KEY_GOES_HERE",
-			CxId:   "CX_ID_GOES_HERE",
-		},
-		WebSearchProvider: types.WebSearchProviderGoogleCustomSearch,
-		Tavily: &types.TavilySettings{
-			ApiKey: "API_KEY_GOES_HERE",
-		},
-		CodebaseInvestigator: &types.CodebaseInvestigatorSettings{Enabled: true},
-		TestWriter:           &types.TestWriterSettings{Enabled: true},
-	}
-}
-
-// LoadSettings loads the application settings from various sources.
-func LoadSettings(workspaceDir string) *Settings {
-	settingsPath := getSettingsPath(workspaceDir)
-	data, err := os.ReadFile(settingsPath)
-	if err != nil {
-		defaultSettings := newDefaultSettings(workspaceDir)
-		if err := SaveSettings(workspaceDir, defaultSettings); err != nil {
-			fmt.Printf("Warning: failed to save default settings: %v\n", err)
-		}
-		return defaultSettings
-	}
-
-	// If the file is empty, treat it as a new settings file
-	if len(data) == 0 {
-		defaultSettings := newDefaultSettings(workspaceDir)
-		if err := SaveSettings(workspaceDir, defaultSettings); err != nil {
-			fmt.Printf("Warning: failed to save default settings: %v\n", err)
-		}
-		return defaultSettings
-	}
-
-	var settings Settings
-	if err := json.Unmarshal(data, &settings); err != nil {
-		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
-		defaultSettings := newDefaultSettings(workspaceDir)
-		if err := SaveSettings(workspaceDir, defaultSettings); err != nil {
-			fmt.Printf("Warning: failed to save default settings: %v\n", err)
-		}
-		return defaultSettings
-	}
-
-	// Apply defaults if not set in the loaded settings to ensure backward compatibility
-	if len(settings.ExtensionPaths) == 0 {
-		settings.ExtensionPaths = []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")}
-	}
-	if settings.McpServers == nil {
-		settings.McpServers = make(map[string]types.MCPServerConfig)
-	}
-	if settings.ApprovalMode == "" {
-		settings.ApprovalMode = types.ApprovalModeDefault
-	}
-	if settings.Model == "" {
-		settings.Model = "gemini-1.5-flash-latest"
-	}
-	if settings.Executor == "" {
-		settings.Executor = "gemini"
-	}
-	if settings.EnabledExtensions == nil {
-		settings.EnabledExtensions = make(map[types.SettingScope][]string)
-	}
-	if settings.Telemetry == nil {
-		settings.Telemetry = &types.TelemetrySettings{
-			Enabled:  true,
-			OutDir:   filepath.Join(workspaceDir, ".goaiagent", "tmp"),
-			LogLevel: "info",
-		}
-	}
-	if settings.GoogleCustomSearch == nil {
-		settings.GoogleCustomSearch = &types.GoogleCustomSearchSettings{}
-	}
-	if settings.WebSearchProvider == "" {
-		settings.WebSearchProvider = types.WebSearchProviderGoogleCustomSearch
-	}
-	if settings.Tavily == nil {
-		settings.Tavily = &types.TavilySettings{}
-	}
-	if settings.DangerousTools == nil {
-		settings.DangerousTools = []string{
-			types.EXECUTE_COMMAND_TOOL_NAME,
-			types.WRITE_FILE_TOOL_NAME,
-			types.SMART_EDIT_TOOL_NAME,
-			types.USER_CONFIRM_TOOL_NAME,
-		}
-	}
-	if settings.CodebaseInvestigator == nil {
-		settings.CodebaseInvestigator = &types.CodebaseInvestigatorSettings{Enabled: true}
-	}
-	if settings.TestWriter == nil {
-		settings.TestWriter = &types.TestWriterSettings{Enabled: true}
-	}
-
-	return &settings
-}
-
-func getSettingsPath(workspaceDir string) string {
-	return filepath.Join(workspaceDir, SettingsFileName)
-}
-
-// SaveSettings saves the application settings.
-func SaveSettings(workspaceDir string, settings *Settings) error {
-	settingsPath := getSettingsPath(workspaceDir)
-	data, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal settings: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(settingsPath), 0755); err != nil {
-		return fmt.Errorf("failed to create settings directory: %w", err)
-	}
-
-	return os.WriteFile(settingsPath, data, 0644)
+	viper.SetDefault("extensionPaths", []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")})
+	viper.SetDefault("mcpServers", make(map[string]types.MCPServerConfig))
+	viper.SetDefault("debugMode", false)
+	viper.SetDefault("approvalMode", types.ApprovalModeDefault)
+	viper.SetDefault("dangerousTools", []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME})
+	viper.SetDefault("model", "mock-flash")
+	viper.SetDefault("executor", types.ExecutorTypeMock)
+	viper.SetDefault("proxy", "")
+	viper.SetDefault("enabledExtensions", make(map[types.SettingScope][]string))
+	viper.SetDefault("toolDiscoveryCommand", "")
+	viper.SetDefault("toolCallCommand", "")
+	viper.SetDefault("telemetry", &types.TelemetrySettings{
+		Enabled:  true,
+		OutDir:   telemetryOutDir,
+		LogLevel: "info",
+	})
+	viper.SetDefault("googleCustomSearch", &types.GoogleCustomSearchSettings{
+		ApiKey: "API_KEY_GOES_HERE",
+		CxId:   "CX_ID_GOES_HERE",
+	})
+	viper.SetDefault("webSearchProvider", types.WebSearchProviderGoogleCustomSearch)
+	viper.SetDefault("tavily", &types.TavilySettings{
+		ApiKey: "API_KEY_GOES_HERE",
+	})
+	viper.SetDefault("codebaseInvestigator", &types.CodebaseInvestigatorSettings{Enabled: true})
+	viper.SetDefault("testWriter", &types.TestWriterSettings{Enabled: true})
 }
 
 // SettingsService manages application settings.
@@ -184,74 +79,89 @@ func NewSettingsService(baseDir string, extensionManager types.ExtensionManager)
 	ss := &SettingsService{
 		baseDir: baseDir,
 	}
-	ss.settings = LoadSettings(baseDir) // Load initial settings
+
+	viper.AddConfigPath(filepath.Join(baseDir, ".goaiagent"))
+	viper.SetConfigName("settings")
+	viper.SetConfigType("json")
+
+	viper.SetEnvPrefix("GOAIAGENT")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	viper.AutomaticEnv()
+
+	newDefaultSettings(baseDir)
+
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			// Config file not found; ignore error if desired
+			fmt.Println("No settings file found, using defaults.")
+			// You might want to create a default config file here
+			if err := viper.SafeWriteConfig(); err != nil {
+				fmt.Printf("Warning: failed to write default settings: %v\n", err)
+			}
+		} else {
+			// Config file was found but another error was produced
+			fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
+		}
+	}
+
+	var settings Settings
+	if err := viper.Unmarshal(&settings); err != nil {
+		fmt.Printf("Warning: could not unmarshal settings, using defaults: %v\n", err)
+	}
+	ss.settings = &settings
+
 	if err := extensionManager.LoadExtensionStatus(); err != nil {
 		fmt.Printf("Warning: failed to load extension status: %v\n", err)
 	}
 	return ss
 }
 
+
 // Get returns the value of a specific setting.
 func (ss *SettingsService) Get(key string) (interface{}, bool) {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-
-	// Use reflection or a switch statement to get values
-	switch key {
-	case "model":
-		return ss.settings.Model, true
-	case "executor":
-		return ss.settings.Executor, true
-	case "debugMode":
-		return ss.settings.DebugMode, true
-	case "approvalMode":
-		return ss.settings.ApprovalMode, true
-	case "proxy":
-		return ss.settings.Proxy, true
-	case "toolDiscoveryCommand":
-		return ss.settings.ToolDiscoveryCommand, true
-	case "toolCallCommand":
-		return ss.settings.ToolCallCommand, true
-	case "enabledExtensions":
-		return ss.settings.EnabledExtensions, true
-	case "extensionPaths":
-		return ss.settings.ExtensionPaths, true
-	case "mcpServers":
-		return ss.settings.McpServers, true
-	case "dangerousTools":
-		return ss.settings.DangerousTools, true
-	// Add other settings here
-	default:
-		return nil, false
-	}
+	return viper.Get(key), viper.IsSet(key)
 }
 
 // GetTelemetrySettings returns the telemetry settings.
 func (ss *SettingsService) GetTelemetrySettings() *types.TelemetrySettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.Telemetry
+	var telemetrySettings types.TelemetrySettings
+	if err := viper.UnmarshalKey("telemetry", &telemetrySettings); err != nil {
+		return nil
+	}
+	return &telemetrySettings
 }
 
 // GetGoogleCustomSearchSettings returns the Google Custom Search settings.
 func (ss *SettingsService) GetGoogleCustomSearchSettings() *types.GoogleCustomSearchSettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.GoogleCustomSearch
+	var googleCustomSearchSettings types.GoogleCustomSearchSettings
+	if err := viper.UnmarshalKey("googleCustomSearch", &googleCustomSearchSettings); err != nil {
+		return nil
+	}
+	return &googleCustomSearchSettings
 }
 
 // GetWebSearchProvider returns the configured web search provider.
 func (ss *SettingsService) GetWebSearchProvider() types.WebSearchProvider {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.WebSearchProvider
+	return types.WebSearchProvider(viper.GetString("webSearchProvider"))
 }
 
 // GetTavilySettings returns the Tavily settings.
 func (ss *SettingsService) GetTavilySettings() *types.TavilySettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.Tavily
+	var tavilySettings types.TavilySettings
+	if err := viper.UnmarshalKey("tavily", &tavilySettings); err != nil {
+		return nil
+	}
+	return &tavilySettings
 }
 
 // GetWorkspaceDir returns the base directory for the settings service.
@@ -265,29 +175,37 @@ func (ss *SettingsService) GetWorkspaceDir() string {
 func (ss *SettingsService) GetDangerousTools() []string {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.DangerousTools
+	return viper.GetStringSlice("dangerousTools")
 }
 
 // GetCodebaseInvestigatorSettings returns the codebase investigator settings.
 func (ss *SettingsService) GetCodebaseInvestigatorSettings() *types.CodebaseInvestigatorSettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.CodebaseInvestigator
+	var codebaseInvestigatorSettings types.CodebaseInvestigatorSettings
+	if err := viper.UnmarshalKey("codebaseInvestigator", &codebaseInvestigatorSettings); err != nil {
+		return nil
+	}
+	return &codebaseInvestigatorSettings
 }
 
 // GetTestWriterSettings returns the test writer settings.
 func (ss *SettingsService) GetTestWriterSettings() *types.TestWriterSettings {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return ss.settings.TestWriter
+	var testWriterSettings types.TestWriterSettings
+	if err := viper.UnmarshalKey("testWriter", &testWriterSettings); err != nil {
+		return nil
+	}
+	return &testWriterSettings
 }
 
 // GetTelemetryLogPath returns the configured telemetry log file path.
 func (ss *SettingsService) GetTelemetryLogPath() string {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	if ss.settings.Telemetry != nil && ss.settings.Telemetry.OutDir != "" {
-		return filepath.Join(ss.settings.Telemetry.OutDir, "go-ai-agent.log")
+	if viper.IsSet("telemetry.outdir") {
+		return filepath.Join(viper.GetString("telemetry.outdir"), "go-ai-agent.log")
 	}
 	// Fallback to a default path if not explicitly configured
 	homeDir, err := os.UserHomeDir()
@@ -301,129 +219,7 @@ func (ss *SettingsService) GetTelemetryLogPath() string {
 func (ss *SettingsService) Set(key string, value interface{}) error {
 	ss.mu.Lock()
 	defer ss.mu.Unlock()
-
-	// Use reflection or a switch statement to set values
-	switch key {
-	case "model":
-		if v, ok := value.(string); ok {
-			// Validate model against current executor's supported models
-			currentExecutorVal, found := ss.Get("executor")
-			if !found {
-				return fmt.Errorf("cannot validate model: executor setting not found")
-			}
-			currentExecutorType, ok := currentExecutorVal.(string)
-			if !ok {
-				return fmt.Errorf("cannot validate model: executor setting is not a string")
-			}
-
-			// Create a temporary config for the executor factory
-			tempConfigParams := &config.ConfigParameters{
-				ModelName: v, // The model we are trying to set
-			}
-			tempConfig := config.NewConfig(tempConfigParams)
-
-			factory, err := core.NewExecutorFactory(currentExecutorType, tempConfig)
-			if err != nil {
-				return fmt.Errorf("failed to create executor factory for validation: %w", err)
-			}
-			tempExecutor, err := factory.NewExecutor(tempConfig, types.GenerateContentConfig{}, nil)
-			if err != nil {
-				return fmt.Errorf("failed to create temporary executor for model validation: %w", err)
-			}
-
-			supportedModels, err := tempExecutor.ListModels()
-			if err != nil {
-				return fmt.Errorf("failed to list models for validation: %w", err)
-			}
-
-			foundModel := false
-			for _, sm := range supportedModels {
-				if sm == v {
-					foundModel = true
-					break
-				}
-			}
-			if !foundModel {
-				return fmt.Errorf("model '%s' is not supported by the current executor '%s'. Supported models: %v", v, currentExecutorType, supportedModels)
-			}
-
-			ss.settings.Model = v
-		} else {
-			return fmt.Errorf("invalid type for model setting, expected string")
-		}
-	case "executor":
-		if v, ok := value.(string); ok {
-			// Validate executor type
-			supportedExecutors := map[string]bool{
-				"gemini": true,
-				"qwen":   true,
-				"mock":   true,
-			}
-			if !supportedExecutors[v] {
-				return fmt.Errorf("unsupported executor type '%s'. Supported types: gemini, qwen, mock", v)
-			}
-			ss.settings.Executor = v
-		} else {
-			return fmt.Errorf("invalid type for executor setting, expected string")
-		}
-	case "debugMode":
-		if v, ok := value.(bool); ok {
-			ss.settings.DebugMode = v
-		} else {
-			return fmt.Errorf("invalid type for debugMode setting, expected bool")
-		}
-	case "approvalMode":
-		if v, ok := value.(types.ApprovalMode); ok {
-			ss.settings.ApprovalMode = v
-		} else {
-			return fmt.Errorf("invalid type for approvalMode setting, expected types.ApprovalMode")
-		}
-	case "proxy":
-		if v, ok := value.(string); ok {
-			ss.settings.Proxy = v
-		} else {
-			return fmt.Errorf("invalid type for proxy setting, expected string")
-		}
-	case "toolDiscoveryCommand":
-		if v, ok := value.(string); ok {
-			ss.settings.ToolDiscoveryCommand = v
-		} else {
-			return fmt.Errorf("invalid type for toolDiscoveryCommand setting, expected string")
-		}
-	case "toolCallCommand":
-		if v, ok := value.(string); ok {
-			ss.settings.ToolCallCommand = v
-		} else {
-			return fmt.Errorf("invalid type for toolCallCommand setting, expected string")
-		}
-	case "enabledExtensions":
-		if v, ok := value.(map[types.SettingScope][]string); ok {
-			ss.settings.EnabledExtensions = v
-		} else {
-			return fmt.Errorf("invalid type for enabledExtensions setting, expected map[types.SettingScope][]string")
-		}
-	case "extensionPaths":
-		if v, ok := value.([]string); ok {
-			ss.settings.ExtensionPaths = v
-		} else {
-			return fmt.Errorf("invalid type for extensionPaths setting, expected []string")
-		}
-	case "mcpServers":
-		if v, ok := value.(map[string]types.MCPServerConfig); ok {
-			ss.settings.McpServers = v
-		} else {
-			return fmt.Errorf("invalid type for mcpServers setting, expected map[string]types.MCPServerConfig")
-		}
-	case "dangerousTools":
-		if v, ok := value.([]string); ok {
-			ss.settings.DangerousTools = v
-		} else {
-			return fmt.Errorf("invalid type for dangerousTools setting, expected []string")
-		}
-	// Add other settings here
-	default:
-		return fmt.Errorf("setting '%s' not found or not settable", key)
-	}
+	viper.Set(key, value)
 	return nil
 }
 
@@ -431,23 +227,7 @@ func (ss *SettingsService) Set(key string, value interface{}) error {
 func (ss *SettingsService) AllSettings() map[string]interface{} {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-
-	all := make(map[string]interface{})
-	all["model"] = ss.settings.Model
-	all["executor"] = ss.settings.Executor
-	all["debugMode"] = ss.settings.DebugMode
-	all["approvalMode"] = ss.settings.ApprovalMode
-	all["proxy"] = ss.settings.Proxy
-	all["toolDiscoveryCommand"] = ss.settings.ToolDiscoveryCommand
-	all["toolCallCommand"] = ss.settings.ToolCallCommand
-	all["enabledExtensions"] = ss.settings.EnabledExtensions
-	all["extensionPaths"] = ss.settings.ExtensionPaths
-	all["mcpServers"] = ss.settings.McpServers
-	all["dangerousTools"] = ss.settings.DangerousTools
-	all["codebaseInvestigator"] = ss.settings.CodebaseInvestigator
-	all["testWriter"] = ss.settings.TestWriter
-	// Add other settings here
-	return all
+	return viper.AllSettings()
 }
 
 // Reset resets all settings to their default values.
@@ -456,12 +236,23 @@ func (ss *SettingsService) Reset() error {
 	defer ss.mu.Unlock()
 
 	// Delete the settings file to ensure defaults are loaded
-	settingsPath := filepath.Join(ss.baseDir, SettingsFileName)
+	settingsPath := viper.ConfigFileUsed()
 	if err := os.Remove(settingsPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to remove settings file: %w", err)
 	}
 
-	ss.settings = LoadSettings(ss.baseDir) // Reload to get defaults
+	// Re-read config to load defaults
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return fmt.Errorf("failed to read config: %w", err)
+		}
+	}
+	var settings Settings
+	if err := viper.Unmarshal(&settings); err != nil {
+		return fmt.Errorf("failed to unmarshal settings: %w", err)
+	}
+	ss.settings = &settings
+
 	return nil
 }
 
@@ -469,5 +260,5 @@ func (ss *SettingsService) Reset() error {
 func (ss *SettingsService) Save() error {
 	ss.mu.RLock()
 	defer ss.mu.RUnlock()
-	return SaveSettings(ss.baseDir, ss.settings)
+	return viper.WriteConfig()
 }

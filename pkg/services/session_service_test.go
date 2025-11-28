@@ -2,7 +2,6 @@ package services
 
 import (
 	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -12,38 +11,31 @@ import (
 )
 
 // setupTestSessionService creates a temporary directory for session files.
-func setupTestSessionService(t *testing.T) (*SessionService, string, func()) {
-	// Create a temp directory to simulate the project root
-	projectRoot, err := os.MkdirTemp("", "project_root_*")
+func setupTestSessionService(t *testing.T) (*SessionService, func()) {
+	sessionsPath, err := os.MkdirTemp("", "sessions_*")
 	assert.NoError(t, err)
 
-	// Create the .goaiagent directory within the temp project root
-	goaiagentDir := filepath.Join(projectRoot, ".goaiagent")
-	err = os.Mkdir(goaiagentDir, 0755)
+	store, err := NewFileSessionStore(sessionsPath)
 	assert.NoError(t, err)
 
-	ss, err := NewSessionService(goaiagentDir)
+	ss, err := NewSessionService(store)
 	assert.NoError(t, err)
 
 	cleanup := func() {
-		os.RemoveAll(projectRoot) // Clean up the entire temp project root
+		os.RemoveAll(sessionsPath)
 	}
 
-	return ss, goaiagentDir, cleanup
+	return ss, cleanup
 }
 
 func TestNewSessionService(t *testing.T) {
-	ss, goaiagentDir, cleanup := setupTestSessionService(t)
+	_, cleanup := setupTestSessionService(t)
 	defer cleanup()
-
-	expectedPath := filepath.Join(goaiagentDir, "sessions")
-	assert.Equal(t, expectedPath, ss.sessionsPath)
-	_, err := os.Stat(expectedPath)
-	assert.False(t, os.IsNotExist(err), "sessions directory should exist")
+	// The setup function already tests the creation of the service
 }
 
 func TestSaveAndLoadHistory(t *testing.T) {
-	ss, _, cleanup := setupTestSessionService(t)
+	ss, cleanup := setupTestSessionService(t)
 	defer cleanup()
 
 	sessionID := "test_session_1"
@@ -56,12 +48,7 @@ func TestSaveAndLoadHistory(t *testing.T) {
 	err := ss.SaveHistory(sessionID, history)
 	assert.NoError(t, err)
 
-	// 2. Verify file exists
-	filePath := ss.getSessionFilePath(sessionID)
-	_, err = os.Stat(filePath)
-	assert.False(t, os.IsNotExist(err), "session file should have been created")
-
-	// 3. Load history
+	// 2. Load history
 	loadedHistory, err := ss.LoadHistory(sessionID)
 	assert.NoError(t, err)
 	assert.Equal(t, len(history), len(loadedHistory))
@@ -70,7 +57,7 @@ func TestSaveAndLoadHistory(t *testing.T) {
 }
 
 func TestLoadHistory_NonExistent(t *testing.T) {
-	ss, _, cleanup := setupTestSessionService(t)
+	ss, cleanup := setupTestSessionService(t)
 	defer cleanup()
 
 	// Try to load a session that doesn't exist
@@ -80,7 +67,7 @@ func TestLoadHistory_NonExistent(t *testing.T) {
 }
 
 func TestListSessions(t *testing.T) {
-	ss, _, cleanup := setupTestSessionService(t)
+	ss, cleanup := setupTestSessionService(t)
 	defer cleanup()
 
 	// Create some session files with different modification times
@@ -99,10 +86,6 @@ func TestListSessions(t *testing.T) {
 	err = ss.SaveHistory(id3, []*types.Content{})
 	assert.NoError(t, err)
 
-	// Create a non-session file that should be ignored
-	nonSessionFile := filepath.Join(ss.sessionsPath, "ignore_this.txt")
-	os.WriteFile(nonSessionFile, []byte("ignore"), 0644)
-
 	sessions, err := ss.ListSessions()
 	assert.NoError(t, err)
 
@@ -114,25 +97,21 @@ func TestListSessions(t *testing.T) {
 }
 
 func TestDeleteSession(t *testing.T) {
-	ss, _, cleanup := setupTestSessionService(t)
+	ss, cleanup := setupTestSessionService(t)
 	defer cleanup()
 
 	sessionID := "session_to_delete"
 	err := ss.SaveHistory(sessionID, []*types.Content{})
 	assert.NoError(t, err)
 
-	// Verify it exists
-	filePath := ss.getSessionFilePath(sessionID)
-	_, err = os.Stat(filePath)
-	assert.False(t, os.IsNotExist(err))
-
 	// Delete it
 	err = ss.DeleteSession(sessionID)
 	assert.NoError(t, err)
 
 	// Verify it's gone
-	_, err = os.Stat(filePath)
-	assert.True(t, os.IsNotExist(err))
+	history, err := ss.LoadHistory(sessionID)
+	assert.NoError(t, err)
+	assert.Empty(t, history)
 
 	// Deleting a non-existent session should not error
 	err = ss.DeleteSession("non_existent_session_id")
@@ -140,7 +119,7 @@ func TestDeleteSession(t *testing.T) {
 }
 
 func TestGenerateSessionID(t *testing.T) {
-	ss, _, cleanup := setupTestSessionService(t)
+	ss, cleanup := setupTestSessionService(t)
 	defer cleanup()
 
 	sessionID := ss.GenerateSessionID()

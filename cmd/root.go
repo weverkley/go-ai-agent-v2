@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
 	"go-ai-agent-v2/go-cli/pkg/config"
@@ -18,6 +19,7 @@ import (
 	"go-ai-agent-v2/go-cli/pkg/types"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 )
 
 var RootCmd = &cobra.Command{
@@ -54,6 +56,7 @@ func initServices(projectRoot string) (
 	types.SettingsServiceIface, // Changed to interface
 	*services.FileFilteringService,
 	*services.ContextService,
+	*services.SessionService,
 ) {
 	workspaceService := services.NewWorkspaceService(projectRoot)
 	fsService := services.NewFileSystemService()
@@ -68,7 +71,34 @@ func initServices(projectRoot string) (
 		os.Exit(1)
 	}
 
-	return workspaceService, fsService, shellService, extensionManager, settingsService, fileFilteringService, contextService
+	var sessionStore services.SessionStore
+	sessionStoreType := viper.GetString("sessionStore.type")
+	switch sessionStoreType {
+	case "redis":
+		redisAddr := viper.GetString("sessionStore.redis.address")
+		redisPassword := viper.GetString("sessionStore.redis.password")
+		redisDB := viper.GetInt("sessionStore.redis.db")
+		sessionStore, err = services.NewRedisSessionStore(redisAddr, redisPassword, redisDB)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing Redis session store: %v\n", err)
+			os.Exit(1)
+		}
+	default:
+		sessionsPath := filepath.Join(projectRoot, ".goaiagent", "sessions")
+		sessionStore, err = services.NewFileSessionStore(sessionsPath)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error initializing file session store: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
+	sessionService, err := services.NewSessionService(sessionStore)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error initializing SessionService: %v\n", err)
+		os.Exit(1)
+	}
+
+	return workspaceService, fsService, shellService, extensionManager, settingsService, fileFilteringService, contextService, sessionService
 }
 
 func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.TelemetrySettings {
@@ -185,7 +215,7 @@ func init() {
 		}
 
 		var fileFilteringService *services.FileFilteringService
-		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService, ContextService = initServices(projectRoot)
+		WorkspaceService, FSService, ShellService, ExtensionManager, SettingsService, fileFilteringService, ContextService, SessionService = initServices(projectRoot)
 		telemetrySettings := getTelemetrySettings(SettingsService)
 
 		// Retrieve agent-specific settings
@@ -210,12 +240,6 @@ func init() {
 
 		// 6. Set the fully populated ToolRegistry into Cfg
 		Cfg.ToolRegistry = toolRegistry
-		// Initialize SessionService now that Cfg is available
-		SessionService, err = services.NewSessionService(Cfg.GetGoaiagentDir())
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error initializing SessionService: %v\n", err)
-			os.Exit(1)
-		}
 
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)

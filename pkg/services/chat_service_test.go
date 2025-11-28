@@ -77,7 +77,11 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 	err = os.Mkdir(goaiagentDir, 0755)
 	assert.NoError(t, err)
 
-	sessionService, err := NewSessionService(goaiagentDir)
+	sessionsPath := filepath.Join(goaiagentDir, "sessions")
+	store, err := NewFileSessionStore(sessionsPath)
+	assert.NoError(t, err)
+
+	sessionService, err := NewSessionService(store)
 	assert.NoError(t, err)
 
 	mockSettingsService := new(MockSettingsService)
