@@ -97,7 +97,7 @@ func setupTestChatService(t *testing.T) (*ChatService, *core.MockExecutor, *Sess
 	appConfig := config.NewConfig(&config.ConfigParameters{}) // Create a simple mock config
 	contextService := NewContextService(projectRoot)
 
-	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, "test_session_id", mockSettingsService, contextService, appConfig, types.GenerateContentConfig{}, nil)
+	chatService, err := NewChatService(mockExecutor, toolRegistry, sessionService, mockSettingsService, contextService, appConfig, types.GenerateContentConfig{}, nil)
 	assert.NoError(t, err)
 
 	cleanup := func() {
@@ -133,7 +133,7 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		eventChan, err := chatService.SendMessage(ctx, "test")
+		eventChan, err := chatService.SendMessage(ctx, "test_session_id", "test")
 		assert.NoError(t, err)
 
 		for event := range eventChan {
@@ -167,7 +167,7 @@ func TestChatService_SendMessage_ToolConfirmation(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 
-		eventChan, err := chatService.SendMessage(ctx, "test")
+		eventChan, err := chatService.SendMessage(ctx, "test_session_id", "test")
 		assert.NoError(t, err)
 
 		var endEvent types.ToolCallEndEvent
@@ -206,7 +206,7 @@ func TestChatService_SendMessage_UserConfirmTool(t *testing.T) {
 			return eventChan, nil
 		}
 
-		eventChan, err := chatService.SendMessage(context.Background(), "test")
+		eventChan, err := chatService.SendMessage(context.Background(), "test_session_id", "test")
 		assert.NoError(t, err)
 
 		for event := range eventChan {
@@ -244,7 +244,7 @@ func TestChatService_SendMessage_ProceedAlways(t *testing.T) {
 			return eventChan, nil
 		}
 
-		eventChan1, err := chatService.SendMessage(context.Background(), "First call")
+		eventChan1, err := chatService.SendMessage(context.Background(), "test_session_id", "First call")
 		assert.NoError(t, err)
 
 		for event := range eventChan1 {
@@ -270,7 +270,7 @@ func TestChatService_SendMessage_ProceedAlways(t *testing.T) {
 			return eventChan, nil
 		}
 
-		eventChan2, err := chatService.SendMessage(context.Background(), "Second call")
+		eventChan2, err := chatService.SendMessage(context.Background(), "test_session_id", "Second call")
 		assert.NoError(t, err)
 
 		var confirmationRequested bool

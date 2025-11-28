@@ -3,6 +3,12 @@ version: '3.8'
 services:
   go-ai-agent:
     build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - GOAIAGENT_RUNMODE=agent
+      - GOAIAGENT_APPROVALMODE=NEVER
+      - GOAIAGENT_TELEMETRY_BACKEND=stdout
     volumes:
       - ./.goaiagent:/app/.goaiagent
     depends_on:

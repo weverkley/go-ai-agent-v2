@@ -773,6 +773,7 @@ type TelemetrySettings struct {
 	OutDir       string `json:"outdir,omitempty"`
 	UseCollector bool   `json:"useCollector,omitempty"`
 	LogLevel     string `json:"logLevel,omitempty"`
+	Backend      string `json:"backend,omitempty"`
 }
 
 // SubagentActivityEvent represents an activity event emitted by a subagent.
@@ -874,4 +875,9 @@ const (
 // TavilySettings represents the configuration for Tavily web search.
 type TavilySettings struct {
 	ApiKey string `json:"apiKey"`
+}
+
+// WebhookTaskRequest represents the JSON body for a task submitted via webhook.
+type WebhookTaskRequest struct {
+	Prompt string `json:"prompt"`
 }

@@ -685,7 +685,7 @@ func (m *ChatModel) handleSlashCommand(input string) (*ChatModel, tea.Cmd) {
 					return m, nil
 				}
 				sessionID := args[2]
-				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, sessionID, m.chatService.GetSettingsService(), m.contextService, m.config, m.chatService.GetGenerationConfig(), nil)
+				newChatService, err := services.NewChatService(m.chatService.GetExecutor(), m.chatService.GetToolRegistry(), m.sessionService, m.chatService.GetSettingsService(), m.contextService, m.config, m.chatService.GetGenerationConfig(), nil)
 				if err != nil {
 					m.messages = append(m.messages, ErrorMessage{Err: fmt.Errorf("failed to resume session: %w", err)})
 					m.updateViewport()
@@ -813,7 +813,7 @@ func (m *ChatModel) logSystemMessage(logMsg string) {
 func (m *ChatModel) startStreaming(userInput string) tea.Cmd {
 	return func() tea.Msg {
 		m.cancelCtx, m.cancelFunc = context.WithCancel(context.Background())
-		stream, err := m.chatService.SendMessage(m.cancelCtx, userInput)
+		stream, err := m.chatService.SendMessage(m.cancelCtx, m.sessionID, userInput)
 		if err != nil {
 			return streamErrorMsg{err}
 		}
@@ -853,7 +853,6 @@ func ReinitializeChatCmd(oldChatService *services.ChatService, sessionService *s
 			newExecutor,
 			oldChatService.GetToolRegistry(),
 			sessionService,
-			chatState.SessionID,
 			settingsService,
 			oldChatService.GetContextService(),
 			appConfig,

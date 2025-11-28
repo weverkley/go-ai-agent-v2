@@ -76,7 +76,7 @@ func newTestModel(t *testing.T, executor core.Executor) *ChatModel {
 	sessionID := "test-session"
 	// Pass an empty generation config for the test setup
 	generationConfig := types.GenerateContentConfig{}
-	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, sessionID, mockSettingsService, contextService, appConfig, generationConfig, nil)
+	chatService, err := services.NewChatService(executor, types.ToolRegistryInterface(types.NewToolRegistry()), sessionService, mockSettingsService, contextService, appConfig, generationConfig, nil)
 	assert.NoError(t, err)
 
 	model := NewChatModel(chatService, sessionService, contextService, "mock", appConfig, dummyCommandExecutor, dummyShellService, realGitService, realWorkspaceService, sessionID)

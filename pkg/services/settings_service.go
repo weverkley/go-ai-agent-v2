@@ -35,6 +35,7 @@ type Settings struct {
 	Tavily               *types.TavilySettings               `json:"tavily,omitempty" mapstructure:"tavily"`
 	CodebaseInvestigator *types.CodebaseInvestigatorSettings `json:"codebaseInvestigator,omitempty" mapstructure:"codebaseInvestigator"`
 	TestWriter           *types.TestWriterSettings           `json:"testWriter,omitempty" mapstructure:"testWriter"`
+	RunMode              string                              `json:"runMode,omitempty" mapstructure:"runMode"`
 }
 
 func newDefaultSettings(workspaceDir string) {
@@ -54,6 +55,7 @@ func newDefaultSettings(workspaceDir string) {
 		Enabled:  true,
 		OutDir:   telemetryOutDir,
 		LogLevel: "info",
+		Backend:  "file",
 	})
 	viper.SetDefault("googleCustomSearch", &types.GoogleCustomSearchSettings{
 		ApiKey: "API_KEY_GOES_HERE",
@@ -65,6 +67,7 @@ func newDefaultSettings(workspaceDir string) {
 	})
 	viper.SetDefault("codebaseInvestigator", &types.CodebaseInvestigatorSettings{Enabled: true})
 	viper.SetDefault("testWriter", &types.TestWriterSettings{Enabled: true})
+	viper.SetDefault("runMode", "cli")
 }
 
 // SettingsService manages application settings.

@@ -39,5 +39,6 @@
   },
   "testWriter": {
     "enabled": true
-  }
+  },
+  "runMode": "cli"
 }

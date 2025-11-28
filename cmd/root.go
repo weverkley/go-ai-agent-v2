@@ -7,7 +7,9 @@ import (
 
 	"go-ai-agent-v2/go-cli/pkg/commands" // Add commands import
 	"go-ai-agent-v2/go-cli/pkg/config"
+	"go-ai-agent-v2/go-cli/pkg/core"
 	"go-ai-agent-v2/go-cli/pkg/core/agents" // Add this line
+	"go-ai-agent-v2/go-cli/pkg/prompts"
 
 	"go-ai-agent-v2/go-cli/pkg/extension"
 
@@ -105,6 +107,41 @@ func getTelemetrySettings(settingsService types.SettingsServiceIface) *types.Tel
 	return settingsService.GetTelemetrySettings()
 }
 
+func createChatService(appConfig types.Config, settingsService types.SettingsServiceIface, sessionService *services.SessionService, contextService *services.ContextService) (*services.ChatService, error) {
+	executorTypeVal, _ := settingsService.Get("executor")
+	executorType, _ := executorTypeVal.(string)
+
+	// Create ExecutorFactory
+	executorFactory, err := core.NewExecutorFactory(executorType, appConfig)
+	if err != nil {
+		return nil, fmt.Errorf("error creating executor factory: %w", err)
+	}
+
+	// Create Executor
+	toolRegistryVal, _ := appConfig.Get("toolRegistry")
+	toolRegistry, _ := toolRegistryVal.(types.ToolRegistryInterface)
+
+	contextContent := contextService.GetContext()
+	systemPrompt, err := prompts.GetCoreSystemPrompt(toolRegistry, appConfig, contextContent)
+	if err != nil {
+		return nil, fmt.Errorf("error creating system prompt: %w", err)
+	}
+	generationConfig := types.GenerateContentConfig{
+		SystemInstruction: systemPrompt,
+	}
+	executor, err := executorFactory.NewExecutor(appConfig, generationConfig, []*types.Content{})
+	if err != nil {
+		return nil, fmt.Errorf("error creating executor: %w", err)
+	}
+
+	chatService, err := services.NewChatService(executor, toolRegistry, sessionService, settingsService, contextService, appConfig, generationConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error creating chat service: %w", err)
+	}
+
+	return chatService, nil
+}
+
 func registerTools(cfg types.Config, fsService services.FileSystemService, shellService services.ShellExecutionService, settingsService types.SettingsServiceIface, workspaceService *services.WorkspaceService) *types.ToolRegistry {
 	return tools.RegisterAllTools(cfg, fsService, shellService, settingsService, workspaceService)
 }
@@ -150,7 +187,7 @@ func initConfig(
 func registerCommands() {
 	RootCmd.AddCommand(todosCmd)
 	chatCmd.Run = func(cmd *cobra.Command, args []string) {
-		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+		// This will be handled by the RootCmd.Run
 	}
 	RootCmd.AddCommand(chatCmd)
 	RootCmd.AddCommand(authCmd)
@@ -243,9 +280,21 @@ func init() {
 
 		telemetry.GlobalLogger = telemetry.NewTelemetryLogger(Cfg.Telemetry)
 		extensionsCliCommand = commands.NewExtensionsCommand(ExtensionManager, SettingsService)
+
+		chatService, err = createChatService(Cfg, SettingsService, SessionService, ContextService)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating chat service: %v\n", err)
+			os.Exit(1)
+		}
 	}
 	RootCmd.Run = func(cmd *cobra.Command, args []string) {
-		runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+		runMode, _ := SettingsService.Get("runMode")
+		switch runMode {
+		case "agent":
+			runAgentCmd(RootCmd, cmd, args)
+		default:
+			runChatCmd(RootCmd, cmd, args, SettingsService, ShellService)
+		}
 	}
 	registerCommands()
 }

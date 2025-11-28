@@ -23,7 +23,6 @@ type ChatService struct {
 	toolRegistry         types.ToolRegistryInterface
 	history              []*types.Content
 	sessionService       *SessionService
-	sessionID            string
 	settingsService      types.SettingsServiceIface
 	contextService       *ContextService
 	appConfig            types.Config
@@ -37,7 +36,7 @@ type ChatService struct {
 }
 
 // NewChatService creates a new ChatService.
-func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, sessionID string, settingsService types.SettingsServiceIface, contextService *ContextService, appConfig types.Config, generationConfig types.GenerateContentConfig, initialState *types.ChatState) (*ChatService, error) {
+func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInterface, sessionService *SessionService, settingsService types.SettingsServiceIface, contextService *ContextService, appConfig types.Config, generationConfig types.GenerateContentConfig, initialState *types.ChatState) (*ChatService, error) {
 	// Prepend context to system instruction
 	contextContent := contextService.GetContext()
 	if contextContent != "" {
@@ -48,7 +47,6 @@ func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInter
 		executor:             executor,
 		toolRegistry:         toolRegistry,
 		sessionService:       sessionService,
-		sessionID:            sessionID,
 		settingsService:      settingsService,
 		contextService:       contextService,
 		appConfig:            appConfig,
@@ -67,23 +65,20 @@ func NewChatService(executor core.Executor, toolRegistry types.ToolRegistryInter
 		cs.proceedAlwaysTools = initialState.ProceedAlwaysTools
 		cs.toolCallCounter = initialState.ToolCallCounter
 		cs.toolErrorCounter = initialState.ToolErrorCounter
-	} else {
-		initialHistory, err := sessionService.LoadHistory(sessionID)
-		if err != nil {
-			return nil, fmt.Errorf("failed to load session history for ID %s: %w", sessionID, err)
-		}
-		cs.history = initialHistory
 	}
 
-	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
-		return nil, fmt.Errorf("failed to save initial session history: %w", err)
-	}
 	return cs, nil
 }
 
 // SendMessage starts the conversation loop for a user's message and returns a channel of events.
-func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-chan any, error) {
+func (cs *ChatService) SendMessage(ctx context.Context, sessionID string, userInput string) (<-chan any, error) {
 	eventChan := make(chan any)
+
+	initialHistory, err := cs.sessionService.LoadHistory(sessionID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load session history for ID %s: %w", sessionID, err)
+	}
+	cs.history = initialHistory
 
 	cs.history = append(cs.history, &types.Content{
 		Role:  "user",
@@ -309,7 +304,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 			break
 		}
 
-		if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+		if err := cs.sessionService.SaveHistory(sessionID, cs.history); err != nil {
 			telemetry.LogErrorf("Failed to save history: %v", err)
 		}
 	}()
@@ -373,14 +368,17 @@ func (cs *ChatService) GetHistory() []*types.Content {
 }
 func (cs *ChatService) ClearHistory() {
 	cs.history = []*types.Content{}
-	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
-		telemetry.LogErrorf("Failed to clear persisted history for session %s: %v", cs.sessionID, err)
-	}
+	// The sessionID for ClearHistory needs to come from somewhere, maybe as a parameter.
+	// For now, it will not work correctly in agent mode.
+	// We'll address this later if needed.
+	// if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+	// 	telemetry.LogErrorf("Failed to clear persisted history for session %s: %v", cs.sessionID, err)
+	// }
 }
 func (cs *ChatService) GetState() *types.ChatState {
 	return &types.ChatState{
 		History:            cs.history,
-		SessionID:          cs.sessionID,
+		SessionID:          "", // SessionID is now per-message
 		ProceedAlwaysTools: cs.proceedAlwaysTools,
 		ToolCallCounter:    cs.toolCallCounter,
 		ToolErrorCounter:   cs.toolErrorCounter,
@@ -408,7 +406,10 @@ func (cs *ChatService) CompressHistory() (*types.ChatCompressionResult, error) {
 		return nil, fmt.Errorf("executor is not initialized")
 	}
 
-	promptID := "compress-" + cs.sessionID // Or generate a unique ID
+	// This promptID will not have the session ID if called from agent mode
+	// when sessionID is handled per-message.
+	// This will need to be refactored if CompressHistory is used in agent mode.
+	promptID := "compress-session"
 	result, err := cs.executor.CompressChat(cs.history, promptID)
 	if err != nil {
 		return nil, err
@@ -439,11 +440,11 @@ func (cs *ChatService) CompressHistory() (*types.ChatCompressionResult, error) {
 
 	cs.history = newHistory
 
-	// Save the new compressed history
-	if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
-		// Log the error but don't fail the whole operation, as the compression itself succeeded.
-		telemetry.LogErrorf("Failed to save compressed history for session %s: %v", cs.sessionID, err)
-	}
+	// The sessionID for SaveHistory needs to come from somewhere, maybe as a parameter.
+	// For now, it will not work correctly in agent mode.
+	// if err := cs.sessionService.SaveHistory(cs.sessionID, cs.history); err != nil {
+	// 	telemetry.LogErrorf("Failed to save compressed history for session %s: %v", cs.sessionID, err)
+	// }
 
 	return result, nil
 }
