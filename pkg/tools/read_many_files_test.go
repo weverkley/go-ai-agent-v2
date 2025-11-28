@@ -19,7 +19,8 @@ func TestReadManyFilesTool_Execute(t *testing.T) {
 	fs := services.NewFileSystemService()
 	tool := NewReadManyFilesTool(fs)
 
-	tempDir := t.TempDir()
+	tempDir, err := filepath.EvalSymlinks(t.TempDir())
+	require.NoError(t, err)
 
 	// Create some dummy files and directories
 	require.NoError(t, os.MkdirAll(filepath.Join(tempDir, "src"), 0755))

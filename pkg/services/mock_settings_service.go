@@ -109,3 +109,8 @@ func (m *MockSettingsService) Save() error {
 	args := m.Called()
 	return args.Error(0)
 }
+
+// SetExtensionManager provides a mock function for SetExtensionManager.
+func (m *MockSettingsService) SetExtensionManager(mgr types.ExtensionManager) {
+	m.Called(mgr)
+}
