@@ -59,7 +59,7 @@ func initServices(projectRoot string) (
 	fsService := services.NewFileSystemService()
 	shellService := services.NewShellExecutionService()
 	extensionManager := extension.NewManager(projectRoot, fsService, services.NewGitService())
-	settingsService := services.NewSettingsService(projectRoot)
+	settingsService := services.NewSettingsService(projectRoot, extensionManager)
 	contextService := services.NewContextService(projectRoot)
 
 	fileFilteringService, err := services.NewFileFilteringService(projectRoot)

@@ -34,7 +34,6 @@ func NewManager(baseDir string, fsService services.FileSystemService, gitService
 		FSService:  fsService,
 		gitService: gitService,
 	}
-	_ = em.LoadExtensionStatus()
 	return em
 }
 
@@ -109,13 +108,9 @@ func (em *Manager) LoadExtensionStatus() error {
 		return fmt.Errorf("failed to check for settings file: %w", err)
 	}
 	if !exists {
+		// If the settings file doesn't exist, there are no extension statuses to load.
+		// The SettingsService is responsible for creating the file with defaults.
 		em.extensions = make(map[string]*Extension)
-		if err := em.FSService.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-			return fmt.Errorf("failed to create directory for settings file: %w", err)
-		}
-		if err := em.FSService.WriteFile(filePath, "{}"); err != nil {
-			return fmt.Errorf("failed to write initial empty settings file: %w", err)
-		}
 		return nil
 	}
 

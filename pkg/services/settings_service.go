@@ -50,8 +50,8 @@ func newDefaultSettings(workspaceDir string) *Settings {
 		ApprovalMode:         types.ApprovalModeDefault,
 		DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME},
 		ShowMemoryUsage:      false,
-		Model:                "gemini-1.5-flash-latest",
-		Executor:             "gemini",
+		Model:                "mock-flash",
+		Executor:             types.ExecutorTypeMock,
 		Proxy:                "",
 		EnabledExtensions:    make(map[types.SettingScope][]string),
 		ToolDiscoveryCommand: "",
@@ -62,12 +62,12 @@ func newDefaultSettings(workspaceDir string) *Settings {
 			LogLevel: "info",
 		},
 		GoogleCustomSearch: &types.GoogleCustomSearchSettings{
-			ApiKey: "your-google-api-key",
-			CxId:   "your-google-cx-id",
+			ApiKey: "API_KEY_GOES_HERE",
+			CxId:   "CX_ID_GOES_HERE",
 		},
 		WebSearchProvider: types.WebSearchProviderGoogleCustomSearch,
 		Tavily: &types.TavilySettings{
-			ApiKey: "your-tavily-api-key",
+			ApiKey: "API_KEY_GOES_HERE",
 		},
 		CodebaseInvestigator: &types.CodebaseInvestigatorSettings{Enabled: true},
 		TestWriter:           &types.TestWriterSettings{Enabled: true},
@@ -79,13 +79,30 @@ func LoadSettings(workspaceDir string) *Settings {
 	settingsPath := getSettingsPath(workspaceDir)
 	data, err := os.ReadFile(settingsPath)
 	if err != nil {
-		return newDefaultSettings(workspaceDir)
+		defaultSettings := newDefaultSettings(workspaceDir)
+		if err := SaveSettings(workspaceDir, defaultSettings); err != nil {
+			fmt.Printf("Warning: failed to save default settings: %v\n", err)
+		}
+		return defaultSettings
+	}
+
+	// If the file is empty, treat it as a new settings file
+	if len(data) == 0 {
+		defaultSettings := newDefaultSettings(workspaceDir)
+		if err := SaveSettings(workspaceDir, defaultSettings); err != nil {
+			fmt.Printf("Warning: failed to save default settings: %v\n", err)
+		}
+		return defaultSettings
 	}
 
 	var settings Settings
 	if err := json.Unmarshal(data, &settings); err != nil {
 		fmt.Printf("Warning: could not parse settings file, using defaults: %v\n", err)
-		return newDefaultSettings(workspaceDir)
+		defaultSettings := newDefaultSettings(workspaceDir)
+		if err := SaveSettings(workspaceDir, defaultSettings); err != nil {
+			fmt.Printf("Warning: failed to save default settings: %v\n", err)
+		}
+		return defaultSettings
 	}
 
 	// Apply defaults if not set in the loaded settings to ensure backward compatibility
@@ -168,11 +185,14 @@ type SettingsService struct {
 }
 
 // NewSettingsService creates a new SettingsService instance.
-func NewSettingsService(baseDir string) types.SettingsServiceIface {
+func NewSettingsService(baseDir string, extensionManager types.ExtensionManager) types.SettingsServiceIface {
 	ss := &SettingsService{
 		baseDir: baseDir,
 	}
 	ss.settings = LoadSettings(baseDir) // Load initial settings
+	if err := extensionManager.LoadExtensionStatus(); err != nil {
+		fmt.Printf("Warning: failed to load extension status: %v\n", err)
+	}
 	return ss
 }
 

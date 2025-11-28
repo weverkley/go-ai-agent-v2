@@ -600,6 +600,11 @@ type SettingsServiceIface interface {
 	Save() error
 }
 
+// ExtensionManager defines the interface for managing extensions.
+type ExtensionManager interface {
+	LoadExtensionStatus() error
+}
+
 // ContextKey is a type for context keys to avoid collisions.
 type ContextKey string
 
