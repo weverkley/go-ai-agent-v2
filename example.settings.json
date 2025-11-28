@@ -1,4 +1,12 @@
 {
+  "sessionStore": {
+    "type": "file",
+    "redis": {
+      "address": "localhost:6379",
+      "password": "password",
+      "db": 0
+    }
+  },
   "extensionPaths": [
     "/home/wever-kley/Workspace/go-ai-agent-v2/.goaiagent/extensions"
   ],
