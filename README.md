@@ -61,6 +61,34 @@ To handle API limits gracefully, the application uses a routing service.
 
 ---
 
+## Configuration
+
+The application is configured using a `settings.json` file, which is automatically generated in the `.goaiagent` directory in your project's root on the first run. The default settings are based on the `example.settings.json` file.
+
+You can modify the `settings.json` file to customize the application's behavior. The following table lists all the available settings, their default values, and a brief description of what they do:
+
+| Setting                | Default Value                                                              | Description                                                                                                                              |
+| ---------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `extensionPaths`       | `[./.goaiagent/extensions]`                                                | A list of paths where the application should look for extensions.                                                                        |
+| `mcpServers`           | `{}`                                                                       | A map of Multi-Component Protocol (MCP) servers to connect to.                                                                          |
+| `debugMode`            | `false`                                                                    | When set to `true`, the application will print debug information to the console.                                                        |
+| `approvalMode`         | `DEFAULT`                                                                  | The approval mode for "dangerous" tool calls. Can be `DEFAULT`, `ALWAYS`, or `NEVER`.                                                    |
+| `dangerousTools`       | `["execute_command", "write_file", "smart_edit", "user_confirm"]`            | A list of tools that require user confirmation before execution.                                                                         |
+| `model`                | `mock-flash`                                                               | The default AI model to use for chat.                                                                                                    |
+| `executor`             | `mock`                                                                     | The default AI model executor to use. Can be `gemini`, `qwen`, or `mock`.                                                                |
+| `proxy`                | `""`                                                                       | The proxy to use for all outgoing requests.                                                                                              |
+| `enabledExtensions`    | `{}`                                                                       | A map of enabled extensions.                                                                                                             |
+| `toolDiscoveryCommand` | `""`                                                                       | A command to run to discover tools.                                                                                                      |
+| `toolCallCommand`      | `""`                                                                       | A command to run to call a tool.                                                                                                         |
+| `telemetry`            | `{ "enabled": true, "outdir": "./.goaiagent/tmp/", "logLevel": "debug" }`    | The telemetry settings.                                                                                                                  |
+| `googleCustomSearch`   | `{ "apiKey": "API_KEY_GOES_HERE", "cxId": "CX_ID_GOES_HERE" }`              | The Google Custom Search API settings.                                                                                                   |
+| `webSearchProvider`    | `googleCustomSearch`                                                       | The web search provider to use. Can be `googleCustomSearch` or `tavily`.                                                                 |
+| `tavily`               | `{ "apiKey": "API_KEY_GOES_HERE" }`                                        | The Tavily API settings.                                                                                                                 |
+| `codebaseInvestigator` | `{ "enabled": true }`                                                      | The Codebase Investigator agent settings.                                                                                                |
+| `testWriter`           | `{ "enabled": true }`                                                      | The Test Writer agent settings.                                                                                                          |
+
+---
+
 ## Getting Started
 
 ### Prerequisites
@@ -82,7 +110,10 @@ To handle API limits gracefully, the application uses a routing service.
     ./main-agent
     ```
 
-3.  **Explore other commands:**
+3.  **Customize Your Settings:**
+    After running the application for the first time, a `settings.json` file will be created in the `.goaiagent` directory. You can modify this file to customize the application's behavior. See the "Configuration" section for more details.
+
+4.  **Explore other commands:**
     ```bash
     # See all available commands
     ./main-agent --help

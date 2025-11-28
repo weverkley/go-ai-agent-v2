@@ -2,6 +2,8 @@
   "extensionPaths": [
     "/home/wever-kley/Workspace/go-ai-agent-v2/.goaiagent/extensions"
   ],
+  "mcpServers": {},
+  "debugMode": false,
   "approvalMode": "DEFAULT",
   "dangerousTools": [
     "execute_command",

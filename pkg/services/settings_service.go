@@ -21,11 +21,8 @@ type Settings struct {
 	ExtensionPaths       []string                            `json:"extensionPaths"`
 	McpServers           map[string]types.MCPServerConfig    `json:"mcpServers,omitempty"`
 	DebugMode            bool                                `json:"debugMode,omitempty"`
-	UserMemory           string                              `json:"userMemory,omitempty"`
 	ApprovalMode         types.ApprovalMode                  `json:"approvalMode,omitempty"`
 	DangerousTools       []string                            `json:"dangerousTools,omitempty"` // New field
-	ShowMemoryUsage      bool                                `json:"showMemoryUsage,omitempty"`
-	TelemetryEnabled     bool                                `json:"telemetryEnabled,omitempty"`
 	Model                string                              `json:"model,omitempty"`
 	Executor             string                              `json:"executor,omitempty"`
 	Proxy                string                              `json:"proxy,omitempty"`
@@ -46,10 +43,8 @@ func newDefaultSettings(workspaceDir string) *Settings {
 		ExtensionPaths:       []string{filepath.Join(workspaceDir, ".goaiagent", "extensions")},
 		McpServers:           make(map[string]types.MCPServerConfig),
 		DebugMode:            false,
-		UserMemory:           "",
 		ApprovalMode:         types.ApprovalModeDefault,
 		DangerousTools:       []string{types.EXECUTE_COMMAND_TOOL_NAME, types.WRITE_FILE_TOOL_NAME, types.SMART_EDIT_TOOL_NAME, types.USER_CONFIRM_TOOL_NAME},
-		ShowMemoryUsage:      false,
 		Model:                "mock-flash",
 		Executor:             types.ExecutorTypeMock,
 		Proxy:                "",
@@ -209,14 +204,8 @@ func (ss *SettingsService) Get(key string) (interface{}, bool) {
 		return ss.settings.Executor, true
 	case "debugMode":
 		return ss.settings.DebugMode, true
-	case "userMemory":
-		return ss.settings.UserMemory, true
 	case "approvalMode":
 		return ss.settings.ApprovalMode, true
-	case "showMemoryUsage":
-		return ss.settings.ShowMemoryUsage, true
-	case "telemetryEnabled":
-		return ss.settings.TelemetryEnabled, true
 	case "proxy":
 		return ss.settings.Proxy, true
 	case "toolDiscoveryCommand":
@@ -383,29 +372,11 @@ func (ss *SettingsService) Set(key string, value interface{}) error {
 		} else {
 			return fmt.Errorf("invalid type for debugMode setting, expected bool")
 		}
-	case "userMemory":
-		if v, ok := value.(string); ok {
-			ss.settings.UserMemory = v
-		} else {
-			return fmt.Errorf("invalid type for userMemory setting, expected string")
-		}
 	case "approvalMode":
 		if v, ok := value.(types.ApprovalMode); ok {
 			ss.settings.ApprovalMode = v
 		} else {
 			return fmt.Errorf("invalid type for approvalMode setting, expected types.ApprovalMode")
-		}
-	case "showMemoryUsage":
-		if v, ok := value.(bool); ok {
-			ss.settings.ShowMemoryUsage = v
-		} else {
-			return fmt.Errorf("invalid type for showMemoryUsage setting, expected bool")
-		}
-	case "telemetryEnabled":
-		if v, ok := value.(bool); ok {
-			ss.settings.TelemetryEnabled = v
-		} else {
-			return fmt.Errorf("invalid type for telemetryEnabled setting, expected bool")
 		}
 	case "proxy":
 		if v, ok := value.(string); ok {
@@ -465,10 +436,7 @@ func (ss *SettingsService) AllSettings() map[string]interface{} {
 	all["model"] = ss.settings.Model
 	all["executor"] = ss.settings.Executor
 	all["debugMode"] = ss.settings.DebugMode
-	all["userMemory"] = ss.settings.UserMemory
 	all["approvalMode"] = ss.settings.ApprovalMode
-	all["showMemoryUsage"] = ss.settings.ShowMemoryUsage
-	all["telemetryEnabled"] = ss.settings.TelemetryEnabled
 	all["proxy"] = ss.settings.Proxy
 	all["toolDiscoveryCommand"] = ss.settings.ToolDiscoveryCommand
 	all["toolCallCommand"] = ss.settings.ToolCallCommand
