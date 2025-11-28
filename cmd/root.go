@@ -193,7 +193,7 @@ func registerCommands() {
 	}
 	RootCmd.AddCommand(chatCmd)
 	RootCmd.AddCommand(authCmd)
-	RootCmd.AddCommand(modelCmd)
+
 	RootCmd.AddCommand(settingsCmd)
 	RootCmd.AddCommand(memoryCmd)
 	RootCmd.AddCommand(ExtensionsCmd)
@@ -209,7 +209,7 @@ func registerCommands() {
 	}
 	RootCmd.AddCommand(generateCmd)
 	RootCmd.AddCommand(smartEditCmd)
-	RootCmd.AddCommand(grepCodeCmd)
+
 	RootCmd.AddCommand(readManyFilesCmd)
 	RootCmd.AddCommand(writeCmd)
 	RootCmd.AddCommand(globCmd)
@@ -217,31 +217,31 @@ func registerCommands() {
 	RootCmd.AddCommand(versionCmd)
 	RootCmd.AddCommand(execCmd)
 	RootCmd.AddCommand(gitBranchCmd)
-	RootCmd.AddCommand(codeGuideCmd)
-	RootCmd.AddCommand(findDocsCmd)
+
+
 	RootCmd.AddCommand(cleanupBackToMainCmd)
-	RootCmd.AddCommand(prReviewCmd)
+
 	RootCmd.AddCommand(aboutCmd)
 	RootCmd.AddCommand(bugCmd)
 	RootCmd.AddCommand(clearCmd)
 	RootCmd.AddCommand(compressCmd)
-	RootCmd.AddCommand(copyCmd)
+
 	RootCmd.AddCommand(corgiCmd)
 	RootCmd.AddCommand(directoryCmd)
 	RootCmd.AddCommand(docsCmd)
-	RootCmd.AddCommand(editorCmd)
-	RootCmd.AddCommand(ideCmd)
-	RootCmd.AddCommand(initCmd)
-	RootCmd.AddCommand(permissionsCmd)
+
+
+
+
 	RootCmd.AddCommand(privacyCmd)
-	RootCmd.AddCommand(profileCmd)
+
 	RootCmd.AddCommand(quitCmd)
-	RootCmd.AddCommand(restoreCmd)
-	RootCmd.AddCommand(setupGithubCmd)
-	RootCmd.AddCommand(statsCmd)
-	RootCmd.AddCommand(terminalSetupCmd)
-	RootCmd.AddCommand(themeCmd)
-	RootCmd.AddCommand(vimCmd)
+
+
+
+
+
+
 }
 
 func init() {

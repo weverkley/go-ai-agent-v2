@@ -18,23 +18,6 @@ var authCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	authCmd.AddCommand(authLoginCmd)
-	authCmd.AddCommand(authStatusCmd)
-	authCmd.AddCommand(authLogoutCmd)
-}
-
-var authLoginCmd = &cobra.Command{
-	Use:   "login <API_KEY>",
-	Short: "Set the Gemini API key",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		apiKey := args[0]
-		fmt.Printf("Gemini API key received. For now, please set it as an environment variable: export GEMINI_API_KEY=%s\n", apiKey)
-		fmt.Println("Secure storage of API keys is not yet implemented. This feature, crucial for security, may be available in a future version.")
-	},
-}
-
 var authStatusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Check if a Gemini API key is configured",
@@ -43,16 +26,11 @@ var authStatusCmd = &cobra.Command{
 		if apiKey != "" {
 			fmt.Println("Gemini API key is configured.")
 		} else {
-			fmt.Println("Gemini API key is NOT configured. Use 'auth login <API_KEY>' to set it.")
+			fmt.Println("Gemini API key is NOT configured. Please set it as an environment variable (e.g., export GEMINI_API_KEY=your_key_here).")
 		}
 	},
 }
 
-var authLogoutCmd = &cobra.Command{
-	Use:   "logout",
-	Short: "Clear the configured Gemini API key",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Clearing the Gemini API key is not yet implemented. If you set it as an environment variable, you will need to unset it manually.")
-		fmt.Println("Secure clearing of API keys, crucial for security, may be available in a future version.")
-	},
+func init() {
+	authCmd.AddCommand(authStatusCmd)
 }
