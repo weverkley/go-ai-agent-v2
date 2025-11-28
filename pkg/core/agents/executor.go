@@ -336,30 +336,34 @@ func (ae *AgentExecutor) callModel(
 
 		if resp.Type == types.StreamEventTypeChunk {
 			chunk := resp.Value
-			if chunk == nil || len(chunk.Candidates) == 0 || chunk.Candidates[0].Content == nil {
-				continue
-			}
+			if genContent, ok := chunk.(*types.GenerateContentResponse); ok { // Type assertion
+				if genContent == nil || len(genContent.Candidates) == 0 || genContent.Candidates[0].Content == nil {
+					continue
+				}
 
-			for _, part := range chunk.Candidates[0].Content.Parts {
-				if part.Thought != "" {
-					thoughtResult := utils.ParseThought(part.Thought)
-					if thoughtResult.Subject != "" {
-						ae.emitActivity(types.ActivityTypeThoughtChunk, map[string]interface{}{"text": thoughtResult.Subject})
+				for _, part := range genContent.Candidates[0].Content.Parts {
+					if part.Thought != "" {
+						thoughtResult := utils.ParseThought(part.Thought)
+						if thoughtResult.Subject != "" {
+							ae.emitActivity(types.ActivityTypeThoughtChunk, map[string]interface{}{"text": thoughtResult.Subject})
+						}
+					}
+
+					if part.FunctionCall != nil {
+						functionCalls = append(functionCalls, part.FunctionCall)
+					}
+
+					if part.Text != "" {
+						if !strings.HasPrefix(part.Text, "**") { // Simple check to filter out thoughts
+							textResponse.WriteString(part.Text)
+						}
 					}
 				}
-
-				if part.FunctionCall != nil {
-					functionCalls = append(functionCalls, part.FunctionCall)
-				}
-
-				if part.Text != "" {
-					if !strings.HasPrefix(part.Text, "**") { // Simple check to filter out thoughts
-						textResponse.WriteString(part.Text)
-					}
-				}
-			}
+			} // Corrected: Added missing closing brace for 'if genContent, ok := ...'
 		} else if resp.Type == types.StreamEventTypeError {
 			return nil, "", resp.Error
+		} else if resp.Type == types.StreamEventTypeTokenCount { // Handle TokenCountEvent
+			// No action needed here, as token counts are handled separately and not part of textResponse
 		}
 	}
 

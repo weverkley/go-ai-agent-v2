@@ -385,7 +385,7 @@ func (m *MockExecutor) CompressChat(history []*types.Content, promptId string) (
 }
 
 // StreamContent mocks the StreamContent method.
-func (m *MockExecutor) StreamContent(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
+func (m *MockExecutor) StreamContent(ctx context.Context, contents []*types.Content, tools []types.Tool) (<-chan any, error) {
 	if m.StreamContentFunc != nil {
 		return m.StreamContentFunc(ctx, contents...)
 	}

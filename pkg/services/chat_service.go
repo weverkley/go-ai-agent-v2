@@ -104,7 +104,7 @@ func (cs *ChatService) SendMessage(ctx context.Context, userInput string) (<-cha
 
 			eventChan <- types.ThinkingEvent{}
 
-			stream, err := cs.executor.StreamContent(ctx, cs.history...)
+			stream, err := cs.executor.StreamContent(ctx, cs.history, cs.toolRegistry.GetAllTools())
 			if err != nil {
 				eventChan <- types.ErrorEvent{Err: err}
 				return

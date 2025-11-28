@@ -141,8 +141,9 @@ type MessageParams struct {
 type StreamEventType string
 
 const (
-	StreamEventTypeChunk StreamEventType = "chunk"
-	StreamEventTypeError StreamEventType = "error"
+	StreamEventTypeChunk      StreamEventType = "chunk"
+	StreamEventTypeError      StreamEventType = "error"
+	StreamEventTypeTokenCount StreamEventType = "token_count" // Added
 )
 
 // GenerateContentResponse represents the response from a content generation call.
@@ -158,7 +159,7 @@ type Candidate struct {
 // StreamResponse represents a response from the stream.
 type StreamResponse struct {
 	Type  StreamEventType
-	Value *GenerateContentResponse // Or a custom struct that mirrors it
+	Value interface{} // Can be *GenerateContentResponse, TokenCountEvent, etc.
 	Error error
 }
 
@@ -616,7 +617,7 @@ type Executor interface {
 	GetHistory() ([]*Content, error)
 	SetHistory(history []*Content) error
 	CompressChat(history []*Content, promptId string) (*ChatCompressionResult, error)
-	StreamContent(ctx context.Context, contents ...*Content) (<-chan any, error)
+	StreamContent(ctx context.Context, contents []*Content, tools []Tool) (<-chan any, error)
 	SetUserConfirmationChannel(chan bool)                          // New method for user confirmation
 	SetToolConfirmationChannel(chan ToolConfirmationOutcome) // New method for rich tool confirmation
 }

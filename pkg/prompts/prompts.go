@@ -123,6 +123,14 @@ func GetCoreSystemPrompt(toolRegistry types.ToolRegistryInterface, config types.
 	sb.WriteString(corePrompts["primary_workflows_suffix"])
 	sb.WriteString("\n\n")
 
+	// Conditionally add main agent tooling prompt for Codebase Investigator
+	if hasCI {
+		if mainAgentCIPrompt, ok := corePrompts["codebase_investigator_main_agent_tooling_prompt"]; ok {
+			sb.WriteString(mainAgentCIPrompt)
+			sb.WriteString("\n\n")
+		}
+	}
+
 	// Add other sections
 	sb.WriteString(corePrompts["operational_guidelines"])
 	sb.WriteString("\n\n")

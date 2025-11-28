@@ -52,7 +52,7 @@ func TestMockExecutor_SubagentFlow(t *testing.T) {
 			// Always send the current full history to the mock StreamContent
 			currentInput = history
 
-			stream, err := mockExecutor.StreamContent(ctx, currentInput...)
+			                 stream, err := mockExecutor.StreamContent(ctx, currentInput, []types.Tool{})
 			if err != nil {
 				allEvents <- types.ErrorEvent{Err: err}
 				return

@@ -51,10 +51,10 @@ func TestGenerateStream(t *testing.T) {
 	qwenChat := &QwenChat{
 		client:    client,
 		modelName: "qwen-turbo",
-		logger:    telemetry.NewTelemetryLogger(nil), // Initialize logger
-	}
-
-	eventChan, err := qwenChat.StreamContent(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
+		        logger:    telemetry.NewTelemetryLogger(nil), // Initialize logger
+			}
+		
+			eventChan, err := qwenChat.StreamContent(context.Background(), []*types.Content{{Parts: []types.Part{{Text: "test"}}}}, []types.Tool{})
 	assert.NoError(t, err)
 
 	var receivedParts []types.Part
@@ -104,7 +104,7 @@ func TestGenerateStreamWithToolCalling(t *testing.T) {
 		logger:       telemetry.NewTelemetryLogger(nil), // Initialize logger
 	}
 
-	eventChan, err := qwenChat.StreamContent(context.Background(), &types.Content{Parts: []types.Part{{Text: "test"}}})
+	eventChan, err := qwenChat.StreamContent(context.Background(), []*types.Content{{Parts: []types.Part{{Text: "test"}}}}, []types.Tool{})
 	assert.NoError(t, err)
 
 	var receivedParts []types.Part

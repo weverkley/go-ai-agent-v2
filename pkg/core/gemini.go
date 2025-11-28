@@ -209,7 +209,7 @@ func buildGeminiTools(toolRegistry types.ToolRegistryInterface, logger telemetry
 	return genaiTools
 }
 
-func (gc *GeminiChat) StreamContent(ctx context.Context, history ...*types.Content) (<-chan any, error) {
+func (gc *GeminiChat) StreamContent(ctx context.Context, history []*types.Content, tools []types.Tool) (<-chan any, error) {
 	eventChan := make(chan any)
 
 			go func() {

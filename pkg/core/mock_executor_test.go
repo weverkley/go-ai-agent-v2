@@ -270,14 +270,14 @@ func TestMockExecutor(t *testing.T) {
 				return expectedReadChan, nil
 			},
 		}
-		respChan, err := mockExecutor.StreamContent(context.Background())
+		respChan, err := mockExecutor.StreamContent(context.Background(), []*types.Content{}, []types.Tool{})
 		assert.NoError(t, err)
 		assert.Equal(t, expectedReadChan, respChan)
 	})
 
 	t.Run("StreamContent should return error if function not provided", func(t *testing.T) {
 		mockExecutor := &core.MockExecutor{}
-		respChan, err := mockExecutor.StreamContent(context.Background())
+		respChan, err := mockExecutor.StreamContent(context.Background(), []*types.Content{}, []types.Tool{})
 		assert.Error(t, err)
 		assert.Nil(t, respChan)
 		assert.Contains(t, err.Error(), "StreamContent not implemented in mock")

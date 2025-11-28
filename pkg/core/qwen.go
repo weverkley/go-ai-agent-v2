@@ -178,25 +178,100 @@ func NewQwenChat(cfg types.Config, generationConfig types.GenerateContentConfig,
 	}, nil
 }
 
-func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Content) (<-chan any, error) {
-	eventChan := make(chan any)
+func (qc *QwenChat) StreamContent(ctx context.Context, contents []*types.Content, tools []types.Tool) (<-chan any, error) {
+	messageParts := []types.Part{}
+	for _, content := range contents {
+		messageParts = append(messageParts, content.Parts...)
+	}
 
+	toolDefinitions := make([]*types.ToolDefinition, 0, len(tools))
+	for _, tool := range tools {
+		toolDefinitions = append(toolDefinitions, &types.ToolDefinition{
+			FunctionDeclarations: []*types.FunctionDeclaration{
+				{
+					Name:        tool.Name(),
+					Description: tool.Description(),
+					Parameters:  tool.Parameters(),
+				},
+			},
+		})
+	}
+
+	messageParams := types.MessageParams{
+		Message:     messageParts,
+		Tools:       toolDefinitions, // Pass the converted tool definitions
+		AbortSignal: ctx,
+	}
+
+	streamResponseChan, err := qc.SendMessageStream(qc.modelName, messageParams, "")
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert <-chan types.StreamResponse to <-chan any
+	anyStreamChan := make(chan any)
+	go func() {
+		defer close(anyStreamChan)
+		for sr := range streamResponseChan {
+			if sr.Type == types.StreamEventTypeChunk {
+				if sr.Value != nil {
+					if genContent, ok := sr.Value.(*types.GenerateContentResponse); ok && len(genContent.Candidates) > 0 {
+						for _, part := range genContent.Candidates[0].Content.Parts {
+							if part.Text != "" {
+								anyStreamChan <- types.Part{Text: part.Text}
+							}
+							if part.FunctionCall != nil {
+								anyStreamChan <- types.Part{FunctionCall: part.FunctionCall}
+							}
+							// Handle TokenCountEvent from the "<!-- TokenCount: ... -->" format
+							if strings.HasPrefix(part.Text, "<!-- TokenCount:") {
+								var inputTokens, outputTokens int
+								fmt.Sscanf(part.Text, "<!-- TokenCount: %d input, %d output -->", &inputTokens, &outputTokens)
+								anyStreamChan <- types.TokenCountEvent{InputTokens: inputTokens, OutputTokens: outputTokens}
+							}
+						}
+					}
+				}
+			} else if sr.Type == types.StreamEventTypeError {
+				anyStreamChan <- types.ErrorEvent{Err: sr.Error}
+			} else if sr.Type == types.StreamEventTypeTokenCount {
+				if tokenEvent, ok := sr.Value.(types.TokenCountEvent); ok {
+					anyStreamChan <- tokenEvent
+				}
+			}
+		}
+	}()
+
+	return anyStreamChan, nil
+}
+
+func (qc *QwenChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
+	eventChan := make(chan types.StreamResponse)
 	go func() {
 		defer close(eventChan)
-		qc.logger.LogDebugf("QwenExecutor: StreamContent goroutine started.")
+		qc.logger.LogDebugf("QwenExecutor: SendMessageStream goroutine started for promptId: %s.", promptId)
 
-		if len(contents) == 0 {
-			qc.logger.LogErrorf("QwenExecutor: StreamContent called with no content.")
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("QwenExecutor: StreamContent called with no content")}
-			return
-		}
+		messages := make([]openai.ChatCompletionMessage, 0)
 
-		messages, err := toOpenAIMessages(contents, qc.logger)
+		// Start with qc.startHistory
+		historyMessages, err := toOpenAIMessages(qc.startHistory, qc.logger)
 		if err != nil {
-			qc.logger.LogErrorf("QwenExecutor: toOpenAIMessages failed: %v", err)
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to convert messages: %w", err)}
+			qc.logger.LogErrorf("QwenExecutor: toOpenAIMessages failed for startHistory: %v", err)
+			eventChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: fmt.Errorf("failed to convert start history: %w", err)}
 			return
 		}
+		messages = append(messages, historyMessages...)
+
+		// Add messages from messageParams.Message (which represents current turn's user input or tool responses)
+		currentTurnContents := []*types.Content{{Parts: messageParams.Message, Role: "user"}} // Assuming messageParams.Message are user parts
+		currentTurnMessages, err := toOpenAIMessages(currentTurnContents, qc.logger)
+		if err != nil {
+			qc.logger.LogErrorf("QwenExecutor: toOpenAIMessages failed for messageParams.Message: %v", err)
+			eventChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: fmt.Errorf("failed to convert current message parts: %w", err)}
+			return
+		}
+		messages = append(messages, currentTurnMessages...)
+
 		qc.logger.LogDebugf("QwenExecutor: Converted %d messages for OpenAI API.", len(messages))
 
 		// Prepend system message if provided
@@ -208,39 +283,54 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 			messages = append([]openai.ChatCompletionMessage{systemMessage}, messages...)
 			qc.logger.LogDebugf("QwenExecutor: Prepended system message.")
 		}
+
 		// Count input tokens
 		var inputText strings.Builder
-		for _, content := range contents {
-			for _, part := range content.Parts {
-				inputText.WriteString(part.Text)
+		for _, msg := range messages {
+			inputText.WriteString(msg.Content)
+			if msg.ToolCalls != nil {
+				for _, tc := range msg.ToolCalls {
+					inputText.WriteString(tc.Function.Arguments)
+				}
 			}
 		}
 		tke, err := tiktoken.GetEncoding("cl100k_base")
 		if err != nil {
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to get tiktoken encoding: %w", err)}
+			eventChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: fmt.Errorf("failed to get tiktoken encoding: %w", err)}
 			return
 		}
 		inputTokens := len(tke.Encode(inputText.String(), nil, nil))
 
 		var openaiTools []openai.Tool
-		if qc.toolRegistry != nil {
-			qc.logger.LogDebugf("QwenExecutor: Building OpenAI tools...")
-			openaiTools = toOpenAITools(qc.toolRegistry, qc.logger)
+		if qc.toolRegistry != nil && messageParams.Tools != nil {
+			qc.logger.LogDebugf("QwenExecutor: Building OpenAI tools from messageParams...")
+			for _, toolDef := range messageParams.Tools {
+				for _, fd := range toolDef.FunctionDeclarations {
+					openaiTools = append(openaiTools, openai.Tool{
+						Type: openai.ToolTypeFunction,
+						Function: &openai.FunctionDefinition{
+							Name:        fd.Name,
+							Description: fd.Description,
+							Parameters:  fd.Parameters,
+						},
+					})
+				}
+			}
 			qc.logger.LogDebugf("QwenExecutor: Finished building %d tools.", len(openaiTools))
 		}
 
 		req := openai.ChatCompletionRequest{
-			Model:    qc.modelName,
+			Model:    modelName,
 			Messages: messages,
 			Stream:   true,
 			Tools:    openaiTools,
 		}
 
 		qc.logger.LogDebugf("QwenExecutor: Calling CreateChatCompletionStream...")
-		stream, err := qc.client.CreateChatCompletionStream(ctx, req)
+		stream, err := qc.client.CreateChatCompletionStream(messageParams.AbortSignal, req)
 		if err != nil {
 			qc.logger.LogErrorf("QwenExecutor: CreateChatCompletionStream failed: %v", err)
-			eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to create Qwen stream: %w", err)}
+			eventChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: fmt.Errorf("failed to create Qwen stream: %w", err)}
 			return
 		}
 		defer stream.Close()
@@ -259,7 +349,7 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 			}
 			if err != nil {
 				qc.logger.LogErrorf("QwenExecutor: Error receiving from stream: %v", err)
-				eventChan <- types.ErrorEvent{Err: fmt.Errorf("error receiving Qwen stream: %w", err)}
+				eventChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: fmt.Errorf("error receiving Qwen stream: %w", err)}
 				return
 			}
 			qc.logger.LogDebugf("QwenExecutor: Received a response chunk.")
@@ -268,7 +358,13 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 				delta := response.Choices[0].Delta
 				if delta.Content != "" {
 					outputText.WriteString(delta.Content)
-					eventChan <- types.Part{Text: delta.Content}
+					eventChan <- types.StreamResponse{Type: types.StreamEventTypeChunk, Value: &types.GenerateContentResponse{
+						Candidates: []*types.Candidate{
+							{
+								Content: &types.Content{Parts: []types.Part{{Text: delta.Content}}},
+							},
+						},
+					}}
 				}
 				if delta.ToolCalls != nil {
 					for _, tc := range delta.ToolCalls {
@@ -302,31 +398,37 @@ func (qc *QwenChat) StreamContent(ctx context.Context, contents ...*types.Conten
 						if jsonArgs != "" {
 							if err := json.Unmarshal([]byte(jsonArgs), &args); err != nil {
 								qc.logger.LogErrorf("QwenExecutor: Failed to unmarshal tool arguments for ID %s: %v", id, err)
-								eventChan <- types.ErrorEvent{Err: fmt.Errorf("failed to unmarshal accumulated tool arguments for ID %s: %w, args: '%s'", id, err, jsonArgs)}
+								eventChan <- types.StreamResponse{Type: types.StreamEventTypeError, Error: fmt.Errorf("failed to unmarshal accumulated tool arguments for ID %s: %w, args: '%s'", id, err, jsonArgs)}
 								continue
 							}
 						}
 						name := toolCallNames[id]
 						qc.logger.LogDebugf("QwenExecutor: Sending complete tool call '%s' (ID: %s)", name, id)
-						eventChan <- types.Part{FunctionCall: &types.FunctionCall{
-							ID:   id,
-							Name: name,
-							Args: args,
+						eventChan <- types.StreamResponse{Type: types.StreamEventTypeChunk, Value: &types.GenerateContentResponse{
+							Candidates: []*types.Candidate{
+								{
+									Content: &types.Content{Parts: []types.Part{{FunctionCall: &types.FunctionCall{
+										ID:   id,
+										Name: name,
+										Args: args,
+									}}}},
+								},
+							},
 						}}
 						delete(toolCallBuffers, id)
 						delete(toolCallNames, id)
 					}
 				}
 			}
-		}
+		} // Closes `for { response, err := stream.Recv() ... }`
 		outputTokens := len(tke.Encode(outputText.String(), nil, nil))
-		eventChan <- types.TokenCountEvent{InputTokens: inputTokens, OutputTokens: outputTokens}
+		eventChan <- types.StreamResponse{Type: types.StreamEventTypeTokenCount, Value: types.TokenCountEvent{InputTokens: inputTokens, OutputTokens: outputTokens}}
 		qc.logger.LogDebugf("QwenExecutor: Finished processing stream.")
 	}()
 
 	return eventChan, nil
 }
-// SetHistory sets the chat history for QwenChat.
+
 func (qc *QwenChat) SetHistory(history []*types.Content) error {
 	qc.startHistory = history
 	return nil
@@ -389,10 +491,6 @@ func (qc *QwenChat) ExecuteTool(ctx context.Context, fc *types.FunctionCall) (ty
 	}
 
 	return tool.Execute(ctx, fc.Args)
-}
-
-func (qc *QwenChat) SendMessageStream(modelName string, messageParams types.MessageParams, promptId string) (<-chan types.StreamResponse, error) {
-	return nil, fmt.Errorf("SendMessageStream not implemented for QwenChat")
 }
 
 func (qc *QwenChat) ListModels() ([]string, error) {
@@ -465,22 +563,61 @@ func (qc *QwenChat) CompressChat(history []*types.Content, promptId string) (*ty
 
 // GenerateContentWithTools is a placeholder implementation for QwenChat.
 func (qc *QwenChat) GenerateContentWithTools(ctx context.Context, history []*types.Content, tools []types.Tool) (*types.GenerateContentResponse, error) {
-	// Convert []types.Tool to []*types.ToolDefinition
-	toolDefinitions := make([]*types.ToolDefinition, len(tools))
-	for i, tool := range tools {
-		toolDefinitions[i] = &types.ToolDefinition{
-			FunctionDeclarations: []*types.FunctionDeclaration{
-				{
-					Name:        tool.Name(),
-					Description: tool.Description(),
-					Parameters:  tool.Parameters(),
-				},
-			},
-		}
+	// Convert history to OpenAI messages
+	messages, err := toOpenAIMessages(history, qc.logger)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert history for GenerateContentWithTools: %w", err)
 	}
-	// This would then use the toolDefinitions
-	// For now, returning not implemented, but the conversion is done.
-	return nil, fmt.Errorf("GenerateContentWithTools not implemented for QwenChat")
+
+	// Convert types.Tool to openai.Tool
+	openaiTools := make([]openai.Tool, 0, len(tools))
+	for _, t := range tools {
+		openaiTools = append(openaiTools, openai.Tool{
+			Type: openai.ToolTypeFunction,
+			Function: &openai.FunctionDefinition{
+				Name:        t.Name(),
+				Description: t.Description(),
+				Parameters:  t.Parameters(),
+			},
+		})
+	}
+
+	// Add system instruction if present
+	if qc.generationConfig.SystemInstruction != "" {
+		systemMessage := openai.ChatCompletionMessage{
+			Role:    openai.ChatMessageRoleSystem,
+			Content: qc.generationConfig.SystemInstruction,
+		}
+		messages = append([]openai.ChatCompletionMessage{systemMessage}, messages...)
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model:    qc.modelName,
+		Messages: messages,
+		Tools:    openaiTools,
+	}
+
+	resp, err := qc.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Qwen chat completion with tools: %w", err)
+	}
+
+	if len(resp.Choices) == 0 {
+		return nil, fmt.Errorf("no response from Qwen API with tools")
+	}
+
+	genericContent, err := fromOpenAIMessage(resp.Choices[0].Message)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert openai message to generic content after tool call: %w", err)
+	}
+
+	return &types.GenerateContentResponse{
+		Candidates: []*types.Candidate{
+			{
+				Content: genericContent,
+			},
+		},
+	}, nil
 }
 
 // SetUserConfirmationChannel is a no-op for QwenChat.
