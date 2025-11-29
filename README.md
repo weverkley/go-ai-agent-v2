@@ -209,6 +209,10 @@ You can also override any of the settings in the `settings.json` file with envir
 - Loop detection tool.
 - Integrate agents.
 
+## Contributing
+
+We welcome contributions to the GAIA Project! Please feel free to open issues or submit pull requests. Adhere to the existing coding style and conventions.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
