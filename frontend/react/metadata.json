@@ -1,0 +1,5 @@
+{
+  "name": "GO AI Agent V2 Client",
+  "description": "A modern, dark-themed React client for interacting with the GO AI Agent V2 via WebSocket, supporting real-time streaming, tool execution visualization, and dynamic state handling.",
+  "requestFramePermissions": []
+}

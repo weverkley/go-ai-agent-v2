@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GO Ai Agent V2 - Client</title>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        body { background-color: #0b0f19; color: white; }
+        .typing-dot { animation: bounce 1.4s infinite ease-in-out both; }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const WS_URL = 'ws://localhost:8080/ws';
+
+        const App = () => {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [isConnected, setIsConnected] = useState(false);
+            const [agentState, setAgentState] = useState('idle'); // idle, thinking, streaming
+            const ws = useRef(null);
+            const messagesEndRef = useRef(null);
+
+            useEffect(() => {
+                connectWebSocket();
+                return () => { if (ws.current) ws.current.close(); };
+            }, []);
+
+            const connectWebSocket = () => {
+                ws.current = new WebSocket(WS_URL);
+
+                ws.current.onopen = () => {
+                    setIsConnected(true);
+                    addSystemMessage('Connected to GO Ai Agent V2');
+                };
+
+                ws.current.onclose = () => {
+                    setIsConnected(false);
+                    addErrorMessage('Connection lost. Refresh to reconnect.');
+                };
+
+                ws.current.onerror = (err) => {
+                    console.error('WS Error:', err);
+                    setIsConnected(false);
+                };
+
+                ws.current.onmessage = (event) => {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleServerEvent(data);
+                    } catch (e) {
+                        console.error('Parse error', e);
+                    }
+                };
+            };
+
+            const handleServerEvent = (data) => {
+                // Log for debugging
+                console.log("Received:", data.type, data.payload);
+
+                switch (data.type) {
+                    case 'streaming_started':
+                        setAgentState('streaming');
+                        // Initialize empty AI message
+                        setMessages(prev => [...prev, { type: 'ai', content: '' }]);
+                        break;
+
+                    case 'thinking':
+                        setAgentState('thinking');
+                        break;
+
+                    case 'chunk':
+                        setAgentState('streaming');
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            const lastMsg = newMsgs[newMsgs.length - 1];
+                            if (lastMsg && lastMsg.type === 'ai') {
+                                newMsgs[newMsgs.length - 1] = {
+                                    ...lastMsg,
+                                    content: lastMsg.content + (data.payload.text || "") // Handle text
+                                };
+                            }
+                            return newMsgs;
+                        });
+                        break;
+
+                    case 'tool_call_start':
+                        // Fix: Using PascalCase keys from your log (ToolName, Args, ToolCallID)
+                        setMessages(prev => [...prev, {
+                            type: 'tool',
+                            status: 'running',
+                            id: data.payload.ToolCallID,
+                            name: data.payload.ToolName,
+                            args: JSON.stringify(data.payload.Args) // Args is an object in your log
+                        }]);
+                        break;
+
+                    case 'tool_call_end':
+                        // Fix: Using PascalCase keys (Result, Err, ToolCallID)
+                        setMessages(prev => {
+                            const newMsgs = [...prev];
+                            // Match by ID if possible, otherwise find last running tool
+                            const index = newMsgs.findIndex(m => m.type === 'tool' && m.id === data.payload.ToolCallID);
+                            
+                            if (index !== -1) {
+                                newMsgs[index] = {
+                                    ...newMsgs[index],
+                                    status: 'complete',
+                                    result: data.payload.Result,
+                                    error: data.payload.Err
+                                };
+                            }
+                            return newMsgs;
+                        });
+                        // Reset to thinking after tool use, usually agent thinks again
+                        setAgentState('thinking'); 
+                        break;
+                    
+                    case 'final_response':
+                        setAgentState('idle');
+                        // Option: Ensure final content matches if chunks were missed
+                        if (data.payload.Content) {
+                            setMessages(prev => {
+                                const newMsgs = [...prev];
+                                const lastMsg = newMsgs[newMsgs.length - 1];
+                                if (lastMsg && lastMsg.type === 'ai') {
+                                    // If strict consistency is needed, you could overwrite here
+                                    // newMsgs[newMsgs.length - 1].content = data.payload.Content;
+                                }
+                                return newMsgs;
+                            });
+                        }
+                        break;
+
+                    case 'error':
+                        setAgentState('idle');
+                        addErrorMessage(data.payload.message || "Unknown error");
+                        break;
+                }
+            };
+
+            const addSystemMessage = (text) => setMessages(prev => [...prev, { type: 'system', content: text }]);
+            const addErrorMessage = (text) => setMessages(prev => [...prev, { type: 'error', content: text }]);
+
+            useEffect(() => {
+                messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages, agentState]);
+
+            const sendMessage = (e) => {
+                e.preventDefault();
+                if (!input.trim() || !isConnected) return;
+                setMessages(prev => [...prev, { type: 'user', content: input }]);
+                ws.current.send(JSON.stringify({ prompt: input }));
+                setInput('');
+                setAgentState('thinking'); // Assume thinking immediately
+            };
+
+            return (
+                <div className="flex flex-col h-screen max-w-4xl mx-auto border-x border-gray-800 shadow-2xl font-sans">
+                    
+                    {/* Header */}
+                    <header className="bg-gray-900/90 backdrop-blur p-4 border-b border-gray-800 flex justify-between items-center sticky top-0 z-10">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-900/20">
+                                <i className="fa-solid fa-cube text-lg"></i>
+                            </div>
+                            <div>
+                                <h1 className="font-bold text-gray-100 tracking-tight">Agent Interface</h1>
+                                <div className="flex items-center gap-2">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+                                    <span className="text-xs text-gray-500">{isConnected ? 'System Online' : 'Disconnected'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* Chat Messages */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-[#0b0f19]">
+                        {messages.length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-600 space-y-3">
+                                <div className="w-16 h-16 rounded-2xl bg-gray-800 flex items-center justify-center">
+                                    <i className="fa-solid fa-bolt text-2xl text-gray-500"></i>
+                                </div>
+                                <p className="text-sm font-medium">System Ready</p>
+                            </div>
+                        )}
+
+                        {messages.map((msg, index) => (
+                            <div key={index} className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                
+                                {/* Avatar */}
+                                {msg.type !== 'user' && msg.type !== 'system' && (
+                                    <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center mr-3 mt-1 flex-shrink-0 border border-gray-700">
+                                        <i className={`text-xs fa-solid ${msg.type === 'tool' ? 'fa-terminal text-yellow-500' : 'fa-robot text-blue-400'}`}></i>
+                                    </div>
+                                )}
+
+                                {/* Bubble */}
+                                <div className={`
+                                    max-w-[85%] rounded-xl px-5 py-3 text-[15px] leading-7 shadow-sm
+                                    ${msg.type === 'user' ? 'bg-blue-600 text-white' : ''}
+                                    ${msg.type === 'ai' ? 'bg-gray-800 text-gray-200 border border-gray-700' : ''}
+                                    ${msg.type === 'tool' ? 'bg-[#161b22] border border-gray-700 w-full font-mono text-xs' : ''}
+                                    ${msg.type === 'system' ? 'w-full text-center text-gray-500 text-xs bg-transparent shadow-none p-0 my-2' : ''}
+                                    ${msg.type === 'error' ? 'bg-red-900/20 border border-red-800 text-red-300' : ''}
+                                `}>
+                                    
+                                    {/* Tool Specific UI */}
+                                    {msg.type === 'tool' && (
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center justify-between border-b border-gray-700 pb-2 mb-1">
+                                                <span className="text-yellow-500 font-bold"><i className="fa-solid fa-code mr-2"></i>{msg.name}</span>
+                                                <span className="text-gray-500">{msg.status === 'running' ? 'Running...' : 'Completed'}</span>
+                                            </div>
+                                            <div className="text-gray-400">
+                                                <span className="text-gray-600 select-none">Input: </span> {msg.args}
+                                            </div>
+                                            {msg.status === 'complete' && (
+                                                <div className="mt-2 pt-2 border-t border-gray-700/50 text-green-400">
+                                                    <span className="text-gray-600 select-none">Output: </span> 
+                                                    {msg.result}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {/* Standard Text */}
+                                    <div className="whitespace-pre-wrap">{msg.content}</div>
+                                </div>
+                            </div>
+                        ))}
+
+                        {/* States: Thinking or Typing */}
+                        {agentState !== 'idle' && (
+                            <div className="flex justify-start items-center ml-11">
+                                <div className="bg-gray-800/50 rounded-full px-4 py-2 flex items-center gap-2 border border-gray-700/50">
+                                    {agentState === 'thinking' ? (
+                                        <>
+                                            <i className="fa-solid fa-microchip text-yellow-500 animate-pulse text-xs"></i>
+                                            <span className="text-xs text-gray-400">Processing...</span>
+                                        </>
+                                    ) : (
+                                        <div className="flex gap-1">
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full typing-dot"></div>
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full typing-dot"></div>
+                                            <div className="w-1.5 h-1.5 bg-blue-500 rounded-full typing-dot"></div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        <div ref={messagesEndRef}></div>
+                    </div>
+
+                    {/* Input */}
+                    <div className="p-4 bg-[#0b0f19] border-t border-gray-800">
+                        <form onSubmit={sendMessage} className="relative max-w-4xl mx-auto">
+                            <input 
+                                type="text" 
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                disabled={!isConnected}
+                                placeholder="Send instructions..."
+                                className="w-full bg-[#161b22] text-white rounded-xl border border-gray-700 pl-4 pr-12 py-3.5 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all placeholder-gray-600"
+                            />
+                            <button 
+                                type="submit"
+                                disabled={!input.trim() || !isConnected} 
+                                className="absolute right-2 top-2 bottom-2 aspect-square bg-blue-600 hover:bg-blue-500 text-white rounded-lg flex items-center justify-center transition-all disabled:bg-transparent disabled:text-gray-600"
+                            >
+                                <i className="fa-solid fa-arrow-up"></i>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

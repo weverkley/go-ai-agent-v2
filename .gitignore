@@ -1,8 +1,5 @@
 # Ignore all files
 docs/*
-!docs/AGENT_REFACTOR_PLAN.md
-!docs/DYNAMIC_EXECUTOR_REFACTOR.md
-!docs/NEW_TOOLS_IMPLEMENTATION_PLAN.md
 !docs/privacy_notice.md
 vendor
 .goaiagent/
