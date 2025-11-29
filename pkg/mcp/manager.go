@@ -30,35 +30,6 @@ func init() {
 	}
 }
 
-// Remove mockableMcpClient as it's not needed in manager.go
-/*
-type mockableMcpClient {
-	name string
-	connectFunc func(timeout time.Duration) error
-	closeFunc func() error
-	getToolsFunc func() ([]types.Tool, error)
-}
-
-func (m *mockableMcpClient) Connect(timeout time.Duration) error {
-	return m.connectFunc(timeout)
-}
-
-func (m *mockableMcpClient) Close() error {
-	if m.closeFunc != nil {
-		return m.closeFunc()
-	}
-	return nil
-}
-
-func (m *mockableMcpClient) GetTools() ([]types.Tool, error) {
-	return m.getToolsFunc()
-}
-
-func (m *mockableMcpClient) Name() string {
-	return m.name
-}
-*/
-
 // McpClientManager manages the lifecycle of multiple MCP clients and local servers.
 type McpClientManager struct {
 	mu             sync.RWMutex                  // Mutex to protect concurrent access
